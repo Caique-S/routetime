@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '../lib/mongodb';
+import { getDatabase } from '../../lib/mongodb';
 
 export async function POST(request: NextRequest) {
   console.log('=== API CARREGAMENTO: Criando novo carregamento ===');

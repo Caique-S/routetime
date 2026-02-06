@@ -39,7 +39,7 @@ export default function ExpedicaoPage() {
     setError("");
 
     try {
-      const response = await fetch(`/expedicao/api/operador?id=${id}`);
+      const response = await fetch(`/api/operador?id=${id}`);
       const data = await response.json();
 
       if (!response.ok) {
