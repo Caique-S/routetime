@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { QrCode, LogIn, Truck, Scan } from 'lucide-react';
-import OperatorModal from './components/OperatorModal';
-import QRScanner from '../app/components/QrScanner';
+import { useState, useEffect } from "react";
+import { QrCode, LogIn, Truck, Scan } from "lucide-react";
+import OperatorModal from "../../components/OperatorModal";
+import QRScanner from "../../components/QrScanner";
 
 interface OperadorData {
   id: string;
@@ -11,17 +11,17 @@ interface OperadorData {
     nome: string;
     cargo: string;
     dataDeCadastro: string;
+    codigo?: string;
   };
-  registro: {};
 }
 
 export default function ExpedicaoPage() {
-  const [operadorId, setOperadorId] = useState('');
+  const [operadorId, setOperadorId] = useState("");
   const [operadorData, setOperadorData] = useState<OperadorData | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [isAnimating, setIsAnimating] = useState(false);
 
   // Animação de entrada
@@ -31,32 +31,33 @@ export default function ExpedicaoPage() {
 
   const buscarOperador = async (id: string) => {
     if (!id.trim()) {
-      setError('Por favor, digite o código do operador');
+      setError("Por favor, digite o código do operador");
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       const response = await fetch(`/expedicao/api/operador?id=${id}`);
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erro ao buscar operador');
+        throw new Error(data.error || "Erro ao buscar operador");
       }
 
       setOperadorData(data);
       setShowModal(true);
-      setOperadorId('');
+      setOperadorId("");
     } catch (err: any) {
-      setError(err.message || 'Operador não encontrado');
+      setError(err.message || "Operador não encontrado");
     } finally {
       setLoading(false);
     }
   };
 
   const handleQRScan = (result: string) => {
+    // O QR Code deve conter o _id do operador
     setOperadorId(result);
     buscarOperador(result);
   };
@@ -75,7 +76,9 @@ export default function ExpedicaoPage() {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
       </div>
 
-      <div className={`max-w-md w-full space-y-8 z-10 transition-all duration-700 ${isAnimating ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+      <div
+        className={`max-w-md w-full space-y-8 z-10 transition-all duration-700 ${isAnimating ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
+      >
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center space-x-3">
@@ -89,17 +92,19 @@ export default function ExpedicaoPage() {
               Expedição
             </h1>
           </div>
-          <p className="text-gray-600 text-sm">Sistema de Controle de Operações</p>
+          <p className="text-gray-600 text-sm">
+            Sistema de Controle de Operações
+          </p>
         </div>
 
         {/* Login Card */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-8 space-y-6 border border-gray-200/50">
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
-              Código do Operador
+              ID do Operador
             </label>
             <p className="text-xs text-gray-500">
-              Digite o código único ou escaneie o QR Code
+              Digite o ID (ObjectId) ou escaneie o QR Code
             </p>
           </div>
 
@@ -110,12 +115,12 @@ export default function ExpedicaoPage() {
                 value={operadorId}
                 onChange={(e) => {
                   setOperadorId(e.target.value);
-                  setError('');
+                  setError("");
                 }}
                 placeholder="Ex: 507f1f77bcf86cd799439011"
                 className="w-full px-4 py-3 pl-4 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none text-gray-900 placeholder-gray-400 bg-white/50 backdrop-blur-sm group-hover:border-blue-400"
               />
-              
+
               <button
                 type="button"
                 onClick={() => setShowScanner(true)}
@@ -171,7 +176,7 @@ export default function ExpedicaoPage() {
         {/* Quick Help */}
         <div className="text-center">
           <p className="text-sm text-gray-500">
-            Precisa de ajuda?{' '}
+            Precisa de ajuda?{" "}
             <button className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
               Contate o administrador
             </button>
@@ -212,9 +217,23 @@ export default function ExpedicaoPage() {
         }
 
         @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-          20%, 40%, 60%, 80% { transform: translateX(5px); }
+          0%,
+          100% {
+            transform: translateX(0);
+          }
+          10%,
+          30%,
+          50%,
+          70%,
+          90% {
+            transform: translateX(-5px);
+          }
+          20%,
+          40%,
+          60%,
+          80% {
+            transform: translateX(5px);
+          }
         }
 
         .animate-blob {

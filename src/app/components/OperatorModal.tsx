@@ -2,6 +2,7 @@
 
 import { CheckCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface OperatorModalProps {
   isOpen: boolean;
@@ -10,22 +11,27 @@ interface OperatorModalProps {
     nome: string;
     cargo: string;
   } | null;
-  
 }
 
 export default function OperatorModal({ isOpen, onClose, operador }: OperatorModalProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && operador) {
       setIsVisible(true);
+      
       const timer = setTimeout(() => {
         setIsVisible(false);
-        setTimeout(onClose, 300);
+        setTimeout(() => {
+          // Redireciona para a página de dispatch
+          router.push('/expedicao/operacao');
+        }, 300);
       }, 2000);
+      
       return () => clearTimeout(timer);
     }
-  }, [isOpen, onClose]);
+  }, [isOpen, operador, router]);
 
   if (!isOpen && !isVisible) return null;
 
@@ -43,30 +49,25 @@ export default function OperatorModal({ isOpen, onClose, operador }: OperatorMod
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col items-center text-center space-y-6">
-          {/* Ícone animado */}
           <div className="relative">
             <div className="absolute inset-0 bg-green-100 rounded-full animate-ping"></div>
             <CheckCircle className="w-20 h-20 text-green-600 relative z-10 animate-bounce" />
           </div>
           
-          {/* Título com animação de entrada */}
           <div className="space-y-2">
             <h2 className="text-3xl font-bold text-gray-800 animate-slide-up">
               Bem vindo
             </h2>
             
-            {/* Mensagem com atraso na animação */}
             <p className="text-lg text-gray-600 animate-slide-up-delayed">
               Operador <span className="font-semibold text-blue-600">{operador?.nome}</span>
             </p>
             
-            {/* Cargo com animação */}
             <p className="text-sm text-gray-500 animate-fade-in">
               {operador?.cargo}
             </p>
           </div>
 
-          {/* Barra de progresso */}
           <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
             <div className="bg-green-600 h-full rounded-full animate-progress"></div>
           </div>
