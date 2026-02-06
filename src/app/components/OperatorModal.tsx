@@ -10,6 +10,7 @@ interface OperatorModalProps {
     nome: string;
     cargo: string;
   } | null;
+  
 }
 
 export default function OperatorModal({ isOpen, onClose, operador }: OperatorModalProps) {
