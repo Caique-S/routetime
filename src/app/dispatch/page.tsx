@@ -36,7 +36,7 @@ export default function Home() {
   const handleLogout = () => {
     localStorage.removeItem("operador_data");
     localStorage.removeItem("operador_nome");
-    router.push("/expedicao");
+    router.push("/");
   };
 
   const handleCardHover = (index: number) => {

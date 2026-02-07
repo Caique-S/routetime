@@ -1,255 +1,325 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { QrCode, LogIn, Truck, Scan } from "lucide-react";
-import OperatorModal from "../../components/OperatorModal";
-import QRScanner from "../../components/QrScanner";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { 
+  ArrowLeft, 
+  RefreshCw, 
+  MapPin, 
+  Building, 
+  Users, 
+  Truck,
+  Calendar,
+  ChevronRight,
+  AlertCircle
+} from 'lucide-react';
 
-interface OperadorData {
-  id: string;
-  operador: {
-    nome: string;
-    cargo: string;
-    dataDeCadastro: string;
-    codigo?: string;
-  };
+interface UploadData {
+  _id: string;
+  fileName: string;
+  uploadDate: string;
+  data: any[];
+  filterColumn?: string;
+  filterValue?: string;
 }
 
-export default function ExpedicaoPage() {
-  const [operadorId, setOperadorId] = useState("");
-  const [operadorData, setOperadorData] = useState<OperadorData | null>(null);
-  const [showScanner, setShowScanner] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [isAnimating, setIsAnimating] = useState(false);
+interface DestinoInfo {
+  nome: string;
+  facility: string;
+  motoristasCount: number;
+  veiculosCount: number;
+  ultimoCarregamento?: string;
+}
 
-  // Animação de entrada
+export default function NovoCarregamentoPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [uploadData, setUploadData] = useState<UploadData | null>(null);
+  const [destinos, setDestinos] = useState<DestinoInfo[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
   useEffect(() => {
-    setIsAnimating(true);
+    fetchUploadData();
   }, []);
 
-  const buscarOperador = async (id: string) => {
-    if (!id.trim()) {
-      setError("Por favor, digite o código do operador");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
+  const fetchUploadData = async () => {
     try {
-      const response = await fetch(`/api/operador?id=${id}`);
-      const data = await response.json();
+      setLoading(true);
+      const response = await fetch('/api/upload?limit=1');
+      const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Erro ao buscar operador");
+      if (result.success && result.data.length > 0) {
+        const latestUpload = result.data[0];
+        setUploadData(latestUpload);
+
+        // Extrair destinos únicos do CSV
+        const destinosMap = new Map<string, DestinoInfo>();
+
+        latestUpload.data.forEach((item: any) => {
+          const destino = item.destino || item.Destino;
+          const facility = item.Facility || item.facility || latestUpload.filterValue || 'N/A';
+
+          if (destino) {
+            if (!destinosMap.has(destino)) {
+              destinosMap.set(destino, {
+                nome: destino,
+                facility: facility,
+                motoristasCount: 1,
+                veiculosCount: item['Tipo de veículo'] ? 1 : 0,
+                ultimoCarregamento: item['Data de início'] || new Date().toISOString()
+              });
+            } else {
+              const existing = destinosMap.get(destino)!;
+              destinosMap.set(destino, {
+                ...existing,
+                motoristasCount: existing.motoristasCount + 1,
+                veiculosCount: existing.veiculosCount + (item['Tipo de veículo'] ? 1 : 0)
+              });
+            }
+          }
+        });
+
+        const destinosArray = Array.from(destinosMap.values());
+        setDestinos(destinosArray);
       }
-
-      setOperadorData(data);
-      setShowModal(true);
-      setOperadorId("");
-    } catch (err: any) {
-      setError(err.message || "Operador não encontrado");
+    } catch (error) {
+      console.error('Erro ao buscar dados:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const handleQRScan = (result: string) => {
-    // O QR Code deve conter o _id do operador
-    setOperadorId(result);
-    buscarOperador(result);
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchUploadData();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    buscarOperador(operadorId);
+  const handleSelectDestino = (destino: DestinoInfo) => {
+    router.push(`/carregamento/destino/${encodeURIComponent(destino.nome)}?facility=${encodeURIComponent(destino.facility)}`);
   };
 
-  return (
-    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center p-4">
-      {/* Background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-green-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
-      </div>
+  const handleBack = () => {
+    router.back();
+  };
 
-      <div
-        className={`max-w-md w-full space-y-8 z-10 transition-all duration-700 ${isAnimating ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}
-      >
-        {/* Header */}
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center space-x-3">
-            <div className="relative">
-              <div className="absolute inset-0 bg-blue-500 rounded-lg transform rotate-6 opacity-20"></div>
-              <div className="relative bg-blue-600 p-3 rounded-lg shadow-lg">
-                <Truck className="w-8 h-8 text-white" />
-              </div>
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-              Expedição
-            </h1>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 safe-area">
+        {/* Header Skeleton */}
+        <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-200/50 pt-safe-top">
+          <div className="px-4 h-16 flex items-center justify-between">
+            <div className="w-20 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
           </div>
-          <p className="text-gray-600 text-sm">
-            Sistema de Controle de Operações
-          </p>
         </div>
 
-        {/* Login Card */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-8 space-y-6 border border-gray-200/50">
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              ID do Operador
-            </label>
-            <p className="text-xs text-gray-500">
-              Digite o ID (ObjectId) ou escaneie o QR Code
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="relative group">
-              <input
-                type="text"
-                value={operadorId}
-                onChange={(e) => {
-                  setOperadorId(e.target.value);
-                  setError("");
-                }}
-                placeholder="Ex: 507f1f77bcf86cd799439011"
-                className="w-full px-4 py-3 pl-4 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none text-gray-900 placeholder-gray-400 bg-white/50 backdrop-blur-sm group-hover:border-blue-400"
-              />
-
-              <button
-                type="button"
-                onClick={() => setShowScanner(true)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 hover:bg-blue-50 rounded-lg transition-colors group/scan"
-                title="Escanear QR Code"
-              >
-                <Scan className="w-5 h-5 text-blue-600 group-hover/scan:scale-110 transition-transform" />
-              </button>
-            </div>
-
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl animate-shake">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                  <p className="text-sm text-red-600">{error}</p>
+        {/* Content Skeleton */}
+        <div className="px-4 py-6">
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white/90 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-gray-200/50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-32 h-6 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="w-6 h-6 bg-gray-200 rounded animate-pulse"></div>
                 </div>
+                <div className="space-y-2">
+                  <div className="w-24 h-4 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="flex gap-4">
+                    <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="w-16 h-8 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 safe-area">
+      {/* Header Fixo */}
+      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm border-b border-gray-200/50 pt-safe-top">
+        <div className="px-4 h-16 flex items-center justify-between">
+          {/* Botão Voltar */}
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 text-gray-700 hover:text-gray-900 active:scale-95 transition-all"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-medium">Voltar</span>
+          </button>
+
+          {/* Título e Badge de Facility */}
+          <div className="flex items-center gap-3">
+            {uploadData?.filterValue && (
+              <div className="hidden sm:flex items-center gap-1 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full shadow-sm">
+                <Building className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-700">
+                  {uploadData.filterValue}
+                </span>
               </div>
             )}
 
+            {/* Botão Atualizar */}
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-linear-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-blue-400 disabled:to-blue-500 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 group shadow-lg hover:shadow-xl disabled:shadow"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 active:scale-95 transition-all disabled:opacity-50 shadow-sm"
+              aria-label="Atualizar dados"
             >
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Validando...</span>
-                </>
-              ) : (
-                <>
-                  <LogIn className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  <span>Acessar Sistema</span>
-                </>
-              )}
+              <RefreshCw className={`w-4 h-4 text-gray-700 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
-          </form>
+          </div>
+        </div>
 
-          <div className="pt-6 border-t border-gray-100">
-            <div className="flex items-center justify-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-gray-500">Sistema Online</span>
-              </div>
-              <span className="text-gray-300">•</span>
-              <span className="text-xs text-gray-500">
-                v1.0 • {new Date().getFullYear()}
+        {/* Badge de Facility Mobile */}
+        {uploadData?.filterValue && (
+          <div className="px-4 pb-3 sm:hidden">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full shadow-sm">
+              <Building className="w-3.5 h-3.5 text-blue-600" />
+              <span className="text-xs font-medium text-blue-700">
+                Facility: {uploadData.filterValue}
               </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Conteúdo Principal */}
+      <div className="px-4 py-6">
+        {/* Banner Informativo */}
+        <div className="mb-6">
+          <div className="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200/50 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-linear-to-br from-blue-100 to-blue-50 rounded-full flex items-center justify-center shrink-0 border border-blue-200/50">
+                <MapPin className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="font-bold text-gray-900 mb-1">Selecione um destino</h2>
+                <p className="text-sm text-gray-600">
+                  {destinos.length > 0 
+                    ? `${destinos.length} destinos disponíveis para carregamento`
+                    : 'Nenhum destino encontrado. Faça upload de um arquivo CSV primeiro.'
+                  }
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Quick Help */}
-        <div className="text-center">
-          <p className="text-sm text-gray-500">
-            Precisa de ajuda?{" "}
-            <button className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
-              Contate o administrador
+        {/* Lista de Destinos */}
+        {destinos.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-20 h-20 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-200/50 shadow-sm">
+              <AlertCircle className="w-10 h-10 text-gray-400" />
+            </div>
+            <h3 className="font-bold text-gray-900 mb-2">Nenhum destino encontrado</h3>
+            <p className="text-gray-600 mb-6">
+              Faça upload de um arquivo CSV com dados de carregamento primeiro.
+            </p>
+            <button
+              onClick={() => router.push('/carregamento/upload')}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-full hover:from-blue-700 hover:to-blue-800 active:scale-95 transition-all shadow-md hover:shadow-lg"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Ir para Upload
             </button>
-          </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {destinos.map((destino, index) => (
+              <div
+                key={index}
+                onClick={() => handleSelectDestino(destino)}
+                className="group bg-white/90 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-gray-200/50 hover:border-blue-300 hover:shadow-md active:scale-[0.99] transition-all cursor-pointer"
+              >
+                {/* Cabeçalho do Card */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 bg-linear-to-br from-blue-100 to-blue-50 rounded-xl flex items-center justify-center border border-blue-200/50">
+                      <MapPin className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-lg">{destino.nome}</h3>
+                      <div className="flex items-center gap-1 text-xs text-gray-600">
+                        <Building className="w-3 h-3" />
+                        <span>{destino.facility}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+                </div>
+
+                {/* Informações do Destino */}
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-50/50 rounded-lg border border-gray-200/50">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">{destino.motoristasCount}</div>
+                      <div className="text-xs text-gray-600">Motoristas</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-50/50 rounded-lg border border-gray-200/50">
+                    <Truck className="w-4 h-4 text-green-600" />
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">{destino.veiculosCount}</div>
+                      <div className="text-xs text-gray-600">Veículos</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Data do Último Carregamento */}
+                {destino.ultimoCarregamento && (
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>
+                      Último: {new Date(destino.ultimoCarregamento).toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-8 pt-6 border-t border-gray-300/50">
+          <div className="text-center">
+            <p className="text-xs text-gray-600">
+              {uploadData ? (
+                <>
+                  Dados carregados de: <span className="font-medium text-gray-800">{uploadData.fileName}</span>
+                  <br />
+                  Última atualização: <span className="font-medium text-gray-800">
+                    {new Date(uploadData.uploadDate).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </>
+              ) : (
+                'Faça upload de um arquivo CSV para ver os destinos disponíveis'
+              )}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Scanner */}
-      {showScanner && (
-        <QRScanner
-          onScan={handleQRScan}
-          onClose={() => setShowScanner(false)}
-        />
-      )}
-
-      {/* Welcome Modal */}
-      <OperatorModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        operador={operadorData?.operador || null}
-      />
-
-      {/* Custom Animations */}
+      {/* Estilos Mobile-Specific */}
       <style jsx global>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
+        /* Melhorias para touch em dispositivos móveis */
+        @media (max-width: 640px) {
+          .safe-area {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
           }
         }
 
-        @keyframes shake {
-          0%,
-          100% {
-            transform: translateX(0);
+        /* Prevenir zoom em inputs em iOS */
+        @media screen and (max-width: 767px) {
+          input, select, textarea {
+            font-size: 16px !important;
           }
-          10%,
-          30%,
-          50%,
-          70%,
-          90% {
-            transform: translateX(-5px);
-          }
-          20%,
-          40%,
-          60%,
-          80% {
-            transform: translateX(5px);
-          }
-        }
-
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
         }
       `}</style>
     </div>

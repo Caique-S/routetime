@@ -1,12 +1,10 @@
 // next.config.js - VERSÃO CORRIGIDA
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import { NextConfig } from "next"
+
+const nextConfig : NextConfig = {
   reactCompiler: true,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   // Adicione outras configurações aqui
 }
 
-module.exports = nextConfig
+export default nextConfig

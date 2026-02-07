@@ -1,69 +1,45 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { 
   ArrowLeft, 
   Users, 
   Truck, 
   Calendar, 
   MapPin,
-  CheckCircle,
   ChevronRight,
   Download,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
-import Link from 'next/link';
 
-// Interface completa do CSVData
-interface CSVData {
-  _id: string;
-  fileName: string;
-  fileSize: number;
-  uploadDate: string;
-  data: Array<{
-    Facility?: string;
-    destino?: string;
-    'Nome do motorista principal'?: string;
-    'Tipo de veículo'?: string;
-    'Veículo de tração'?: string;
-    'Data de início'?: string;
-    [key: string]: any;
-  }>;
-  status: string;
-  totalRecords: number;
-  processedRecords: number;
-  filterColumn?: string;
-  filterValue?: string;
-  metadata?: {
-    headers: string[];
-    delimiter: string;
-    encoding: string;
-    lineBreak: string;
-  };
-}
-
-interface MotoristaInfo {
-  nome: string;
-  tipoVeiculo?: string;
-  veiculoTracao?: string;
-  dataInicio?: string;
-}
-
-export default function DestinoPage() {
+// Componente que usa useSearchParams, envolto em Suspense
+function DestinoContent() {
   const router = useRouter();
   const params = useParams();
-  const searchParams = useSearchParams();
+  const [searchParams, setSearchParams] = useState<URLSearchParams | null>(null);
   const destino = params.destino as string;
-  const facility = searchParams.get('facility') || 'SBA04';
   
   const [loading, setLoading] = useState(true);
-  const [csvData, setCsvData] = useState<CSVData | null>(null);
-  const [motoristas, setMotoristas] = useState<MotoristaInfo[]>([]);
+  const [csvData, setCsvData] = useState<any>(null);
+  const [motoristas, setMotoristas] = useState<any[]>([]);
+  
+  // Obter query params de forma segura
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      setSearchParams(params);
+    }
+  }, []);
+  
+  const facility = searchParams?.get('facility') || 'SBA04';
 
   useEffect(() => {
-    fetchDestinoData();
-  }, [destino, facility]);
+    if (destino && searchParams) {
+      fetchDestinoData();
+    }
+  }, [destino, facility, searchParams]);
 
   const fetchDestinoData = async () => {
     try {
@@ -71,25 +47,14 @@ export default function DestinoPage() {
       const response = await fetch('/api/upload?limit=1');
       const result = await response.json();
 
-      console.log('API Response:', result);
-
       if (result.success && result.data.length > 0) {
         const latestUpload = result.data[0];
         setCsvData(latestUpload);
-
-        console.log('CSV Data loaded:', {
-          fileName: latestUpload.fileName,
-          uploadDate: latestUpload.uploadDate,
-          totalRecords: latestUpload.totalRecords,
-          filterValue: latestUpload.filterValue
-        });
 
         // Filtrar dados para este destino e facility
         const filteredData = latestUpload.data.filter((item: any) => 
           item.Facility === facility && item.destino === destino
         );
-
-        console.log(`Filtrados ${filteredData.length} registros para ${destino} - ${facility}`);
 
         // Agrupar motoristas únicos com informações adicionais
         const motoristasMap = new Map();
@@ -107,9 +72,6 @@ export default function DestinoPage() {
 
         const motoristasArray = Array.from(motoristasMap.values());
         setMotoristas(motoristasArray);
-        console.log('Motoristas encontrados:', motoristasArray.length);
-      } else {
-        console.warn('Nenhum dado CSV encontrado na resposta da API');
       }
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
@@ -357,5 +319,18 @@ export default function DestinoPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+// Componente principal que envolve o conteúdo em Suspense
+export default function DestinoPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    }>
+      <DestinoContent />
+    </Suspense>
   );
 }

@@ -25,7 +25,7 @@ export default function OperatorModal({ isOpen, onClose, operador }: OperatorMod
         setIsVisible(false);
         setTimeout(() => {
           // Redireciona para a página de dispatch
-          router.push('/expedicao/operacao');
+          router.push('/dispatch');
         }, 300);
       }, 2000);
       

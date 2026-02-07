@@ -1,20 +1,24 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { Upload, FileUp, AlertCircle, Filter, Loader2 } from 'lucide-react';
-import { parse } from 'papaparse'
-import Link from 'next/link';
+import { useState, useEffect, useRef } from "react";
+import { Upload, FileUp, AlertCircle, Filter, Loader2 } from "lucide-react";
+import { parse } from "papaparse";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // Estados para os filtros
   const [headers, setHeaders] = useState<string[]>([]);
-  const [selectedColumn, setSelectedColumn] = useState<string>('');
+  const [selectedColumn, setSelectedColumn] = useState<string>("");
   const [columnValues, setColumnValues] = useState<string[]>([]);
-  const [selectedValue, setSelectedValue] = useState<string>('');
+  const [selectedValue, setSelectedValue] = useState<string>("");
 
   // Estado para controlar o carregamento dos valores da coluna
   const [loadingColumnValues, setLoadingColumnValues] = useState(false);
@@ -34,7 +38,7 @@ export default function UploadPage() {
         });
 
         if (errors.length > 0) {
-          setMessage({ type: 'error', text: 'Erro ao ler o arquivo CSV' });
+          setMessage({ type: "error", text: "Erro ao ler o arquivo CSV" });
           return;
         }
 
@@ -46,9 +50,9 @@ export default function UploadPage() {
       reader.readAsText(file);
     } else {
       setHeaders([]);
-      setSelectedColumn('');
+      setSelectedColumn("");
       setColumnValues([]);
-      setSelectedValue('');
+      setSelectedValue("");
     }
   }, [file]);
 
@@ -69,16 +73,18 @@ export default function UploadPage() {
       });
 
       if (errors.length > 0) {
-        setMessage({ type: 'error', text: 'Erro ao ler os valores da coluna' });
+        setMessage({ type: "error", text: "Erro ao ler os valores da coluna" });
         setLoadingColumnValues(false);
         return;
       }
 
       // Extrair valores únicos da coluna selecionada
-      const values = (data as any[]).map(row => row[selectedColumn]).filter(Boolean);
+      const values = (data as any[])
+        .map((row) => row[selectedColumn])
+        .filter(Boolean);
       const uniqueValues = Array.from(new Set(values)).slice(0, 100); // Limitar a 100 valores para não sobrecarregar a UI
 
-      setColumnValues(uniqueValues.map(v => String(v)));
+      setColumnValues(uniqueValues.map((v) => String(v)));
       setLoadingColumnValues(false);
     };
     reader.readAsText(file);
@@ -88,8 +94,8 @@ export default function UploadPage() {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
-      setSelectedColumn('');
-      setSelectedValue('');
+      setSelectedColumn("");
+      setSelectedValue("");
       setMessage(null);
     }
   };
@@ -98,12 +104,15 @@ export default function UploadPage() {
     e.preventDefault();
 
     if (!file) {
-      setMessage({ type: 'error', text: 'Por favor, selecione um arquivo CSV' });
+      setMessage({
+        type: "error",
+        text: "Por favor, selecione um arquivo CSV",
+      });
       return;
     }
 
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      setMessage({ type: 'error', text: 'Apenas arquivos CSV são permitidos' });
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setMessage({ type: "error", text: "Apenas arquivos CSV são permitidos" });
       return;
     }
 
@@ -111,13 +120,13 @@ export default function UploadPage() {
     setMessage(null);
 
     const formData = new FormData();
-    formData.append('file', file);
-    if (selectedColumn) formData.append('filterColumn', selectedColumn);
-    if (selectedValue) formData.append('filterValue', selectedValue);
+    formData.append("file", file);
+    if (selectedColumn) formData.append("filterColumn", selectedColumn);
+    if (selectedValue) formData.append("filterValue", selectedValue);
 
     try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
+      const response = await fetch("/api/upload", {
+        method: "POST",
         body: formData,
       });
 
@@ -125,35 +134,47 @@ export default function UploadPage() {
 
       if (response.ok) {
         setMessage({
-          type: 'success',
-          text: `Arquivo processado com sucesso! ${data.data.processedRecords} registros gravados.`
+          type: "success",
+          text: `Arquivo processado com sucesso! ${data.data.processedRecords} registros gravados.`,
         });
         // Resetar o formulário
         setFile(null);
         setHeaders([]);
-        setSelectedColumn('');
+        setSelectedColumn("");
         setColumnValues([]);
-        setSelectedValue('');
+        setSelectedValue("");
         if (fileInputRef.current) {
-          fileInputRef.current.value = '';
+          fileInputRef.current.value = "";
         }
       } else {
-        setMessage({ type: 'error', text: data.error || 'Erro ao fazer upload' });
+        setMessage({
+          type: "error",
+          text: data.error || "Erro ao fazer upload",
+        });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Erro de conexão com o servidor' });
+      setMessage({ type: "error", text: "Erro de conexão com o servidor" });
     } finally {
       setUploading(false);
     }
+  };
+
+  const router = useRouter();
+
+  const handleBack = () => {
+    router.back();
   };
 
   return (
     <div className="min-h-screen mt-12 bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center text-green-600 hover:text-green-700 mb-4">
+          <button
+            onClick={handleBack}
+            className="inline-flex items-center text-green-600 hover:text-green-700 mb-4"
+          >
             ← Voltar
-          </Link>
+          </button>
           <h2 className="text-3xl font-bold text-gray-900">Upload de CSV</h2>
           <p className="mt-2 text-gray-600">
             Faça upload de um arquivo CSV para processamento
@@ -238,7 +259,9 @@ export default function UploadPage() {
                         {loadingColumnValues ? (
                           <div className="flex items-center justify-center p-2">
                             <Loader2 className="h-5 w-5 animate-spin text-green-600" />
-                            <span className="ml-2 text-sm text-gray-500">Carregando valores...</span>
+                            <span className="ml-2 text-sm text-gray-500">
+                              Carregando valores...
+                            </span>
                           </div>
                         ) : (
                           <>
@@ -247,7 +270,10 @@ export default function UploadPage() {
                               onChange={(e) => setSelectedValue(e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
                             >
-                              <option value="">Selecione um valor (ou deixe em branco para todos)</option>
+                              <option value="">
+                                Selecione um valor (ou deixe em branco para
+                                todos)
+                              </option>
                               {columnValues.map((value) => (
                                 <option key={value} value={value}>
                                   {value}
@@ -255,7 +281,9 @@ export default function UploadPage() {
                               ))}
                             </select>
                             <p className="mt-1 text-xs text-gray-500">
-                              {columnValues.length === 100 ? 'Mostrando até 100 valores. Selecione um valor específico para filtrar.' : 'Selecione um valor para filtrar.'}
+                              {columnValues.length === 100
+                                ? "Mostrando até 100 valores. Selecione um valor específico para filtrar."
+                                : "Selecione um valor para filtrar."}
                             </p>
                           </>
                         )}
@@ -263,17 +291,24 @@ export default function UploadPage() {
                     )}
                   </div>
                   <p className="mt-2 text-xs text-gray-500">
-                    Se nenhum valor for selecionado, todos os registros serão importados.
+                    Se nenhum valor for selecionado, todos os registros serão
+                    importados.
                   </p>
                 </div>
               </div>
             )}
 
             {message && (
-              <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50' : 'bg-red-50'}`}>
+              <div
+                className={`p-4 rounded-md ${message.type === "success" ? "bg-green-50" : "bg-red-50"}`}
+              >
                 <div className="flex items-center">
-                  <AlertCircle className={`h-5 w-5 ${message.type === 'success' ? 'text-green-400' : 'text-red-400'} mr-2`} />
-                  <p className={`text-sm font-medium ${message.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
+                  <AlertCircle
+                    className={`h-5 w-5 ${message.type === "success" ? "text-green-400" : "text-red-400"} mr-2`}
+                  />
+                  <p
+                    className={`text-sm font-medium ${message.type === "success" ? "text-green-800" : "text-red-800"}`}
+                  >
                     {message.text}
                   </p>
                 </div>
@@ -285,16 +320,32 @@ export default function UploadPage() {
                 type="submit"
                 disabled={uploading || !file}
                 className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white
-                  ${uploading || !file
-                    ? 'bg-green-400 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
+                  ${
+                    uploading || !file
+                      ? "bg-green-400 cursor-not-allowed"
+                      : "bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                   }`}
               >
                 {uploading ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <svg
+                      className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     Processando...
                   </>
@@ -309,19 +360,28 @@ export default function UploadPage() {
           </form>
 
           <div className="mt-8 pt-6 border-t border-gray-200">
-            <h3 className="text-sm font-medium text-gray-900 mb-3">Informações importantes:</h3>
+            <h3 className="text-sm font-medium text-gray-900 mb-3">
+              Informações importantes:
+            </h3>
             <ul className="text-sm text-gray-600 space-y-2">
               <li className="flex items-start">
                 <div className="shrink-0 h-5 w-5 text-green-500">✓</div>
-                <span className="ml-2">O arquivo deve estar no formato CSV</span>
+                <span className="ml-2">
+                  O arquivo deve estar no formato CSV
+                </span>
               </li>
               <li className="flex items-start">
                 <div className="shrink-0 h-5 w-5 text-green-500">✓</div>
-                <span className="ml-2">A primeira linha deve conter os cabeçalhos</span>
+                <span className="ml-2">
+                  A primeira linha deve conter os cabeçalhos
+                </span>
               </li>
               <li className="flex items-start">
                 <div className="shrink-0 h-5 w-5 text-green-500">✓</div>
-                <span className="ml-2">Os dados serão filtrados conforme a coluna e valor selecionados</span>
+                <span className="ml-2">
+                  Os dados serão filtrados conforme a coluna e valor
+                  selecionados
+                </span>
               </li>
             </ul>
           </div>
