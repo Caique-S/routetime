@@ -15,7 +15,7 @@ interface OperadorData {
   registro: {};
 }
 
-export default function ExpedicaoPage() {
+export default function Home() {
   const [operadorId, setOperadorId] = useState('');
   const [operadorData, setOperadorData] = useState<OperadorData | null>(null);
   const [showScanner, setShowScanner] = useState(false);
@@ -47,6 +47,13 @@ export default function ExpedicaoPage() {
       }
 
       setOperadorData(data);
+      
+       if (data.operador) {
+      localStorage.setItem('operador_nome', data.operador.nome);
+      localStorage.setItem('operador_cargo', data.operador.cargo);
+      localStorage.setItem('operador_data', JSON.stringify(data.operador));
+       }
+
       setShowModal(true);
       setOperadorId('');
     } catch (err: any) {

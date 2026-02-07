@@ -1,4 +1,4 @@
-"use client";
+'use client'
 
 import { useState, useEffect } from "react";
 import {
@@ -13,29 +13,72 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+interface OperadorData {
+  nome: string;
+  cargo: string;
+  dataDeCadastro: string;
+}
+
 export default function Home() {
   const router = useRouter();
   const [isAnimating, setIsAnimating] = useState(false);
   const [operadorNome, setOperadorNome] = useState("Operador");
+  const [operadorCargo , setOperadorCargo] = useState("")
+  const [operadorData, setOperadorData] = useState<OperadorData | null>(null);
   const [activeCard, setActiveCard] = useState<number | null>(null);
 
   useEffect(() => {
     setIsAnimating(true);
     // Buscar nome do operador logado do localStorage
-    const operadorData = localStorage.getItem("operador_data");
-    if (operadorData) {
-      try {
-        const parsed = JSON.parse(operadorData);
-        setOperadorNome(parsed.nome || "Operador");
-      } catch (e) {
-        console.error("Erro ao parsear dados do operador:", e);
-      }
+    const operadorNomeStorage = localStorage.getItem("operador_nome");
+    const operadorCargoStorage = localStorage.getItem("operador_cargo");
+    const operadorDataStorage = localStorage.getItem("operador_data");
+
+    if (operadorNomeStorage) {
+      setOperadorNome(operadorNomeStorage)
     }
-  }, []);
+
+    if(operadorCargoStorage){
+      setOperadorCargo(operadorCargoStorage)
+    }
+
+    if(operadorDataStorage){
+      try{
+        console.log("OperadorDataStorage sem o Parse: " + operadorDataStorage)
+        const parsedData = JSON.parse(operadorDataStorage);
+        console.log("Data depois do Parse: " + parsedData)
+        setOperadorData(parsedData);
+
+      if (!operadorNomeStorage && parsedData.nome) {
+          setOperadorNome(parsedData.nome);
+        }
+      }catch (e){
+        console.log("Erro ao Parsear dados do Operador",e)
+      }
+
+    }
+
+    if (!operadorNomeStorage) {
+      router.push("/");
+    }
+
+  }, [router]);
 
   const handleLogout = () => {
-    localStorage.removeItem("operador_data");
     localStorage.removeItem("operador_nome");
+    localStorage.removeItem("operador_cargo");
+    localStorage.removeItem("operador_data");
+
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('operador_')) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
     router.push("/");
   };
 

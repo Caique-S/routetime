@@ -1,4 +1,4 @@
-"use client";
+'use client'
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -87,6 +87,7 @@ export default function NovoCarregamentoPage() {
         const latestUpload = result.data[0];
         setUploadData(latestUpload);
 
+        localStorage.setItem("ExpedicaoEditavel", JSON.stringify(latestUpload))
         // Extrair destinos únicos do CSV
         const destinosMap = new Map<string, DestinoInfo>();
 
