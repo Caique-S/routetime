@@ -20,7 +20,7 @@ interface Operador {
 export default function AdminOperadoresPage() {
   const [formData, setFormData] = useState({
     nome: '',
-    cargo: 'Operador',
+    cargo: 'Dispatch',
     codigo: '',
     cpf: '',
     email: '',
@@ -42,7 +42,7 @@ export default function AdminOperadoresPage() {
   const fetchOperadores = async () => {
     try {
       setOperadoresLoading(true);
-      const response = await fetch('/api/operador/list');
+      const response = await fetch('/api/operador');
       const data = await response.json();
       if (data.success) {
         setOperadores(data.data);
@@ -88,7 +88,7 @@ export default function AdminOperadoresPage() {
         // Resetar formulário
         setFormData({
           nome: '',
-          cargo: 'Operador',
+          cargo: 'Dispatch',
           codigo: '',
           cpf: '',
           email: '',
@@ -448,7 +448,7 @@ export default function AdminOperadoresPage() {
           <ul className="space-y-2 text-sm text-blue-800">
             <li className="flex items-start">
               <span className="inline-block w-2 h-2 bg-blue-600 rounded-full mt-1 mr-3 shrink-0"></span>
-              Cada operador recebe um <strong className="font-mono">ID único</strong> gerado automaticamente pelo MongoDB
+              Cada operador recebe um <strong className="font-mono">ID único</strong> gerado automaticamente pelo Banco de Dados.
             </li>
             <li className="flex items-start">
               <span className="inline-block w-2 h-2 bg-blue-600 rounded-full mt-1 mr-3 shrink-0"></span>

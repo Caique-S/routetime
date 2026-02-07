@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     // Criar operador (o _id será gerado automaticamente pelo MongoDB)
     const operadorData = {
       nome: data.nome,
-      cargo: data.cargo || 'Operador',
+      cargo: data.cargo || 'Dispatch',
       dataDeCadastro: new Date(),
       codigo: data.codigo || `OP${Date.now().toString().slice(-6)}`,
       email: data.email || '',
