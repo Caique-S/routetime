@@ -181,7 +181,7 @@ export default function NovoCarregamentoPage() {
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full shadow-sm">
               <Building className="w-3.5 h-3.5 text-blue-600" />
               <span className="text-xs font-medium text-blue-700">
-                Facility: {uploadData.filterValue}
+                Operação: {uploadData.filterValue}
               </span>
             </div>
           </div>
@@ -198,10 +198,10 @@ export default function NovoCarregamentoPage() {
                 <MapPin className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <h2 className="font-bold text-gray-900 mb-1">Selecione um destino</h2>
+                <h2 className="font-bold text-gray-900 mb-1">Rotas Encontradas</h2>
                 <p className="text-sm text-gray-600">
                   {destinos.length > 0 
-                    ? `${destinos.length} destinos disponíveis para carregamento`
+                    ? `${destinos.length} rotas disponíveis para carregamento`
                     : 'Nenhum destino encontrado. Faça upload de um arquivo CSV primeiro.'
                   }
                 </p>

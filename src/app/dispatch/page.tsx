@@ -251,36 +251,7 @@ export default function Home() {
             </div>
           </Link>
         </div>
-
-        {/* Stats Section */}
-        <div className="mt-20 max-w-4xl mx-auto">
-          <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-2xl shadow-2xl p-8 text-white overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-32 translate-x-32"></div>
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -translate-x-24 translate-y-24"></div>
-
-            <div className="relative z-10">
-              <h3 className="text-2xl font-bold mb-6">Resumo das Operações</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold">24</div>
-                  <div className="text-sm opacity-90">Carregamentos Hoje</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold">156</div>
-                  <div className="text-sm opacity-90">Esta Semana</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold">42</div>
-                  <div className="text-sm opacity-90">Motoristas Ativos</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold">98%</div>
-                  <div className="text-sm opacity-90">Taxa de Sucesso</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        
       </main>
 
       {/* Footer */}
