@@ -2,18 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  ArrowLeft,
-  CheckCircle,
-  FileText,
-  Truck,
-  User,
-  Calendar,
-  MapPin,
-  Building,
-  Download,
-  Printer
-} from 'lucide-react';
 
 export default function CreateCarregamentoPage() {
   const router = useRouter();
@@ -94,100 +82,10 @@ export default function CreateCarregamentoPage() {
     }
   };
 
-  const handleGerarRelatorio = () => {
-    // Gerar PDF ou documento do relatório
-    const relatorio = {
-      ...carregamentoData,
-      dataEmissao: new Date().toISOString(),
-      numeroRelatorio: `REL-${Date.now()}`
-    };
-    
-    // Salvar relatório
-    localStorage.setItem('UltimoRelatorio', JSON.stringify(relatorio));
-    
-    // Abrir em nova janela para impressão
-    const janelaRelatorio = window.open('', '_blank');
-    if (janelaRelatorio) {
-      janelaRelatorio.document.write(`
-        <html>
-          <head>
-            <title>Relatório de Carregamento - ${relatorio.id}</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 40px; }
-              .header { text-align: center; margin-bottom: 40px; }
-              .section { margin-bottom: 30px; }
-              .field { margin: 10px 0; }
-              .label { font-weight: bold; color: #555; }
-              .value { color: #333; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>📋 Relatório de Carregamento</h1>
-              <p>Número: ${relatorio.id}</p>
-              <p>Data: ${new Date(relatorio.dataEmissao).toLocaleDateString('pt-BR')}</p>
-            </div>
-            
-            <div class="section">
-              <h2>🚚 Dados do Transporte</h2>
-              <div class="field">
-                <span class="label">Destino:</span>
-                <span class="value"> ${relatorio.destino} (${relatorio.destinoCodigo})</span>
-              </div>
-              <div class="field">
-                <span class="label">Motorista:</span>
-                <span class="value"> ${relatorio.motorista}</span>
-              </div>
-              <div class="field">
-                <span class="label">Veículos:</span>
-                <span class="value"> ${relatorio.veiculoTracao} + ${relatorio.veiculoCarga}</span>
-              </div>
-              <div class="field">
-                <span class="label">Travel ID:</span>
-                <span class="value"> ${relatorio.travelId}</span>
-              </div>
-            </div>
-            
-            <div class="section">
-              <h2>🏢 Dados da Operação</h2>
-              <div class="field">
-                <span class="label">Facility:</span>
-                <span class="value"> ${relatorio.facility}</span>
-              </div>
-              <div class="field">
-                <span class="label">Operador:</span>
-                <span class="value"> ${relatorio.operador}</span>
-              </div>
-              <div class="field">
-                <span class="label">Data/Hora:</span>
-                <span class="value"> ${new Date(relatorio.dataCriacao).toLocaleString('pt-BR')}</span>
-              </div>
-            </div>
-            
-            <div style="margin-top: 50px; text-align: center; color: #666;">
-              <p>Relatório gerado automaticamente pelo Dispatch Center</p>
-              <p>© ${new Date().getFullYear()} - Sistema de Expedição</p>
-            </div>
-            
-            <script>
-              window.onload = function() {
-                window.print();
-              }
-            </script>
-          </body>
-        </html>
-      `);
-    }
-  };
-
-  if (loading) {
-    return <div>Carregando...</div>;
-  }
 
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 to-gray-100">
-      {/* Interface de criação de carregamento */}
-      {/* Similar às outras páginas, com formulário para dados adicionais */}
+
     </div>
   );
 }

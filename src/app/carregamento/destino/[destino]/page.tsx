@@ -1,5 +1,4 @@
-'use client'
-
+"use client";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
@@ -17,7 +16,6 @@ import {
   Building,
 } from "lucide-react";
 
-// ALTERE O COMPONENTE DestinoContent:
 function DestinoContent() {
   const router = useRouter();
   const params = useParams();
@@ -200,8 +198,9 @@ function DestinoContent() {
                   <h1 className="text-xl font-bold text-gray-900">
                     Destino: {destinoInfo ? destinoInfo.nome : destinoCodigo}
                   </h1>
-                  <p className="text-xs text-gray-500">
-                    Selecione um motorista
+                  <p className="text-1xl text-gray-500">
+                    <Hash className="w-4 h-4 inline mr-1" />
+                    Código: {destinoCodigo}
                   </p>
                 </div>
               </div>
@@ -216,51 +215,13 @@ function DestinoContent() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Resumo do Destino */}
         <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-2xl shadow-xl p-6 text-white mb-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between">
-            <div>
-              {/* ALTERAÇÃO AQUI: Usar destinoInfo.nome */}
-              <h2 className="text-2xl font-bold mb-2">
-                {destinoInfo ? destinoInfo.nome : destinoCodigo}
-              </h2>
-              <p className="opacity-90">
-                Motoristas disponíveis para este destino
-              </p>
-              <div className="flex items-center space-x-4 mt-3">
-                <span className="text-sm opacity-90">
-                  <Users className="w-4 h-4 inline mr-1" />
-                  {motoristas.length} motorista(s)
-                </span>
-                {/* Adicione contagem de veículos se disponível */}
-                {destinoInfo && (
-                  <span className="text-sm opacity-90">
-                    <Truck className="w-4 h-4 inline mr-1" />
-                    {destinoInfo.totalVeiculos} veículo(s)
-                  </span>
-                )}
-              </div>
+          <div className="text-1sm text-white-600">
+              {motoristas.length} motorista(s) encontrado(s)
             </div>
-            <div className="mt-4 md:mt-0">
-              <div className="text-sm opacity-90">
-                Operação: <span className="font-bold">{facility}</span>
-              </div>
-              <div className="text-xs opacity-75 mt-1">
-                Código: {destinoCodigo}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Lista de Motoristas */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">
-              Motoristas Disponíveis
-            </h2>
-            <div className="text-sm text-gray-600">
-              {motoristas.length} motorista(s) encontrado(s)
-            </div>
-          </div>
-
           {motoristas.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {motoristas.map((motorista, index) => (
@@ -279,16 +240,13 @@ function DestinoContent() {
                         <h3 className="font-bold text-gray-900">
                           {motorista.nome}
                         </h3>
-                        <p className="text-sm text-gray-600">
-                          Motorista Principal
-                        </p>
+                        <p className="text-sm text-gray-600">Motorista</p>
                       </div>
                     </div>
                     <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
                   </div>
 
                   <div className="space-y-3">
-                    {/* ADICIONAR MAIS INFORMAÇÕES AQUI */}
                     {motorista.tipoVeiculo && (
                       <div className="flex items-center text-sm text-gray-600">
                         <Truck className="w-4 h-4 mr-2 text-gray-400" />
@@ -298,49 +256,48 @@ function DestinoContent() {
                         </span>
                       </div>
                     )}
-                    {motorista.veiculoTracao && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Truck className="w-4 h-4 mr-2 text-gray-400" />
-                        <span className="font-medium">Tração:</span>
-                        <span className="ml-1 text-gray-800">
-                          {motorista.veiculoTracao}
-                        </span>
-                      </div>
+                    {motorista.tipoVeiculo === "Carreta" ? (
+                      <>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Truck className="w-4 h-4 mr-2 text-gray-400" />
+                          <span className="font-medium">Placa Tração:</span>
+                          <span className="ml-1 text-gray-800">
+                            {motorista.veiculoTracao}
+                          </span>
+                        </div>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Truck className="w-4 h-4 mr-2 text-gray-400" />
+                          <span className="font-medium">Placa Carga:</span>
+                          <span className="ml-1 text-gray-800">
+                            {motorista.veiculoCarga}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      motorista.veiculoTracao && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Truck className="w-4 h-4 mr-2 text-gray-400" />
+                          <span className="font-medium">Placa Tração:</span>
+                          <span className="ml-1 text-gray-800">
+                            {motorista.veiculoTracao}
+                          </span>
+                        </div>
+                      )
                     )}
-                    {motorista.veiculoCarga && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Truck className="w-4 h-4 mr-2 text-gray-400" />
-                        <span className="font-medium">Carga:</span>
-                        <span className="ml-1 text-gray-800">
-                          {motorista.veiculoCarga}
-                        </span>
-                      </div>
-                    )}
+
                     {motorista.travelId && (
                       <div className="flex items-center text-sm text-gray-600">
                         <Hash className="w-4 h-4 mr-2 text-gray-400" />
                         <span className="font-medium">Travel ID:</span>
-                        <span className="ml-1 text-gray-800 font-mono">
+                        <span className="ml-1 text-blue-600 font-mono">
                           {motorista.travelId}
                         </span>
                       </div>
                     )}
-                    {motorista.dataInicio && (
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                        <span className="font-medium">Data Prevista:</span>
-                        <span className="ml-1 text-gray-800">
-                          {new Date(motorista.dataInicio).toLocaleDateString(
-                            "pt-BR",
-                          )}
-                        </span>
-                      </div>
-                    )}
                   </div>
-
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <div className="inline-flex items-center text-blue-600 text-sm font-medium">
-                      <span>Selecionar este motorista</span>
+                      <span>Despachar Motorista</span>
                       <ChevronRight className="w-4 h-4 ml-1" />
                     </div>
                   </div>
@@ -368,54 +325,6 @@ function DestinoContent() {
             </div>
           )}
         </div>
-
-        {/* Informações Adicionais - SUBSTITUIR csvData POR INFORMAÇÕES DO DESTINO */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Informações da Operação
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
-                <MapPin className="w-4 h-4" />
-                <span className="font-medium">Destino:</span>
-              </div>
-              <p className="text-gray-900">
-                {destinoInfo ? destinoInfo.nome : destinoCodigo} (
-                {destinoCodigo})
-              </p>
-            </div>
-            <div>
-              <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
-                <Building className="w-4 h-4" />
-                <span className="font-medium">Operação (Facility):</span>
-              </div>
-              <p className="text-gray-900">{facility}</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-            <div>
-              <div className="text-sm text-gray-600 mb-1">
-                <span className="font-medium">Total de Motoristas:</span>{" "}
-                {motoristas.length}
-              </div>
-              <div className="text-sm text-gray-600">
-                <span className="font-medium">Total de Veículos:</span>{" "}
-                {destinoInfo ? destinoInfo.totalVeiculos : motoristas.length}
-              </div>
-            </div>
-            <div>
-              {destinoInfo && destinoInfo.ultimoCarregamento && (
-                <div className="text-sm text-gray-600">
-                  <span className="font-medium">Último Carregamento:</span>{" "}
-                  {new Date(destinoInfo.ultimoCarregamento).toLocaleDateString(
-                    "pt-BR",
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
       </main>
 
       {/* Footer */}
@@ -423,7 +332,6 @@ function DestinoContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between">
             <div className="text-gray-500 text-sm">
-              {/* ALTERAÇÃO AQUI: Usar destinoInfo.nome */}
               <p>
                 Sistema de Carregamento • Destino:{" "}
                 {destinoInfo ? destinoInfo.nome : destinoCodigo}
@@ -431,37 +339,6 @@ function DestinoContent() {
               <p className="mt-1">
                 Operação: {facility} • © {new Date().getFullYear()}
               </p>
-            </div>
-            <div className="flex items-center space-x-4 mt-4 md:mt-0">
-              <button
-                className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                onClick={() => {
-                  // Função para exportar dados do localStorage
-                  const dataToExport = {
-                    destino: destinoInfo,
-                    motoristas: motoristas,
-                    timestamp: new Date().toISOString(),
-                  };
-                  const dataStr = JSON.stringify(dataToExport, null, 2);
-                  const dataBlob = new Blob([dataStr], {
-                    type: "application/json",
-                  });
-                  const url = URL.createObjectURL(dataBlob);
-                  const link = document.createElement("a");
-                  link.href = url;
-                  link.download = `carregamento_${destinoCodigo}_${new Date().toISOString().split("T")[0]}.json`;
-                  link.click();
-                }}
-              >
-                <Download className="w-4 h-4" />
-                <span>Exportar Dados</span>
-              </button>
-              <button
-                onClick={handleVoltar}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Voltar
-              </button>
             </div>
           </div>
         </div>
