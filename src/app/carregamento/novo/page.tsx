@@ -144,7 +144,7 @@ export default function NovoCarregamentoPage() {
   };
 
   const handleBack = () => {
-    router.back();
+    router.push("/carregamento/novo");
   };
 
   if (loading) {
