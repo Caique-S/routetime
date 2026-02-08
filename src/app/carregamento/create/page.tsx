@@ -63,6 +63,7 @@ export default function CreatePage() {
   const [destinoInfo, setDestinoInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isComplete, setIsComplete] = useState(false);
+  const [copiado, setCopiado] = useState<string | null>(null);
 
   useEffect(() => {
     loadCarregamentoData();
@@ -94,7 +95,6 @@ export default function CreatePage() {
       }
 
       // 4. Construir a chave do localStorage para buscar os dados do carregamento
-      // Na página de destino, a chave é: `carregamentos_${destinoCodigo}_${facility}`
       let carregamentosData = null;
       
       // Primeiro, tentar usar o destinoInfo para construir a chave
@@ -201,25 +201,58 @@ export default function CreatePage() {
     return mapeamento[codigo] || codigo;
   };
 
-  const handleVoltar = () => {
-    router.back();
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      console.error('Erro ao copiar para área de transferência:', err);
+      
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        return true;
+      } catch (fallbackErr) {
+        console.error('Fallback também falhou:', fallbackErr);
+        return false;
+      }
+    }
   };
 
-  const handleImprimir = () => {
-    window.print();
-  };
-
-  const handleDownload = () => {
+  const handleDespachar = async () => {
     if (!carregamento) return;
 
-    const content = `
+    const mensagem = `Veiculo *${getNomeDestino(carregamento.destino)}* saindo nesse exato momento. Obs: *${carregamento.carga.gaiolas}* Gaiolas, *${carregamento.carga.volumosos}* Volumosos e *${carregamento.carga.manga}* Manga Palets.`;
 
-*ID:* ${carregamento.id}
+    const copiadoComSucesso = await copyToClipboard(mensagem);
+    
+    if (copiadoComSucesso) {
+      setCopiado('despachar');
+      
+      setTimeout(() => {
+        setCopiado(null);
+        window.open('https://chat.whatsapp.com/G5PEe8GbLZWAavzBkpSuKE?mode=gi_t', '_blank');
+      }, 1000);
+    } else {
+      alert('Não foi possível copiar a mensagem. Tente novamente.');
+    }
+  };
+
+  const handleInformacoesXPT = async () => {
+    if (!carregamento) return;
+
+    const content = `*ID:* ${carregamento.motorista.travelId}
 *Doca:* (${carregamento.doca || "Não definida"})
 *${carregamento.motorista.tipoVeiculo}:* ${getNomeDestino(carregamento.destino)} 
 *Condutor:* ${carregamento.motorista.nome}
 *Placa Tração:* ${carregamento.motorista.veiculoTracao}
-${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga: ${carregamento.motorista.veiculoCarga}` : ''}
+${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${carregamento.motorista.veiculoCarga}` : ''}
 
 *Encostado na doca:* ${carregamento.horarios.encostadoDoca || "Não registrado"}
 *Início carregamento:* ${carregamento.horarios.inicioCarregamento || "Não registrado"}
@@ -233,25 +266,29 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
 
 *Total de gaiolas:* ${carregamento.carga.gaiolas}
 *Total de volumosos:* ${carregamento.carga.volumosos}
-*Total de manga palete:* ${carregamento.carga.manga}
-    `;
+*Total de manga palete:* ${carregamento.carga.manga}`;
 
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `carregamento_${carregamento.id}_${carregamento.motorista.nome}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const copiadoComSucesso = await copyToClipboard(content);
+    
+    if (copiadoComSucesso) {
+      setCopiado('xpt');
+      
+      setTimeout(() => {
+        setCopiado(null);
+        window.open('https://chat.whatsapp.com/KgobWakeXIx1M0VCGki5dN?mode=gi_t', '_blank');
+      }, 1000);
+    } else {
+      alert('Não foi possível copiar as informações. Tente novamente.');
+    }
+  };
+
+  const handleVoltar = () => {
+    router.back();
   };
 
   const handleFinalizar = () => {
-    // Salvar no banco de dados (implementação futura)
     alert("Carregamento finalizado e salvo com sucesso!");
     
-    // Limpar dados temporários
     localStorage.removeItem('motoristaSelecionadoId');
     localStorage.removeItem('MotoristaSelecionado');
     localStorage.removeItem('DestinoAtual');
@@ -260,7 +297,6 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
   };
 
   const handleEditar = () => {
-    // Voltar para a página do destino
     if (destinoInfo && carregamento) {
       router.push(`/carregamento/destino/${carregamento.destino}?facility=${carregamento.facility}`);
     } else {
@@ -359,18 +395,20 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
               </div>
               <div className="mt-4 md:mt-0 flex gap-3">
                 <button
-                  onClick={handleImprimir}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                  onClick={handleDespachar}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors relative"
+                  disabled={!!copiado}
                 >
                   <Truck className="w-4 h-4" />
-                  Despachar
+                  {copiado === 'despachar' ? 'Copiado!' : 'Despachar'}
                 </button>
                 <button
-                  onClick={handleDownload}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                  onClick={handleInformacoesXPT}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors relative"
+                  disabled={!!copiado}
                 >
                   <BookType className="w-4 h-4" />
-                  Informações XPT
+                  {copiado === 'xpt' ? 'Copiado!' : 'Informações XPT'}
                 </button>
               </div>
             </div>
