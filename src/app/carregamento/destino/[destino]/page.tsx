@@ -233,7 +233,7 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
         ...carregamentoData,
         carga: {
           ...carregamentoData.carga,
-          [tipo]: numericValue === '' ? "00" : "00"
+          [tipo]: numericValue === '' ? "" : numericValue
         }
       });
     }
@@ -265,7 +265,7 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
         ...carregamentoData,
         lacres: {
           ...carregamentoData.lacres,
-          [tipo]: numericValue
+          [tipo]: numericValue === '' ? "" : numericValue
         }
       });
     }
