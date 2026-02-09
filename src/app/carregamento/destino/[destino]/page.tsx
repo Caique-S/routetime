@@ -168,7 +168,7 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
   };
 
   const handleVoltar = () => {
-    router.push("/carregamento/novo");
+    router.push("/dispatch");
   };
 
   const handleOpenModal = (modal: string, motorista: any) => {
