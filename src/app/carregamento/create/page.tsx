@@ -26,9 +26,9 @@ interface CarregamentoData {
   id: string;
   doca: string;
   carga: {
-    gaiolas: number;
-    volumosos: number;
-    manga: number;
+    gaiolas: string;
+    volumosos: string;
+    manga: string;
   };
   horarios: {
     encostadoDoca: string;
@@ -157,7 +157,7 @@ export default function CreatePage() {
         const newCarregamento: CarregamentoData = {
           id: Math.floor(10000000 + Math.random() * 90000000).toString(),
           doca: "",
-          carga: { gaiolas: 0, volumosos: 0, manga: 0 },
+          carga: { gaiolas: "", volumosos: "", manga: "" },
           horarios: { encostadoDoca: "", inicioCarregamento: "", terminoCarregamento: "", saidaLiberada: "", previsaoChegada: "" },
           lacres: { traseiro: "", lateral1: "", lateral2: "" },
           motorista: motorista,
@@ -276,8 +276,8 @@ export default function CreatePage() {
 
   const handleInformacoesXPT = async () => {
     if (!carregamento) return;
-
-    const content = `*ID:* ${carregamento.id}
+const content = 
+`*ID:* ${carregamento.motorista.travelId}
 *Doca:* (${carregamento.doca || "Não definida"})
 *${carregamento.motorista.tipoVeiculo}:* ${getNomeDestino(carregamento.destino)} 
 *Condutor:* ${carregamento.motorista.nome}
@@ -609,19 +609,19 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
                     <span className="text-sm text-gray-600">Total de Gaiolas</span>
                     <span className="font-semibold text-gray-900 text-xl">
-                      {carregamento.carga.gaiolas || "0"}
+                      {carregamento.carga.gaiolas || ""}
                     </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
                     <span className="text-sm text-gray-600">Total de Volumosos</span>
                     <span className="font-semibold text-gray-900 text-xl">
-                      {carregamento.carga.volumosos || "0"}
+                      {carregamento.carga.volumosos || ""}
                     </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
                     <span className="text-sm text-gray-600">Total de Manga Palete</span>
                     <span className="font-semibold text-gray-900 text-xl">
-                      {carregamento.carga.manga || "0"}
+                      {carregamento.carga.manga || ""}
                     </span>
                   </div>
                 </div>
