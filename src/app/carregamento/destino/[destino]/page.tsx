@@ -19,7 +19,9 @@ import {
   Box,
   DoorClosed,
   X,
+  Scan,
 } from "lucide-react";
+import QRScanner from "@/app/components/QrScanner";
 
 // Interfaces
 interface MotoristaInfo {
@@ -37,9 +39,9 @@ interface CarregamentoData {
   id: string;
   doca: string;
   carga: {
-    gaiolas: number;
-    volumosos: number;
-    manga: number;
+    gaiolas: string;
+    volumosos: string;
+    manga: string;
   };
   horarios: {
     encostadoDoca: string;
@@ -72,6 +74,8 @@ function DestinoContent() {
   const [selectedMotorista, setSelectedMotorista] = useState<any>(null);
   const [carregamentoData, setCarregamentoData] = useState<CarregamentoData | null>(null);
   const [carregamentos, setCarregamentos] = useState<Record<string, CarregamentoData>>({});
+const [showQRScanner, setShowQRScanner] = useState(false);
+const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacres'] | null>(null);
 
   const facility = searchParams?.get("facility") || "N/A";
 
@@ -182,7 +186,7 @@ function DestinoContent() {
       setCarregamentoData({
         id: generateId(),
         doca: "",
-        carga: { gaiolas: 0, volumosos: 0, manga: 0 },
+        carga: { gaiolas: "", volumosos: "", manga: "" },
         horarios: { encostadoDoca: "", inicioCarregamento: "", terminoCarregamento: "", saidaLiberada: "", previsaoChegada: "" },
         lacres: { traseiro: "", lateral1: "", lateral2: "" },
         motorista: motorista,
@@ -222,13 +226,14 @@ function DestinoContent() {
     }
   };
 
-  const handleCargaChange = (tipo: 'gaiolas' | 'volumosos' | 'manga', value: number) => {
+  const handleCargaChange = (tipo: 'gaiolas' | 'volumosos' | 'manga', value: string) => {
     if (carregamentoData) {
+      const numericValue = value.replace(/\D/g, '').slice(0, 2);
       setCarregamentoData({
         ...carregamentoData,
         carga: {
           ...carregamentoData.carga,
-          [tipo]: value
+          [tipo]: numericValue === '' ? "00" : "00"
         }
       });
     }
@@ -255,15 +260,30 @@ function DestinoContent() {
 
   const handleLacreChange = (tipo: keyof CarregamentoData['lacres'], value: string) => {
     if (carregamentoData) {
+      const numericValue = value.replace(/\D/g, '').slice(0, 7);
       setCarregamentoData({
         ...carregamentoData,
         lacres: {
           ...carregamentoData.lacres,
-          [tipo]: value
+          [tipo]: numericValue
         }
       });
     }
   };
+
+  const handleQRScan = (result: string) => {
+  if (activeQRField && carregamentoData) {
+    // Extrair apenas números do QR Code e limitar a 7 dígitos
+    const numericResult = result.replace(/\D/g, '').slice(0, 7);
+    
+    // Atualizar o campo específico
+    handleLacreChange(activeQRField, numericResult);
+    
+    // Fechar o scanner
+    setShowQRScanner(false);
+    setActiveQRField(null);
+  }
+};
 
   const calcularPrevisaoChegada = (saidaLiberada: string, destinoCodigo: string): string => {
     if (!saidaLiberada) return "";
@@ -370,7 +390,7 @@ function DestinoContent() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {/* Resumo do Destino */}
         <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-2xl shadow-xl p-6 text-white mb-8">
           <div className="text-1sm text-white-600">
@@ -570,7 +590,7 @@ function DestinoContent() {
             </div>
             <div className="p-6">
               <p className="text-sm text-gray-600 mb-4">
-                Selecione a doca para o motorista: <strong>{selectedMotorista.nome}</strong>
+                Selecione a doca para: <strong>{selectedMotorista.nome}</strong>
               </p>
               <div className="grid grid-cols-4 gap-3">
                 {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
@@ -626,9 +646,8 @@ function DestinoContent() {
                 </label>
                 <input
                   type="number"
-                  max="99"
-                  value={carregamentoData.carga.gaiolas || 0}
-                  onChange={(e) => handleCargaChange('gaiolas', parseInt(e.target.value) || 0)}
+                  value={carregamentoData.carga.gaiolas || ""}
+                  onChange={(e) => handleCargaChange('gaiolas', e.target.value || "")}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -638,9 +657,8 @@ function DestinoContent() {
                 </label>
                 <input
                   type="number"
-                  max="99"
-                  value={carregamentoData.carga.volumosos || 0}
-                  onChange={(e) => handleCargaChange('volumosos', parseInt(e.target.value) || 0)}
+                  value={carregamentoData.carga.volumosos || ""}
+                  onChange={(e) => handleCargaChange('volumosos', e.target.value || "")}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -650,9 +668,8 @@ function DestinoContent() {
                 </label>
                 <input
                   type="number"
-                  max="99"
-                  value={carregamentoData.carga.manga || 0}
-                  onChange={(e) => handleCargaChange('manga', parseInt(e.target.value) || 0)}
+                  value={carregamentoData.carga.manga || ""}
+                  onChange={(e) => handleCargaChange('manga', e.target.value || "")}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -767,76 +784,167 @@ function DestinoContent() {
       )}
 
       {/* Modal Lacres */}
-      {activeModal === 'lacres' && selectedMotorista && carregamentoData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-6 border-b">
-              <div className="flex items-center gap-3">
-                <Tag className="w-5 h-5 text-purple-600" />
-                <h3 className="text-lg font-bold">Registrar Lacres</h3>
-              </div>
-              <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 rounded-lg">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Lacre Traseiro
-                </label>
-                <input
-                  type="text"
-                  value={carregamentoData.lacres.traseiro || ''}
-                  onChange={(e) => handleLacreChange('traseiro', e.target.value)}
-                  placeholder="Ex: 4476646"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Lacre Lateral 1
-                </label>
-                <input
-                  type="text"
-                  value={carregamentoData.lacres.lateral1 || ''}
-                  onChange={(e) => handleLacreChange('lateral1', e.target.value)}
-                  placeholder="Ex: 4476647"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Lacre Lateral 2
-                </label>
-                <input
-                  type="text"
-                  value={carregamentoData.lacres.lateral2 || ''}
-                  onChange={(e) => handleLacreChange('lateral2', e.target.value)}
-                  placeholder="Ex: 4476649"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-            <div className="p-6 border-t flex justify-end gap-3">
+{activeModal === 'lacres' && selectedMotorista && carregamentoData && (
+  <>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md">
+        <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center gap-3">
+            <Tag className="w-5 h-5 text-purple-600" />
+            <h3 className="text-lg font-bold">Registrar Lacres</h3>
+          </div>
+          <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 rounded-lg">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          {/* Lacre Traseiro - COM SCANNER */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Lacre Traseiro
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={carregamentoData.lacres.traseiro || ''}
+                onChange={(e) => handleLacreChange('traseiro', e.target.value)}
+                placeholder="Ex: 4476646"
+                className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${
+                  carregamentoData.lacres.traseiro.length === 7 ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                }`}
+                maxLength={7}
+                inputMode="numeric"
+              />
               <button
-                onClick={handleCloseModal}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                type="button"
+                onClick={() => {
+                  setActiveQRField('traseiro');
+                  setShowQRScanner(true);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
               >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveModal}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-              >
-                Salvar Lacres
+                <Scan className="w-5 h-5" />
+                <span className="hidden sm:inline">QR</span>
               </button>
             </div>
+            {carregamentoData.lacres.traseiro.length === 7 && (
+              <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                ✓ Lacre válido (7 dígitos)
+              </p>
+            )}
+          </div>
+
+          {/* Lacre Lateral 1 - COM SCANNER */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Lacre Lateral 1
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={carregamentoData.lacres.lateral1 || ''}
+                onChange={(e) => handleLacreChange('lateral1', e.target.value)}
+                placeholder="Ex: 4476647"
+                className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${
+                  carregamentoData.lacres.lateral1.length === 7 ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                }`}
+                maxLength={7}
+                inputMode="numeric"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveQRField('lateral1');
+                  setShowQRScanner(true);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <Scan className="w-5 h-5" />
+                <span className="hidden sm:inline">QR</span>
+              </button>
+            </div>
+            {carregamentoData.lacres.lateral1.length === 7 && (
+              <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                ✓ Lacre válido (7 dígitos)
+              </p>
+            )}
+          </div>
+
+          {/* Lacre Lateral 2 - COM SCANNER */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Lacre Lateral 2
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={carregamentoData.lacres.lateral2 || ''}
+                onChange={(e) => handleLacreChange('lateral2', e.target.value)}
+                placeholder="Ex: 4476649"
+                className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${
+                  carregamentoData.lacres.lateral2.length === 7 ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                }`}
+                maxLength={7}
+                inputMode="numeric"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveQRField('lateral2');
+                  setShowQRScanner(true);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <Scan className="w-5 h-5" />
+                <span className="hidden sm:inline">QR</span>
+              </button>
+            </div>
+            {carregamentoData.lacres.lateral2.length === 7 && (
+              <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                ✓ Lacre válido (7 dígitos)
+              </p>
+            )}
+          </div>
+
+          {/* Instruções */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+            <p className="text-xs text-blue-700">
+              <strong>Dica:</strong> Use o botão QR para escanear automaticamente.
+            </p>
           </div>
         </div>
-      )}
+        <div className="p-6 border-t flex justify-end gap-3">
+          <button
+            onClick={handleCloseModal}
+            className="px-4 py-2 text-gray-600 hover:text-gray-800"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSaveModal}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          >
+            Salvar Lacres
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {/* Scanner QR Code */}
+    {showQRScanner && (
+      <QRScanner
+        onScan={handleQRScan}
+        onClose={() => {
+          setShowQRScanner(false);
+          setActiveQRField(null);
+        }}
+      />
+    )}
+  </>
+)}
 
       {/* Footer */}
-      <footer className="mt-8 py-6 border-t border-gray-200 pb-safe-bottom">
+      <footer className="mb-4 py-2 border-t border-gray-200 pb-safe-bottom">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between">
             <div className="text-gray-500 text-sm">
@@ -853,7 +961,7 @@ function DestinoContent() {
                 Motoristas: {motoristas.length} • Dados preenchidos: {
                   Object.keys(carregamentos).filter(key => 
                     carregamentos[key]?.doca || 
-                    carregamentos[key]?.carga?.gaiolas > 0 || 
+                    carregamentos[key]?.carga?.gaiolas != "" || 
                     carregamentos[key]?.horarios?.encostadoDoca
                   ).length
                 }

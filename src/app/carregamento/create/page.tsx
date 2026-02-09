@@ -178,10 +178,40 @@ export default function CreatePage() {
   };
 
   const checkCompletion = (data: CarregamentoData) => {
-    const hasDoca = !!data.doca && data.doca !== "";
-    const hasCarga = data.carga.gaiolas > 0 || data.carga.volumosos > 0 || data.carga.manga > 0;
-    const hasHorarios = !!data.horarios.encostadoDoca && data.horarios.encostadoDoca !== "";
-    const hasLacres = !!data.lacres.traseiro && data.lacres.traseiro !== "";
+    // 1. Doca: deve estar preenchida
+    const hasDoca = !!data.doca && data.doca.trim() !== "";
+    
+    // 2. Carga: todos os campos devem ter valores numéricos (incluindo 0)
+    // Convertendo para número e verificando se não é NaN
+    const gaiolas = Number(data.carga.gaiolas);
+    const volumosos = Number(data.carga.volumosos);
+    const manga = Number(data.carga.manga);
+    
+    const hasCarga = 
+      !isNaN(gaiolas) && 
+      !isNaN(volumosos) && 
+      !isNaN(manga);
+    
+    // 3. Horários: todos os campos devem estar preenchidos
+    const hasHorarios = 
+      !!data.horarios.encostadoDoca && data.horarios.encostadoDoca.trim() !== "" &&
+      !!data.horarios.inicioCarregamento && data.horarios.inicioCarregamento.trim() !== "" &&
+      !!data.horarios.terminoCarregamento && data.horarios.terminoCarregamento.trim() !== "" &&
+      !!data.horarios.saidaLiberada && data.horarios.saidaLiberada.trim() !== "" &&
+      !!data.horarios.previsaoChegada && data.horarios.previsaoChegada.trim() !== "";
+    
+    // 4. Lacres: apenas o traseiro é obrigatório
+    const hasLacres = !!data.lacres.traseiro && data.lacres.traseiro.trim() !== "";
+    
+    console.log('Verificação de completude:', {
+      hasDoca,
+      hasCarga,
+      hasHorarios,
+      hasLacres,
+      carga: data.carga,
+      horarios: data.horarios,
+      lacres: data.lacres
+    });
     
     setIsComplete(hasDoca && hasCarga && hasHorarios && hasLacres);
   };
@@ -228,7 +258,7 @@ export default function CreatePage() {
   const handleDespachar = async () => {
     if (!carregamento) return;
 
-    const mensagem = `Veiculo *${getNomeDestino(carregamento.destino)}* saindo nesse exato momento. Obs: *${carregamento.carga.gaiolas}* Gaiolas, *${carregamento.carga.volumosos}* Volumosos e *${carregamento.carga.manga}* Manga Palets.`;
+    const mensagem = `Veiculo ${getNomeDestino(carregamento.destino)} saindo nesse exato momento. Obs: ${carregamento.carga.gaiolas} Gaiolas, ${carregamento.carga.volumosos} Volumosos e ${carregamento.carga.manga} Manga Palets.`;
 
     const copiadoComSucesso = await copyToClipboard(mensagem);
     
@@ -247,7 +277,7 @@ export default function CreatePage() {
   const handleInformacoesXPT = async () => {
     if (!carregamento) return;
 
-    const content = `*ID:* ${carregamento.motorista.travelId}
+    const content = `*ID:* ${carregamento.id}
 *Doca:* (${carregamento.doca || "Não definida"})
 *${carregamento.motorista.tipoVeiculo}:* ${getNomeDestino(carregamento.destino)} 
 *Condutor:* ${carregamento.motorista.nome}
@@ -287,6 +317,16 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
   };
 
   const handleFinalizar = () => {
+    // Validar novamente antes de finalizar
+    if (!carregamento) return;
+    
+    checkCompletion(carregamento);
+    
+    if (!isComplete) {
+      alert("Por favor, complete todos os campos obrigatórios antes de finalizar.");
+      return;
+    }
+    
     alert("Carregamento finalizado e salvo com sucesso!");
     
     localStorage.removeItem('motoristaSelecionadoId');
@@ -568,15 +608,21 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
                     <span className="text-sm text-gray-600">Total de Gaiolas</span>
-                    <span className="font-semibold text-gray-900 text-xl">{carregamento.carga.gaiolas}</span>
+                    <span className="font-semibold text-gray-900 text-xl">
+                      {carregamento.carga.gaiolas || "0"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
                     <span className="text-sm text-gray-600">Total de Volumosos</span>
-                    <span className="font-semibold text-gray-900 text-xl">{carregamento.carga.volumosos}</span>
+                    <span className="font-semibold text-gray-900 text-xl">
+                      {carregamento.carga.volumosos || "0"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
                     <span className="text-sm text-gray-600">Total de Manga Palete</span>
-                    <span className="font-semibold text-gray-900 text-xl">{carregamento.carga.manga}</span>
+                    <span className="font-semibold text-gray-900 text-xl">
+                      {carregamento.carga.manga || "0"}
+                    </span>
                   </div>
                 </div>
               </div>
