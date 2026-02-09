@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import { useState, useEffect } from "react";
 import {
@@ -23,7 +23,7 @@ export default function Home() {
   const router = useRouter();
   const [isAnimating, setIsAnimating] = useState(false);
   const [operadorNome, setOperadorNome] = useState("Operador");
-  const [operadorCargo , setOperadorCargo] = useState("")
+  const [operadorCargo, setOperadorCargo] = useState("");
   const [operadorData, setOperadorData] = useState<OperadorData | null>(null);
   const [activeCard, setActiveCard] = useState<number | null>(null);
 
@@ -35,33 +35,31 @@ export default function Home() {
     const operadorDataStorage = localStorage.getItem("operador_data");
 
     if (operadorNomeStorage) {
-      setOperadorNome(operadorNomeStorage)
+      setOperadorNome(operadorNomeStorage);
     }
 
-    if(operadorCargoStorage){
-      setOperadorCargo(operadorCargoStorage)
+    if (operadorCargoStorage) {
+      setOperadorCargo(operadorCargoStorage);
     }
 
-    if(operadorDataStorage){
-      try{
-        console.log("OperadorDataStorage sem o Parse: " + operadorDataStorage)
+    if (operadorDataStorage) {
+      try {
+        console.log("OperadorDataStorage sem o Parse: " + operadorDataStorage);
         const parsedData = JSON.parse(operadorDataStorage);
-        console.log("Data depois do Parse: " + parsedData)
+        console.log("Data depois do Parse: " + parsedData);
         setOperadorData(parsedData);
 
-      if (!operadorNomeStorage && parsedData.nome) {
+        if (!operadorNomeStorage && parsedData.nome) {
           setOperadorNome(parsedData.nome);
         }
-      }catch (e){
-        console.log("Erro ao Parsear dados do Operador",e)
+      } catch (e) {
+        console.log("Erro ao Parsear dados do Operador", e);
       }
-
     }
 
     if (!operadorNomeStorage) {
       router.push("/");
     }
-
   }, [router]);
 
   const handleLogout = () => {
@@ -72,13 +70,13 @@ export default function Home() {
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key?.startsWith('operador_')) {
+      if (key?.startsWith("operador_")) {
         keysToRemove.push(key);
       }
     }
-    
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-    
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+
     router.push("/");
   };
 
@@ -88,6 +86,10 @@ export default function Home() {
 
   const handleCardLeave = () => {
     setActiveCard(null);
+  };
+
+  const handlePermissionGuide = () => {
+    router.push("/permissions-guide");
   };
 
   return (
@@ -121,7 +123,10 @@ export default function Home() {
             </div>
 
             <div className="flex items-center space-x-4">
-              <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+              <button
+                onClick={handlePermissionGuide}
+                className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              >
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
@@ -294,7 +299,6 @@ export default function Home() {
             </div>
           </Link>
         </div>
-        
       </main>
 
       {/* Footer */}

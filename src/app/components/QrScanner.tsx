@@ -1,8 +1,7 @@
+"use client";
 
-'use client';
-
-import { useEffect, useRef, useState } from 'react';
-import { QrCode, X, Camera, CameraOff, Scan } from 'lucide-react';
+import { useEffect, useRef, useState } from "react";
+import { QrCode, X, Camera, CameraOff, Scan, Smartphone } from "lucide-react";
 
 interface QRScannerProps {
   onScan: (result: string) => void;
@@ -14,8 +13,14 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
   const [error, setError] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [scanning, setScanning] = useState(true);
+  const [isWebView, setIsWebView] = useState(false);
 
   useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isAndroidWebView =
+      /wv/.test(userAgent) || /android.*wv/.test(userAgent);
+    setIsWebView(isAndroidWebView);
+
     startCamera();
     return () => stopCamera();
   }, []);
@@ -23,28 +28,39 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
   const startCamera = async () => {
     try {
       setError(null);
-      
+
+      if (isWebView) {
+        console.log("🔄 Iniciando câmera no WebView");
+      }
+
       // Verificar se estamos em um contexto seguro (HTTPS ou localhost)
-      const isLocalhost = window.location.hostname === 'localhost' || 
-                         window.location.hostname === '127.0.0.1';
-      const isSecure = window.location.protocol === 'https:' || isLocalhost;
-      
+      const isLocalhost =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1";
+      const isSecure = window.location.protocol === "https:" || isLocalhost;
+
       if (!isSecure) {
-        setError('Acesso à câmera requer HTTPS. Em desenvolvimento, use localhost.');
+        setError(
+          "Acesso à câmera requer HTTPS. Em desenvolvimento, use localhost.",
+        );
         return;
       }
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setError('Seu navegador não suporta acesso à câmera. Tente usar Chrome ou Edge.');
+        setError(
+          "Seu navegador não suporta acesso à câmera. Tente usar Chrome ou Edge.",
+        );
         return;
       }
 
       // Primeiro listar dispositivos disponíveis
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
-      
+      const videoDevices = devices.filter(
+        (device) => device.kind === "videoinput",
+      );
+
       if (videoDevices.length === 0) {
-        setError('Nenhuma câmera encontrada no dispositivo.');
+        setError("Nenhuma câmera encontrada no dispositivo.");
         return;
       }
 
@@ -53,19 +69,19 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: 'environment',
+            facingMode: "environment",
             width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }
+            height: { ideal: 720 },
+          },
         });
       } catch (err) {
         // Se falhar, tentar câmera frontal
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: 'user',
+            facingMode: "user",
             width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }
+            height: { ideal: 720 },
+          },
         });
       }
 
@@ -73,38 +89,51 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         setCameraActive(true);
-        
+
         // Usar a API de Barcode Detection se disponível (navegadores modernos)
-        if ('BarcodeDetector' in window) {
+        if ("BarcodeDetector" in window) {
           detectBarcodes();
         } else {
-          setError('Seu navegador não suporta leitura automática de QR Code. Use o campo manual.');
+          setError(
+            "Seu navegador não suporta leitura automática de QR Code. Use o campo manual.",
+          );
         }
       }
     } catch (err: any) {
-      console.error('Erro ao acessar câmera:', err);
-      
-      if (err.name === 'NotAllowedError') {
-        setError('Permissão de câmera negada. Por favor, permita o acesso à câmera.');
-      } else if (err.name === 'NotFoundError') {
-        setError('Nenhuma câmera encontrada no dispositivo.');
-      } else if (err.name === 'NotSupportedError') {
-        setError('Seu navegador não suporta esta funcionalidade.');
+      console.error("Erro ao acessar câmera:", err);
+
+      if (err.name === "NotAllowedError") {
+        if (isWebView) {
+          setError(
+            "Permissão de câmera necessária. Verifique: \n1. Permissões do aplicativo\n2. Configurações do dispositivo\n3. Tente reiniciar o app",
+          );
+        }
+        setError(
+          "Permissão de câmera negada. Por favor, permita o acesso à câmera.",
+        );
+      } else if (err.name === "NotFoundError") {
+        setError("Nenhuma câmera encontrada no dispositivo.");
+      } else if (err.name === "NotSupportedError") {
+        setError("Seu navegador não suporta esta funcionalidade.");
       } else {
-        setError(`Erro: ${err.message || 'Não foi possível acessar a câmera'}`);
+        setError(`Erro: ${err.message || "Não foi possível acessar a câmera"}`);
       }
     }
   };
 
   const detectBarcodes = async () => {
-    if (!videoRef.current || !('BarcodeDetector' in window)) return;
+    if (!videoRef.current || !("BarcodeDetector" in window)) return;
 
     try {
       // @ts-ignore - BarcodeDetector é uma API experimental
-      const barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
-      
+      const barcodeDetector = new BarcodeDetector({ formats: ["qr_code"] });
+
       const detectFrame = async () => {
-        if (!scanning || !videoRef.current || videoRef.current.readyState !== 4) {
+        if (
+          !scanning ||
+          !videoRef.current ||
+          videoRef.current.readyState !== 4
+        ) {
           requestAnimationFrame(detectFrame);
           return;
         }
@@ -112,14 +141,14 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
         try {
           // @ts-ignore
           const barcodes = await barcodeDetector.detect(videoRef.current);
-          
+
           if (barcodes.length > 0) {
             const qrCode = barcodes[0];
             handleScanSuccess(qrCode.rawValue);
             return;
           }
         } catch (err) {
-          console.error('Erro na detecção:', err);
+          console.error("Erro na detecção:", err);
         }
 
         requestAnimationFrame(detectFrame);
@@ -127,15 +156,15 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
 
       detectFrame();
     } catch (err) {
-      console.error('Erro ao criar detector:', err);
-      setError('Não foi possível iniciar o scanner de QR Code.');
+      console.error("Erro ao criar detector:", err);
+      setError("Não foi possível iniciar o scanner de QR Code.");
     }
   };
 
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach((track) => track.stop());
       videoRef.current.srcObject = null;
       setCameraActive(false);
     }
@@ -143,7 +172,7 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
 
   const handleScanSuccess = (result: string) => {
     if (!scanning) return;
-    
+
     setScanning(false);
     stopCamera();
     onScan(result);
@@ -151,7 +180,7 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
   };
 
   const handleManualInput = () => {
-    const code = prompt('Digite o código do operador:');
+    const code = prompt("Digite o código do operador:");
     if (code && code.trim()) {
       handleScanSuccess(code.trim());
     }
@@ -171,7 +200,12 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
             <QrCode className="w-6 h-6" />
             <div>
               <h3 className="font-bold text-lg">Escanear QR Code</h3>
-              <p className="text-xs opacity-90">Posicione o código na área destacada</p>
+              {isWebView && (
+                <p className="text-xs opacity-90 flex items-center gap-1">
+                  <Smartphone className="w-3 h-3" />
+                  Modo Aplicativo
+                </p>
+              )}
             </div>
           </div>
           <button
@@ -189,11 +223,11 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
               <CameraOff className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <p className="text-red-500 font-medium mb-2">{error}</p>
               <p className="text-gray-300 text-sm mb-6">
-                {window.location.protocol === 'http:' && 
-                 !window.location.hostname.includes('localhost') &&
-                 !window.location.hostname.includes('127.0.0.1') ? 
-                  'Acesso à câmera requer HTTPS em produção.' : 
-                  'Verifique as permissões da câmera.'}
+                {window.location.protocol === "http:" &&
+                !window.location.hostname.includes("localhost") &&
+                !window.location.hostname.includes("127.0.0.1")
+                  ? "Acesso à câmera requer HTTPS em produção."
+                  : "Verifique as permissões da câmera."}
               </p>
               <div className="flex gap-3">
                 <button
@@ -219,7 +253,7 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
                 muted
                 className="absolute inset-0 w-full h-full object-cover"
               />
-              
+
               {/* Overlay de escaneamento */}
               <div className="relative z-10 w-full h-full flex items-center justify-center">
                 <div className="w-64 h-64 border-2 border-blue-500 rounded-xl relative">
@@ -228,7 +262,7 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
                   <div className="absolute -top-1 -right-1 w-6 h-6 border-t-2 border-r-2 border-blue-500 rounded-tr"></div>
                   <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-2 border-l-2 border-blue-500 rounded-bl"></div>
                   <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-2 border-r-2 border-blue-500 rounded-br"></div>
-                  
+
                   {/* Linha de escaneamento animada */}
                   <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-transparent via-blue-500 to-transparent animate-scan"></div>
                 </div>
@@ -258,7 +292,20 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
                 <span className="text-gray-500">Câmera inativa</span>
               )}
             </div>
-            
+
+            {isWebView && !cameraActive && (
+              <div className="bg-yellow-50 border border-yellow-200 p-3 mx-4 mt-4 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>WebView Detectado:</strong> Se a câmera não funcionar:
+                </p>
+                <ul className="text-xs text-yellow-700 mt-1 ml-4 list-disc">
+                  <li>Verifique as permissões do aplicativo</li>
+                  <li>Reinicie o aplicativo</li>
+                  <li>Use o modo manual se necessário</li>
+                </ul>
+              </div>
+            )}
+
             {cameraActive && (
               <button
                 onClick={toggleCamera}
@@ -277,7 +324,7 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
             <p className="text-xs text-gray-500">
               A leitura é automática. Mantenha o código estável e bem iluminado.
             </p>
-            
+
             <div className="pt-4">
               <button
                 onClick={handleManualInput}
@@ -293,7 +340,8 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
       {/* Dica para mobile */}
       <div className="mt-4 text-center text-white/80 max-w-md">
         <p className="text-sm">
-          Dica: Mantenha o QR Code a cerca de 15-20cm da câmera para melhor leitura
+          Dica: Mantenha o QR Code a cerca de 15-20cm da câmera para melhor
+          leitura
         </p>
       </div>
 
@@ -307,7 +355,7 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
             transform: translateY(256px);
           }
         }
-        
+
         .animate-scan {
           animation: scan 2s ease-in-out infinite;
         }
