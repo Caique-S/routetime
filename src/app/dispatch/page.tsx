@@ -89,7 +89,7 @@ export default function Home() {
   };
 
   const handlePermissionGuide = () => {
-    router.push("/permissions-guide");
+    router.push("/guide");
   };
 
   return (
