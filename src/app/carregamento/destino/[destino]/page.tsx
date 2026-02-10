@@ -59,6 +59,8 @@ interface CarregamentoData {
   destino: string;
   facility: string;
   timestamp: string;
+  status: "emFila" | "carregando" | "liberado",
+  posicaoVeiculo: number,
 }
 
 function DestinoContent() {
@@ -180,7 +182,13 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
     const existingData = carregamentos[motoristaId];
     
     if (existingData) {
-      setCarregamentoData(existingData);
+      const statusCorrigido = existingData.horarios?.encostadoDoca && existingData.horarios.encostadoDoca.trim() !== ''
+      ? 'carregando'
+      : existingData.status || 'emFila'; 
+      setCarregamentoData({
+    ...existingData,
+    status: statusCorrigido as any
+  });
     } else {
       // Criar novo objeto de carregamento
       setCarregamentoData({
@@ -192,7 +200,9 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
         motorista: motorista,
         destino: destinoCodigo,
         facility: facility,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        status: "emFila",
+        posicaoVeiculo: 0
       });
     }
   };
@@ -207,24 +217,37 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
     if (!selectedMotorista || !carregamentoData) return;
 
     const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
-    const updatedCarregamentos = {
-      ...carregamentos,
-      [motoristaId]: carregamentoData
+
+  // Verificar se é o modal de horários e se encostadoDoca está preenchido
+  let dadosAtualizados = { ...carregamentoData };
+  
+  if (activeModal === 'horarios' && carregamentoData.horarios.encostadoDoca) {
+    // Atualizar status para "carregando" se encostadoDoca estiver preenchido
+    dadosAtualizados = {
+      ...carregamentoData,
+      status: 'carregando' as const
     };
-
-    setCarregamentos(updatedCarregamentos);
-    localStorage.setItem('carregamentos_' + destinoCodigo + '_' + facility, JSON.stringify(updatedCarregamentos));
-    handleCloseModal();
+  }
+  
+  const updatedCarregamentos = {
+    ...carregamentos,
+    [motoristaId]: dadosAtualizados
   };
 
-  const handleDocaChange = (value: string) => {
-    if (carregamentoData) {
-      setCarregamentoData({
-        ...carregamentoData,
-        doca: value
-      });
-    }
+  setCarregamentos(updatedCarregamentos);
+  localStorage.setItem('carregamentos_' + destinoCodigo + '_' + facility, JSON.stringify(updatedCarregamentos));
+  handleCloseModal();
+
   };
+
+    const handleDocaChange = (value: string) => {
+     if (carregamentoData) {
+       setCarregamentoData({
+         ...carregamentoData,
+         doca: value
+       });
+     }
+  }
 
   const handleCargaChange = (tipo: 'gaiolas' | 'volumosos' | 'manga', value: string) => {
     if (carregamentoData) {
@@ -285,6 +308,33 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
   }
 };
 
+const handleUpdateStatus = (motorista: any, newStatus: "emFila" | "carregando" | "liberado") => {
+  const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
+  const updatedCarregamentos = { ...carregamentos };
+  
+  if (updatedCarregamentos[motoristaId]) {
+    updatedCarregamentos[motoristaId] = {
+      ...updatedCarregamentos[motoristaId],
+      status: newStatus
+    };
+    
+    // Se for mudar para "liberado", calcular posição
+    if (newStatus === "liberado") {
+      const liberadosCount = Object.values(updatedCarregamentos).filter(
+        (c: CarregamentoData) => 
+          c.destino === destinoCodigo && 
+          c.facility === facility && 
+          c.status === "liberado"
+      ).length;
+      
+      updatedCarregamentos[motoristaId].posicaoVeiculo = liberadosCount + 1;
+    }
+    
+    setCarregamentos(updatedCarregamentos);
+    localStorage.setItem('carregamentos_' + destinoCodigo + '_' + facility, JSON.stringify(updatedCarregamentos));
+  }
+};
+  
   const calcularPrevisaoChegada = (saidaLiberada: string, destinoCodigo: string): string => {
     if (!saidaLiberada) return "";
     
@@ -323,11 +373,11 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
     return saida.getHours().toString().padStart(2, '0') + ':' + 
            saida.getMinutes().toString().padStart(2, '0');
   };
-
+  
   const generateId = (): string => {
     return Math.floor(10000000 + Math.random() * 90000000).toString();
   };
-
+  
   const handleSelecionarMotorista = (motorista: any) => {
     const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
     localStorage.setItem('motoristaSelecionadoId', motoristaId);
@@ -336,7 +386,7 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
     
     router.push(`/carregamento/create`);
   };
-
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex items-center justify-center safe-area">
@@ -350,7 +400,7 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
       </div>
     );
   }
-
+  
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 safe-area">
       {/* Header */}
@@ -409,8 +459,11 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
                 return (
                   <div
                     key={index}
-                    className="bg-white rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 p-6 text-left group"
-                  >
+                    className={`bg-white rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 p-6 text-left group
+                    ${dadosCarregamento?.status === 'carregando' ? 'border-orange-400' : 
+                      dadosCarregamento?.status === 'liberado' ? 'border-green-500' : 'border-gray-200' }
+                    `}
+>
                     <div
                       className="cursor-pointer"
                       onClick={() => handleSelecionarMotorista(motorista)}
@@ -418,7 +471,8 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center space-x-3">
                           <div className="w-12 h-12 bg-linear-to-br from-blue-100 to-blue-50 rounded-lg flex items-center justify-center">
-                            <Users className="w-6 h-6 text-blue-600" />
+                            <Users className={`w-6 h-6 ${dadosCarregamento?.status === 'carregando' 
+                            ? 'text-orange-500' : dadosCarregamento?.status === 'liberado' ? 'text-green-500' : 'text-blue-600' }`} />
                           </div>
                           <div>
                             <h3 className="font-bold text-gray-900">

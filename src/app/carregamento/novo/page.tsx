@@ -29,7 +29,7 @@ interface DestinoInfo {
   facility: string;
   motoristasCount: number;
   veiculosCount: number;
-  ultimoCarregamento?: string;
+  atribuicao?: string;
 }
 // Função para mapear códigos de destino para nomes amigáveis
 const getNomeDestino = (codigo: string): string => {
@@ -105,7 +105,7 @@ export default function NovoCarregamentoPage() {
                 facility: facility,
                 motoristasCount: 1,
                 veiculosCount: item["Tipo de veículo"] ? 1 : 0,
-                ultimoCarregamento:
+                atribuicao:
                   item["Data de início"] || new Date().toISOString(),
               });
             } else {
@@ -344,13 +344,13 @@ export default function NovoCarregamentoPage() {
                   </div>
 
                   {/* Data do Último Carregamento */}
-                  {destino.ultimoCarregamento && (
+                  {destino.atribuicao && (
                     <div className="flex items-center gap-2 text-xs text-gray-600">
                       <Calendar className="w-3.5 h-3.5" />
                       <span>
-                        Último:{" "}
+                        Atribuído:{" "}
                         {new Date(
-                          destino.ultimoCarregamento,
+                          destino.atribuicao,
                         ).toLocaleDateString("pt-BR")}
                       </span>
                     </div>

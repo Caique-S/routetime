@@ -51,6 +51,8 @@ interface CarregamentoData {
     placa: string;
     transportadora: string;
     dataInicio: string;
+    status?: "emFila" | "carregando" | "liberado";
+    posicaoVeiculo?: number;
   };
   destino: string;
   facility: string;
@@ -202,6 +204,8 @@ export default function CreatePage() {
     
     // 4. Lacres: apenas o traseiro é obrigatório
     const hasLacres = !!data.lacres.traseiro && data.lacres.traseiro.trim() !== "";
+
+    const hasStatus = data.motorista.status === 'carregando'
     
     console.log('Verificação de completude:', {
       hasDoca,
@@ -213,7 +217,7 @@ export default function CreatePage() {
       lacres: data.lacres
     });
     
-    setIsComplete(hasDoca && hasCarga && hasHorarios && hasLacres);
+    setIsComplete(hasDoca && hasCarga && hasHorarios && hasLacres && hasStatus);
   };
 
   const getNomeDestino = (codigo: string): string => {
@@ -312,11 +316,11 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
     }
   };
 
-  const handleVoltar = () => {
+  const handleVoltar = async () => {
     router.back();
   };
 
-  const handleFinalizar = () => {
+  const handleFinalizar = async () => {
     // Validar novamente antes de finalizar
     if (!carregamento) return;
     
@@ -326,14 +330,19 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
       alert("Por favor, complete todos os campos obrigatórios antes de finalizar.");
       return;
     }
-    
-    alert("Carregamento finalizado e salvo com sucesso!");
-    
-    localStorage.removeItem('motoristaSelecionadoId');
+
+    const enviado = await enviarParaBanco(carregamento);
+
+    if(enviado){
+      alert("Carregamento finalizado e salvo com sucesso!");
+          localStorage.removeItem('motoristaSelecionadoId');
     localStorage.removeItem('MotoristaSelecionado');
     localStorage.removeItem('DestinoAtual');
+    router.push("/carregamento/destino");
+    }else{
+      alert("Erro ao salvar no banco de dados. Tente novamente.");
+    }
     
-    router.push("/carregamento/novo");
   };
 
   const handleEditar = () => {
@@ -343,6 +352,85 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
       router.push("/carregamento/novo");
     }
   };
+
+  const enviarParaBanco = async (carregamentoData: CarregamentoData) => {
+  try {
+    // Primeiro, calcular posição baseada em quantos já foram liberados para este destino
+    const chaveBase = `carregamentos_${carregamentoData.destino}_${carregamentoData.facility}`;
+    const carregamentosStr = localStorage.getItem(chaveBase);
+    let liberadosCount = 1;
+    
+    if (carregamentosStr) {
+      const carregamentos = JSON.parse(carregamentosStr);
+      liberadosCount = Object.values(carregamentos).filter(
+        (c: any) => c.status === 'liberado'
+      ).length + 1;
+    }
+    
+    // Atualizar posição localmente
+    const updatedData = {
+      ...carregamentoData,
+      posicaoVeiculo: liberadosCount,
+      status: "liberado" as const
+    };
+    
+    // Preparar dados para o banco
+    const dadosParaBanco = {
+      ...updatedData,
+      operador: localStorage.getItem("operador_nome") || "Não identificado",
+      dataEnvio: new Date().toISOString(),
+      mensagemDespacho: `Veiculo ${getNomeDestino(updatedData.destino)} (${liberadosCount}) saindo nesse exato momento. Obs: ${updatedData.carga.gaiolas} Gaiolas, ${updatedData.carga.volumosos} Volumosos e ${updatedData.carga.manga} Manga Palets.`,
+      mensagemXPT: `*ID:* ${updatedData.motorista.travelId}
+*Doca:* (${updatedData.doca || "Não definida"})
+*${updatedData.motorista.tipoVeiculo}:* ${getNomeDestino(updatedData.destino)} (${liberadosCount})
+*Condutor:* ${updatedData.motorista.nome}
+*Placa Tração:* ${updatedData.motorista.veiculoTracao}
+${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${updatedData.motorista.veiculoCarga}` : ''}
+
+*Encostado na doca:* ${updatedData.horarios.encostadoDoca || "Não registrado"}
+*Início carregamento:* ${updatedData.horarios.inicioCarregamento || "Não registrado"}
+*Término carregamento:* ${updatedData.horarios.terminoCarregamento || "Não registrado"}
+*Saída liberada:* ${updatedData.horarios.saidaLiberada || "Não registrado"}
+*Previsão de chegada:* ${updatedData.horarios.previsaoChegada || "Não calculado"}
+
+*Lacre Traseiro:* ${updatedData.lacres.traseiro || ""}
+*Lacre Lateral 1:* ${updatedData.lacres.lateral1 || ""}
+*Lacre Lateral 2:* ${updatedData.lacres.lateral2 || ""}
+
+*Total de gaiolas:* ${updatedData.carga.gaiolas}
+*Total de volumosos:* ${updatedData.carga.volumosos}
+*Total de manga palete:* ${updatedData.carga.manga}`
+    };
+    
+    // Enviar para o banco
+    const response = await fetch('/api/carregamento', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dadosParaBanco),
+    });
+    
+    if (response.ok) {
+      // Atualizar localStorage com status liberado
+      const motoristaId = `${carregamentoData.destino}_${carregamentoData.facility}_${carregamentoData.motorista.nome}_${carregamentoData.motorista.travelId}`;
+      const carregamentosAtualizados = {
+        ...JSON.parse(carregamentosStr || '{}'),
+        [motoristaId]: updatedData
+      };
+      
+      localStorage.setItem(chaveBase, JSON.stringify(carregamentosAtualizados));
+      return true;
+    } else {
+      console.error('Erro ao enviar para o banco:', await response.json());
+      return false;
+    }
+    
+  } catch (error) {
+    console.error('Erro ao enviar para o banco:', error);
+    return false;
+  }
+};
 
   if (loading) {
     return (
@@ -437,7 +525,7 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
                 <button
                   onClick={handleDespachar}
                   className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors relative"
-                  disabled={!!copiado}
+                  disabled={!isComplete || !!copiado}
                 >
                   <Truck className="w-4 h-4" />
                   {copiado === 'despachar' ? 'Copiado!' : 'Despachar'}
@@ -445,7 +533,7 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
                 <button
                   onClick={handleInformacoesXPT}
                   className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors relative"
-                  disabled={!!copiado}
+                  disabled={!isComplete || !!copiado}
                 >
                   <BookType className="w-4 h-4" />
                   {copiado === 'xpt' ? 'Copiado!' : 'Informações XPT'}
