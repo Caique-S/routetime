@@ -525,7 +525,7 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                 <button
                   onClick={handleDespachar}
                   className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors relative"
-                  disabled={!isComplete || !!copiado}
+                  disabled={!!copiado}
                 >
                   <Truck className="w-4 h-4" />
                   {copiado === 'despachar' ? 'Copiado!' : 'Despachar'}
@@ -533,7 +533,7 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                 <button
                   onClick={handleInformacoesXPT}
                   className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors relative"
-                  disabled={!isComplete || !!copiado}
+                  disabled={!!copiado}
                 >
                   <BookType className="w-4 h-4" />
                   {copiado === 'xpt' ? 'Copiado!' : 'Informações XPT'}
