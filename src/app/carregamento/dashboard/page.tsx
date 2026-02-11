@@ -115,7 +115,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-gray-500">Monitoramento de Carregamentos</p>
               </div>
             </div>
-            
+          
             <div className="flex items-center space-x-4">
               <Link
                 href="/dispatch"

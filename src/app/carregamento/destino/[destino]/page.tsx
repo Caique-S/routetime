@@ -61,6 +61,7 @@ interface CarregamentoData {
   timestamp: string;
   status: "emFila" | "carregando" | "liberado";
   posicaoVeiculo?: number;
+  finalizado?: boolean;
 }
 
 function DestinoContent() {
@@ -74,6 +75,7 @@ function DestinoContent() {
   const [destinoInfo, setDestinoInfo] = useState<any>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [selectedMotorista, setSelectedMotorista] = useState<any>(null);
+  const [filter, setFilter] = useState<"active" | "finalized">("active");
   const [carregamentoData, setCarregamentoData] =
     useState<CarregamentoData | null>(null);
   const [carregamentos, setCarregamentos] = useState<
@@ -250,70 +252,75 @@ function DestinoContent() {
     setCarregamentoData(null);
   };
 
-const handleSaveModal = () => {
-  if (!selectedMotorista || !carregamentoData) return;
+  const handleSaveModal = () => {
+    if (!selectedMotorista || !carregamentoData) return;
 
-  const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
+    const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
 
-  let dadosAtualizados = { ...carregamentoData };
+    let dadosAtualizados = { ...carregamentoData };
 
-  if (
-    (activeModal === "horarios" || activeModal === "carga" || activeModal === "lacres") &&
-    carregamentoData.horarios.encostadoDoca?.trim() !== ""
-  ) {
-    const saidaLiberada = carregamentoData.horarios.saidaLiberada?.trim() && carregamentoData.lacres.traseiro?.trim()
+    if (
+      (activeModal === "horarios" ||
+        activeModal === "carga" ||
+        activeModal === "lacres") &&
+      carregamentoData.horarios.encostadoDoca?.trim() !== ""
+    ) {
+      const saidaLiberada =
+        carregamentoData.horarios.saidaLiberada?.trim() &&
+        carregamentoData.lacres.traseiro?.trim();
 
-    if (saidaLiberada) {
-      // --- STATUS LIBERADO ---
-      const chaveCarregamentos = `carregamentos_${destinoCodigo}_${facility}`;
-      const carregamentosSalvos = localStorage.getItem(chaveCarregamentos);
-      let liberadosCount = 0;
+      if (saidaLiberada) {
+        // --- STATUS LIBERADO ---
+        const chaveCarregamentos = `carregamentos_${destinoCodigo}_${facility}`;
+        const carregamentosSalvos = localStorage.getItem(chaveCarregamentos);
+        let liberadosCount = 0;
 
-      if (carregamentosSalvos) {
-        try {
-          const parsed = JSON.parse(carregamentosSalvos);
-          liberadosCount = Object.entries(parsed).filter(
-            ([id, c]: [string,any]) => c.status === "liberado" && id !== motoristaId
-          ).length;
-        } catch (e) {
-          console.error("Erro ao ler carregamentos salvos:", e);
+        if (carregamentosSalvos) {
+          try {
+            const parsed = JSON.parse(carregamentosSalvos);
+            liberadosCount = Object.entries(parsed).filter(
+              ([id, c]: [string, any]) =>
+                c.status === "liberado" && id !== motoristaId,
+            ).length;
+          } catch (e) {
+            console.error("Erro ao ler carregamentos salvos:", e);
+          }
         }
+
+        const novaPosicao = liberadosCount + 1;
+
+        dadosAtualizados = {
+          ...carregamentoData,
+          status: "liberado",
+          posicaoVeiculo: novaPosicao,
+        };
+      } else {
+        // --- STATUS CARREGANDO ---
+        dadosAtualizados = {
+          ...carregamentoData,
+          status: "carregando",
+          posicaoVeiculo: undefined, // ✅ em vez de delete
+        };
       }
-
-      const novaPosicao = liberadosCount + 1;
-
-      dadosAtualizados = {
-        ...carregamentoData,
-        status: "liberado",
-        posicaoVeiculo: novaPosicao,
-      };
     } else {
-      // --- STATUS CARREGANDO ---
-      dadosAtualizados = {
-        ...carregamentoData,
-        status: "carregando",
-        posicaoVeiculo: undefined, // ✅ em vez de delete
-      };
+      // Se a condição não for atendida, mantém o status atual, mas remove a posição se não for liberado
+      if (dadosAtualizados.status !== "liberado") {
+        dadosAtualizados.posicaoVeiculo = undefined; // ✅ em vez de delete
+      }
     }
-  } else {
-    // Se a condição não for atendida, mantém o status atual, mas remove a posição se não for liberado
-    if (dadosAtualizados.status !== "liberado") {
-      dadosAtualizados.posicaoVeiculo = undefined; // ✅ em vez de delete
-    }
-  }
 
-  const updatedCarregamentos = {
-    ...carregamentos,
-    [motoristaId]: dadosAtualizados,
+    const updatedCarregamentos = {
+      ...carregamentos,
+      [motoristaId]: dadosAtualizados,
+    };
+
+    setCarregamentos(updatedCarregamentos);
+    localStorage.setItem(
+      `carregamentos_${destinoCodigo}_${facility}`,
+      JSON.stringify(updatedCarregamentos),
+    );
+    handleCloseModal();
   };
-
-  setCarregamentos(updatedCarregamentos);
-  localStorage.setItem(
-    `carregamentos_${destinoCodigo}_${facility}`,
-    JSON.stringify(updatedCarregamentos)
-  );
-  handleCloseModal();
-};
 
   const handleDocaChange = (value: string) => {
     if (carregamentoData) {
@@ -473,6 +480,20 @@ const handleSaveModal = () => {
     );
   }
 
+
+const motoristasFiltrados = motoristas.filter(motorista => {
+  const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
+  const dados = carregamentos[motoristaId];
+  
+  if (filter === 'active') {
+    // Em andamento: não finalizados OU sem registro (nunca foram finalizados)
+    return !dados?.finalizado;
+  } else {
+    // Finalizados: possuem a flag finalizado = true
+    return dados?.finalizado === true;
+  }
+});
+
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 safe-area">
       {/* Header */}
@@ -513,10 +534,51 @@ const handleSaveModal = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        {/* Resumo do Destino */}
-        <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-2xl shadow-xl p-6 text-white mb-8">
-          <div className="text-1sm text-white-600">
-            {motoristas.length} motorista(s) encontrado(s)
+        {/* Filtros: Em andamento / Finalizados */}
+        <div className="mb-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setFilter("active")}
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    filter === "active"
+                      ? "bg-blue-600 text-white shadow-md"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  🚛 Pendentes
+                  <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                    {
+                      motoristas.filter((m) => {
+                        const id = `${destinoCodigo}_${facility}_${m.nome}_${m.travelId}`;
+                        const dados = carregamentos[id];
+                        return !dados?.finalizado;
+                      }).length
+                    }
+                  </span>
+                </button>
+                <button
+                  onClick={() => setFilter("finalized")}
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    filter === "finalized"
+                      ? "bg-gray-700 text-white shadow-md"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  ✅ Finalizados
+                  <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                    {
+                      motoristas.filter((m) => {
+                        const id = `${destinoCodigo}_${facility}_${m.nome}_${m.travelId}`;
+                        const dados = carregamentos[id];
+                        return dados?.finalizado === true;
+                      }).length
+                    }
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -524,7 +586,7 @@ const handleSaveModal = () => {
         <div className="mb-8">
           {motoristas.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {motoristas.map((motorista, index) => {
+              {motoristasFiltrados.map((motorista, index) => {
                 const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
                 const dadosCarregamento = carregamentos[motoristaId];
 
@@ -543,7 +605,12 @@ const handleSaveModal = () => {
                   >
                     <div
                       className="cursor-pointer"
-                      onClick={() => handleSelecionarMotorista(motorista)}
+                      onClick={() => {
+    // Só permite clique se NÃO estiver na aba finalizados
+    if (filter !== 'finalized' && dadosCarregamento?.finalizado !== true) {
+      handleSelecionarMotorista(motorista);
+    }
+  }}
                     >
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center space-x-3">
@@ -648,7 +715,9 @@ const handleSaveModal = () => {
                             handleOpenModal("carga", motorista);
                           }}
                           className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                            dadosCarregamento?.carga?.gaiolas && dadosCarregamento?.carga?.volumosos && dadosCarregamento?.carga?.manga
+                            dadosCarregamento?.carga?.gaiolas &&
+                            dadosCarregamento?.carga?.volumosos &&
+                            dadosCarregamento?.carga?.manga
                               ? "bg-green-100 text-green-700 border border-green-300"
                               : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
                           }`}

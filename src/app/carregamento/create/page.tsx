@@ -423,12 +423,16 @@ ${data.motorista.veiculoCarga && data.motorista.veiculoCarga !== "Não especific
 
 const enviarParaBanco = async (carregamentoData: CarregamentoData) => {
   try {
-    // 1. Preparar payload – APENAS os dados que o banco precisa
+    // 1. Gerar motoristaId
+    const motoristaId = `${carregamentoData.destino}_${carregamentoData.facility}_${carregamentoData.motorista.nome}_${carregamentoData.motorista.travelId}`;
+    const chaveBase = `carregamentos_${carregamentoData.destino}_${carregamentoData.facility}`;
+
+    // 2. Preparar payload para o banco
     const dadosParaBanco = {
       ...carregamentoData,
+      motoristaId, // <-- enviar também para o banco
       operador: localStorage.getItem("operador_nome") || "Não identificado",
       dataEnvio: new Date().toISOString(),
-      // Opcional: gerar mensagens novamente (pode ser útil para histórico)
       mensagemDespacho: `Veiculo ${getNomeDestino(carregamentoData.destino)} (${carregamentoData.posicaoVeiculo?.toString().padStart(2, '0')}) saindo nesse exato momento. Obs: ${carregamentoData.carga.gaiolas} Gaiolas, ${carregamentoData.carga.volumosos} Volumosos e ${carregamentoData.carga.manga} Manga Palets.`,
       mensagemXPT: `*ID:* ${carregamentoData.motorista.travelId}
 *Doca:* (${carregamentoData.doca || "Não definida"})
@@ -452,7 +456,7 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
 *Total de manga palete:* ${carregamentoData.carga.manga}`
     };
 
-    // 2. Enviar para o banco
+    // 3. Enviar para o banco
     const response = await fetch('/api/carregamento', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -460,16 +464,29 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
     });
 
     if (response.ok) {
-      // 3. Limpeza: remover dados temporários do motorista selecionado
+      // ✅ 4. Marcar como finalizado no localStorage
+      const carregamentosStr = localStorage.getItem(chaveBase);
+      if (carregamentosStr) {
+        const carregamentos = JSON.parse(carregamentosStr);
+        if (carregamentos[motoristaId]) {
+          carregamentos[motoristaId] = {
+            ...carregamentos[motoristaId],
+            finalizado: true,  // <-- flag de finalizado
+          };
+          localStorage.setItem(chaveBase, JSON.stringify(carregamentos));
+        }
+      }
+
+      // 5. Limpeza das chaves temporárias
       localStorage.removeItem('motoristaSelecionadoId');
       localStorage.removeItem('MotoristaSelecionado');
       localStorage.removeItem('DestinoAtual');
+
       return true;
     } else {
       console.error('Erro ao enviar para o banco:', await response.json());
       return false;
     }
-    
   } catch (error) {
     console.error('Erro ao enviar para o banco:', error);
     return false;
