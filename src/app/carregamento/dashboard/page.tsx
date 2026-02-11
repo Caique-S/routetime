@@ -118,11 +118,11 @@ export default function DashboardPage() {
             
             <div className="flex items-center space-x-4">
               <Link
-                href="/carregamento/novo"
+                href="/dispatch"
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
               >
                 <Package className="w-4 h-4" />
-                <span>Novo Carregamento</span>
+                <span>Relatório</span>
               </Link>
             </div>
           </div>

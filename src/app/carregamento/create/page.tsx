@@ -51,8 +51,8 @@ interface CarregamentoData {
     placa: string;
     transportadora: string;
     dataInicio: string;
-    status?: "emFila" | "carregando" | "liberado";
   };
+  status?: "emFila" | "carregando" | "liberado";
   posicaoVeiculo?: number;
   destino: string;
   facility: string;
@@ -219,13 +219,14 @@ export default function CreatePage() {
     const hasLacres =
       !!data.lacres.traseiro && data.lacres.traseiro.trim() !== "";
 
-    const hasStatus = data.motorista.status === "liberado";
+    const hasStatus = data.status === "liberado";
 
     console.log("Verificação de completude:", {
       hasDoca,
       hasCarga,
       hasHorarios,
       hasLacres,
+      hasStatus,
       carga: data.carga,
       horarios: data.horarios,
       lacres: data.lacres,
@@ -273,67 +274,120 @@ export default function CreatePage() {
     }
   };
 
-  const handleDespachar = async () => {
-    if (!carregamento) return;
+  const fetchCarregamentoFromDB = async (motoristaId: string) => {
+  try {
+    setLoading(true);
+    const response = await fetch(`/api/carregamento?motoristaId=${encodeURIComponent(motoristaId)}`);
+    const result = await response.json();
 
-    const mensagem = `Veiculo ${getNomeDestino(carregamento.destino)} (0${carregamento.posicaoVeiculo}) saindo nesse exato momento. Obs: ${carregamento.carga.gaiolas} Gaiolas, ${carregamento.carga.volumosos} Volumosos e ${carregamento.carga.manga} Manga Palets.`;
+    if (result.success && result.data.length > 0) {
+      // Pega o primeiro registro (deve ser único)
+      const dbData = result.data[0];
+      
+      // Converte _id para id e remove _id (para manter compatibilidade)
+      const { _id, ...rest } = dbData;
+      const carregamentoData = { 
+        ...rest, 
+        id: _id,
+        // Garante que posicaoVeiculo seja número, se existir
+        posicaoVeiculo: dbData.posicaoVeiculo 
+      };
 
-    const copiadoComSucesso = await copyToClipboard(mensagem);
-
-    if (copiadoComSucesso) {
-      setCopiado("despachar");
-
-      setTimeout(() => {
-        setCopiado(null);
-        window.open(
-          "https://chat.whatsapp.com/G5PEe8GbLZWAavzBkpSuKE?mode=gi_t",
-          "_blank",
-        );
-      }, 1000);
-    } else {
-      alert("Não foi possível copiar a mensagem. Tente novamente.");
+      setCarregamento(carregamentoData);
+      checkCompletion(carregamentoData);
+      return carregamentoData;
     }
-  };
+  } catch (error) {
+    console.error('Erro ao buscar carregamento do banco:', error);
+  } finally {
+    setLoading(false);
+  }
+  return null;
+};
 
-  const handleInformacoesXPT = async () => {
-    if (!carregamento) return;
-    const content = `*ID:* ${carregamento.motorista.travelId}
-*Doca:* (${carregamento.doca || "Não definida"})
-*${carregamento.motorista.tipoVeiculo}:* ${getNomeDestino(carregamento.destino)} (0${carregamento.posicaoVeiculo})
-*Condutor:* ${carregamento.motorista.nome}
-*Placa Tração:* ${carregamento.motorista.veiculoTracao}
-${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${carregamento.motorista.veiculoCarga}` : ""}
+const handleDespachar = async () => {
+  // Tenta usar o carregamento já carregado no estado
+  let data = carregamento;
 
-*Encostado na doca:* ${carregamento.horarios.encostadoDoca || "Não registrado"}
-*Início carregamento:* ${carregamento.horarios.inicioCarregamento || "Não registrado"}
-*Término carregamento:* ${carregamento.horarios.terminoCarregamento || "Não registrado"}
-*Saída liberada:* ${carregamento.horarios.saidaLiberada || "Não registrado"}
-*Previsão de chegada:* ${carregamento.horarios.previsaoChegada || "Não calculado"}
-
-*Lacre Traseiro:* ${carregamento.lacres.traseiro || "Não registrado"}
-*Lacre Lateral 1:* ${carregamento.lacres.lateral1 || "Não registrado"}
-*Lacre Lateral 2:* ${carregamento.lacres.lateral2 || "Não registrado"}
-
-*Total de gaiolas:* ${carregamento.carga.gaiolas}
-*Total de volumosos:* ${carregamento.carga.volumosos}
-*Total de manga palete:* ${carregamento.carga.manga}`;
-
-    const copiadoComSucesso = await copyToClipboard(content);
-
-    if (copiadoComSucesso) {
-      setCopiado("xpt");
-
-      setTimeout(() => {
-        setCopiado(null);
-        window.open(
-          "https://chat.whatsapp.com/KgobWakeXIx1M0VCGki5dN?mode=gi_t",
-          "_blank",
-        );
-      }, 1000);
-    } else {
-      alert("Não foi possível copiar as informações. Tente novamente.");
+  // Se não existir ou não tiver posição, busca do banco
+  if (!data || !data.posicaoVeiculo) {
+    const motoristaId = localStorage.getItem('motoristaSelecionadoId');
+    if (motoristaId) {
+      data = await fetchCarregamentoFromDB(motoristaId);
     }
-  };
+  }
+
+  if (!data) {
+    alert('Não foi possível carregar os dados do carregamento. Tente novamente.');
+    return;
+  }
+
+  const posicao = data.posicaoVeiculo?.toString().padStart(2, '0') || '';
+  const mensagem = `Veiculo ${getNomeDestino(data.destino)} (${posicao}) saindo nesse exato momento. Obs: ${data.carga.gaiolas} Gaiolas, ${data.carga.volumosos} Volumosos e ${data.carga.manga} Manga Palets.`;
+
+  const copiadoComSucesso = await copyToClipboard(mensagem);
+
+  if (copiadoComSucesso) {
+    setCopiado('despachar');
+    setTimeout(() => {
+      setCopiado(null);
+      window.open('https://chat.whatsapp.com/G5PEe8GbLZWAavzBkpSuKE?mode=gi_t', '_blank');
+    }, 1000);
+  } else {
+    alert('Não foi possível copiar a mensagem. Tente novamente.');
+  }
+};
+
+const handleInformacoesXPT = async () => {
+  let data = carregamento;
+
+  if (!data || !data.posicaoVeiculo) {
+    const motoristaId = localStorage.getItem('motoristaSelecionadoId');
+    if (motoristaId) {
+      data = await fetchCarregamentoFromDB(motoristaId);
+    }
+  }
+
+  if (!data) {
+    alert('Não foi possível carregar os dados do carregamento. Tente novamente.');
+    return;
+  }
+
+  const posicao = data.posicaoVeiculo?.toString().padStart(2, '0') || '';
+  const content = 
+`*ID:* ${data.motorista.travelId}
+*Doca:* (${data.doca || "Não definida"})
+*${data.motorista.tipoVeiculo}:* ${getNomeDestino(data.destino)} (${posicao})
+*Condutor:* ${data.motorista.nome}
+*Placa Tração:* ${data.motorista.veiculoTracao}
+${data.motorista.veiculoCarga && data.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${data.motorista.veiculoCarga}` : ''}
+
+*Encostado na doca:* ${data.horarios.encostadoDoca || "Não registrado"}
+*Início carregamento:* ${data.horarios.inicioCarregamento || "Não registrado"}
+*Término carregamento:* ${data.horarios.terminoCarregamento || "Não registrado"}
+*Saída liberada:* ${data.horarios.saidaLiberada || "Não registrado"}
+*Previsão de chegada:* ${data.horarios.previsaoChegada || "Não calculado"}
+
+*Lacre Traseiro:* ${data.lacres.traseiro || "Não registrado"}
+*Lacre Lateral 1:* ${data.lacres.lateral1 || "Não registrado"}
+*Lacre Lateral 2:* ${data.lacres.lateral2 || "Não registrado"}
+
+*Total de gaiolas:* ${data.carga.gaiolas}
+*Total de volumosos:* ${data.carga.volumosos}
+*Total de manga palete:* ${data.carga.manga}`;
+
+  const copiadoComSucesso = await copyToClipboard(content);
+
+  if (copiadoComSucesso) {
+    setCopiado('xpt');
+    setTimeout(() => {
+      setCopiado(null);
+      window.open('https://chat.whatsapp.com/KgobWakeXIx1M0VCGki5dN?mode=gi_t', '_blank');
+    }, 1000);
+  } else {
+    alert('Não foi possível copiar as informações. Tente novamente.');
+  }
+};
 
   const handleVoltar = async () => {
     router.back();
@@ -345,21 +399,13 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
 
     checkCompletion(carregamento);
 
-    if (!isComplete) {
-      alert(
-        "Por favor, complete todos os campos obrigatórios antes de finalizar.",
-      );
-      return;
-    }
-
     const enviado = await enviarParaBanco(carregamento);
 
     if (enviado) {
-      alert("Carregamento finalizado e salvo com sucesso!");
       localStorage.removeItem("motoristaSelecionadoId");
       localStorage.removeItem("MotoristaSelecionado");
       localStorage.removeItem("DestinoAtual");
-      router.push("/carregamento/destino");
+      router.push(`/carregamento/destino/${carregamento.destino}?facility=${carregamento.facility}`);
     } else {
       alert("Erro ao salvar no banco de dados. Tente novamente.");
     }
@@ -375,87 +421,60 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
     }
   };
 
-  const enviarParaBanco = async (carregamentoData: CarregamentoData) => {
-    try {
-      // Primeiro, calcular posição baseada em quantos já foram liberados para este destino
-      const chaveBase = `carregamentos_${carregamentoData.destino}_${carregamentoData.facility}`;
-      const carregamentosStr = localStorage.getItem(chaveBase);
-      let liberadosCount = 1;
+const enviarParaBanco = async (carregamentoData: CarregamentoData) => {
+  try {
+    // 1. Preparar payload – APENAS os dados que o banco precisa
+    const dadosParaBanco = {
+      ...carregamentoData,
+      operador: localStorage.getItem("operador_nome") || "Não identificado",
+      dataEnvio: new Date().toISOString(),
+      // Opcional: gerar mensagens novamente (pode ser útil para histórico)
+      mensagemDespacho: `Veiculo ${getNomeDestino(carregamentoData.destino)} (${carregamentoData.posicaoVeiculo?.toString().padStart(2, '0')}) saindo nesse exato momento. Obs: ${carregamentoData.carga.gaiolas} Gaiolas, ${carregamentoData.carga.volumosos} Volumosos e ${carregamentoData.carga.manga} Manga Palets.`,
+      mensagemXPT: `*ID:* ${carregamentoData.motorista.travelId}
+*Doca:* (${carregamentoData.doca || "Não definida"})
+*${carregamentoData.motorista.tipoVeiculo}:* ${getNomeDestino(carregamentoData.destino)} (${carregamentoData.posicaoVeiculo?.toString().padStart(2, '0')})
+*Condutor:* ${carregamentoData.motorista.nome}
+*Placa Tração:* ${carregamentoData.motorista.veiculoTracao}
+${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${carregamentoData.motorista.veiculoCarga}` : ''}
 
-      if (carregamentosStr) {
-        const carregamentos = JSON.parse(carregamentosStr);
-        liberadosCount =
-          Object.values(carregamentos).filter(
-            (c: any) => c.status === "liberado",
-          ).length + 1;
-      }
+*Encostado na doca:* ${carregamentoData.horarios.encostadoDoca || "Não registrado"}
+*Início carregamento:* ${carregamentoData.horarios.inicioCarregamento || "Não registrado"}
+*Término carregamento:* ${carregamentoData.horarios.terminoCarregamento || "Não registrado"}
+*Saída liberada:* ${carregamentoData.horarios.saidaLiberada || "Não registrado"}
+*Previsão de chegada:* ${carregamentoData.horarios.previsaoChegada || "Não calculado"}
 
-      // Atualizar posição localmente
-      const updatedData = {
-        ...carregamentoData,
-        posicaoVeiculo: liberadosCount,
-        status: "liberado" as const,
-      };
+*Lacre Traseiro:* ${carregamentoData.lacres.traseiro || ""}
+*Lacre Lateral 1:* ${carregamentoData.lacres.lateral1 || ""}
+*Lacre Lateral 2:* ${carregamentoData.lacres.lateral2 || ""}
 
-      // Preparar dados para o banco
-      const dadosParaBanco = {
-        ...updatedData,
-        operador: localStorage.getItem("operador_nome") || "Não identificado",
-        dataEnvio: new Date().toISOString(),
-        mensagemDespacho: `Veiculo ${getNomeDestino(updatedData.destino)} (${liberadosCount}) saindo nesse exato momento. Obs: ${updatedData.carga.gaiolas} Gaiolas, ${updatedData.carga.volumosos} Volumosos e ${updatedData.carga.manga} Manga Palets.`,
-        mensagemXPT: `*ID:* ${updatedData.motorista.travelId}
-*Doca:* (${updatedData.doca || "Não definida"})
-*${updatedData.motorista.tipoVeiculo}:* ${getNomeDestino(updatedData.destino)} (${liberadosCount})
-*Condutor:* ${updatedData.motorista.nome}
-*Placa Tração:* ${updatedData.motorista.veiculoTracao}
-${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${updatedData.motorista.veiculoCarga}` : ""}
+*Total de gaiolas:* ${carregamentoData.carga.gaiolas}
+*Total de volumosos:* ${carregamentoData.carga.volumosos}
+*Total de manga palete:* ${carregamentoData.carga.manga}`
+    };
 
-*Encostado na doca:* ${updatedData.horarios.encostadoDoca || "Não registrado"}
-*Início carregamento:* ${updatedData.horarios.inicioCarregamento || "Não registrado"}
-*Término carregamento:* ${updatedData.horarios.terminoCarregamento || "Não registrado"}
-*Saída liberada:* ${updatedData.horarios.saidaLiberada || "Não registrado"}
-*Previsão de chegada:* ${updatedData.horarios.previsaoChegada || "Não calculado"}
+    // 2. Enviar para o banco
+    const response = await fetch('/api/carregamento', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dadosParaBanco),
+    });
 
-*Lacre Traseiro:* ${updatedData.lacres.traseiro || ""}
-*Lacre Lateral 1:* ${updatedData.lacres.lateral1 || ""}
-*Lacre Lateral 2:* ${updatedData.lacres.lateral2 || ""}
-
-*Total de gaiolas:* ${updatedData.carga.gaiolas}
-*Total de volumosos:* ${updatedData.carga.volumosos}
-*Total de manga palete:* ${updatedData.carga.manga}`,
-      };
-
-      // Enviar para o banco
-      const response = await fetch("/api/carregamento", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(dadosParaBanco),
-      });
-
-      if (response.ok) {
-        // Atualizar localStorage com status liberado
-        const motoristaId = `${carregamentoData.destino}_${carregamentoData.facility}_${carregamentoData.motorista.nome}_${carregamentoData.motorista.travelId}`;
-        const carregamentosAtualizados = {
-          ...JSON.parse(carregamentosStr || "{}"),
-          [motoristaId]: updatedData,
-        };
-
-        localStorage.setItem(
-          chaveBase,
-          JSON.stringify(carregamentosAtualizados),
-        );
-        return true;
-      } else {
-        console.error("Erro ao enviar para o banco:", await response.json());
-        return false;
-      }
-    } catch (error) {
-      console.error("Erro ao enviar para o banco:", error);
+    if (response.ok) {
+      // 3. Limpeza: remover dados temporários do motorista selecionado
+      localStorage.removeItem('motoristaSelecionadoId');
+      localStorage.removeItem('MotoristaSelecionado');
+      localStorage.removeItem('DestinoAtual');
+      return true;
+    } else {
+      console.error('Erro ao enviar para o banco:', await response.json());
       return false;
     }
-  };
+    
+  } catch (error) {
+    console.error('Erro ao enviar para o banco:', error);
+    return false;
+  }
+};
 
   if (loading) {
     return (

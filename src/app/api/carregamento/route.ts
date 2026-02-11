@@ -10,47 +10,22 @@ export async function POST(request: NextRequest) {
     
     console.log('Dados recebidos:', data);
     
-    // Validar dados obrigatórios
-    const requiredFields = ['destino', 'motorista', 'operadorId', 'facility'];
-    for (const field of requiredFields) {
-      if (!data[field]) {
-        console.error(`❌ Campo obrigatório faltando: ${field}`);
-        return NextResponse.json(
-          { error: `Campo obrigatório faltando: ${field}` },
-          { status: 400 }
-        );
-      }
+    // --- Validação simplificada e compatível com o frontend ---
+    if (!data.destino) {
+      return NextResponse.json({ error: 'Destino é obrigatório' }, { status: 400 });
+    }
+    if (!data.facility) {
+      return NextResponse.json({ error: 'Facility é obrigatória' }, { status: 400 });
+    }
+    if (!data.motorista || !data.motorista.nome) {
+      return NextResponse.json({ error: 'Dados do motorista incompletos' }, { status: 400 });
     }
     
-    // Buscar informações do CSV para completar dados
-    const latestUpload = await db.collection('uploads_atribuicao')
-      .findOne({}, { sort: { uploadDate: -1 } });
-    
-    let dadosMotorista = {};
-    if (latestUpload?.data) {
-      // Encontrar dados específicos do motorista no CSV
-      const motoristaData = latestUpload.data.find((item: any) => 
-        item['Nome do motorista principal'] === data.motorista &&
-        item.destino === data.destino &&
-        item.Facility === data.facility
-      );
-      
-      if (motoristaData) {
-        dadosMotorista = {
-          tipoVeiculo: motoristaData['Tipo de veículo'],
-          veiculoTracao: motoristaData['Veículo de tração'],
-          placa: motoristaData['Placa'] || motoristaData['Placa do Cavalo'] || 'N/A',
-          dataInicio: motoristaData['Data de início'] || new Date().toISOString(),
-          transportadora: motoristaData['Transportadora'] || 'N/A'
-        };
-      }
-    }
-    
-    // Criar carregamento
+   const motoristaId = `${data.destino}_${data.facility}_${data.motorista.nome}_${data.motorista.travelId}`;
+
     const carregamento = {
       ...data,
-      ...dadosMotorista,
-      status: 'pendente',
+      motoristaId,
       dataCriacao: new Date(),
       dataAtualizacao: new Date(),
       numero: `CAR-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
@@ -74,13 +49,8 @@ export async function POST(request: NextRequest) {
     
   } catch (error: any) {
     console.error('❌ Erro ao criar carregamento:', error);
-    console.error('Stack trace:', error.stack);
-    
     return NextResponse.json(
-      { 
-        error: 'Erro ao criar carregamento',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
+      { error: 'Erro ao criar carregamento' },
       { status: 500 }
     );
   }
