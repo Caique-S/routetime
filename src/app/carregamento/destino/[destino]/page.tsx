@@ -60,7 +60,7 @@ interface CarregamentoData {
   facility: string;
   timestamp: string;
   status: "emFila" | "carregando" | "liberado";
-  posicaoVeiculo: number;
+  posicaoVeiculo?: number;
 }
 
 function DestinoContent() {
@@ -250,47 +250,70 @@ function DestinoContent() {
     setCarregamentoData(null);
   };
 
-  const handleSaveModal = () => {
-    if (!selectedMotorista || !carregamentoData) return;
+const handleSaveModal = () => {
+  if (!selectedMotorista || !carregamentoData) return;
 
-    const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
+  const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
 
-    // Verificar se é o modal de horários e se encostadoDoca está preenchido
-    let dadosAtualizados = { ...carregamentoData };
+  let dadosAtualizados = { ...carregamentoData };
 
-    if (activeModal === "horarios" || activeModal === "carga" || activeModal === "lacres" && carregamentoData.horarios.encostadoDoca) {
-      // Atualizar status para "carregando" se encostadoDoca estiver preenchido
-      if (
-        carregamentoData.horarios.saidaLiberada &&
-        carregamentoData.horarios.saidaLiberada.trim() !== ""
-      ) {
-        dadosAtualizados = {
-          ...carregamentoData,
-          status: "liberado",
-        };
-      } else if (
-        carregamentoData.horarios.encostadoDoca &&
-        carregamentoData.horarios.encostadoDoca.trim() !== ""
-      ) {
-        dadosAtualizados = {
-          ...carregamentoData,
-          status: "carregando",
-        };
+  if (
+    (activeModal === "horarios" || activeModal === "carga" || activeModal === "lacres") &&
+    carregamentoData.horarios.encostadoDoca?.trim() !== ""
+  ) {
+    const saidaLiberada = carregamentoData.horarios.saidaLiberada?.trim() && carregamentoData.lacres.traseiro?.trim()
+
+    if (saidaLiberada) {
+      // --- STATUS LIBERADO ---
+      const chaveCarregamentos = `carregamentos_${destinoCodigo}_${facility}`;
+      const carregamentosSalvos = localStorage.getItem(chaveCarregamentos);
+      let liberadosCount = 0;
+
+      if (carregamentosSalvos) {
+        try {
+          const parsed = JSON.parse(carregamentosSalvos);
+          liberadosCount = Object.entries(parsed).filter(
+            ([id, c]: [string,any]) => c.status === "liberado" && id !== motoristaId
+          ).length;
+        } catch (e) {
+          console.error("Erro ao ler carregamentos salvos:", e);
+        }
       }
+
+      const novaPosicao = liberadosCount + 1;
+
+      dadosAtualizados = {
+        ...carregamentoData,
+        status: "liberado",
+        posicaoVeiculo: novaPosicao,
+      };
+    } else {
+      // --- STATUS CARREGANDO ---
+      dadosAtualizados = {
+        ...carregamentoData,
+        status: "carregando",
+        posicaoVeiculo: undefined, // ✅ em vez de delete
+      };
     }
+  } else {
+    // Se a condição não for atendida, mantém o status atual, mas remove a posição se não for liberado
+    if (dadosAtualizados.status !== "liberado") {
+      dadosAtualizados.posicaoVeiculo = undefined; // ✅ em vez de delete
+    }
+  }
 
-    const updatedCarregamentos = {
-      ...carregamentos,
-      [motoristaId]: dadosAtualizados,
-    };
-
-    setCarregamentos(updatedCarregamentos);
-    localStorage.setItem(
-      "carregamentos_" + destinoCodigo + "_" + facility,
-      JSON.stringify(updatedCarregamentos),
-    );
-    handleCloseModal();
+  const updatedCarregamentos = {
+    ...carregamentos,
+    [motoristaId]: dadosAtualizados,
   };
+
+  setCarregamentos(updatedCarregamentos);
+  localStorage.setItem(
+    `carregamentos_${destinoCodigo}_${facility}`,
+    JSON.stringify(updatedCarregamentos)
+  );
+  handleCloseModal();
+};
 
   const handleDocaChange = (value: string) => {
     if (carregamentoData) {
@@ -625,7 +648,7 @@ function DestinoContent() {
                             handleOpenModal("carga", motorista);
                           }}
                           className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                            dadosCarregamento?.carga
+                            dadosCarregamento?.carga?.gaiolas && dadosCarregamento?.carga?.volumosos && dadosCarregamento?.carga?.manga
                               ? "bg-green-100 text-green-700 border border-green-300"
                               : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
                           }`}

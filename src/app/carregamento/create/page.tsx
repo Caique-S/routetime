@@ -52,8 +52,8 @@ interface CarregamentoData {
     transportadora: string;
     dataInicio: string;
     status?: "emFila" | "carregando" | "liberado";
-    posicaoVeiculo?: number;
   };
+  posicaoVeiculo?: number;
   destino: string;
   facility: string;
   timestamp: string;
@@ -61,7 +61,9 @@ interface CarregamentoData {
 
 export default function CreatePage() {
   const router = useRouter();
-  const [carregamento, setCarregamento] = useState<CarregamentoData | null>(null);
+  const [carregamento, setCarregamento] = useState<CarregamentoData | null>(
+    null,
+  );
   const [destinoInfo, setDestinoInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isComplete, setIsComplete] = useState(false);
@@ -74,7 +76,7 @@ export default function CreatePage() {
   const loadCarregamentoData = () => {
     try {
       // 1. Carregar informações do destino
-      const destinoData = localStorage.getItem('DestinoAtual');
+      const destinoData = localStorage.getItem("DestinoAtual");
       let destinoInfoLocal = null;
       if (destinoData) {
         destinoInfoLocal = JSON.parse(destinoData);
@@ -82,15 +84,15 @@ export default function CreatePage() {
       }
 
       // 2. Carregar informações do motorista
-      const motoristaData = localStorage.getItem('MotoristaSelecionado');
+      const motoristaData = localStorage.getItem("MotoristaSelecionado");
       let motorista = null;
       if (motoristaData) {
         motorista = JSON.parse(motoristaData);
       }
 
       // 3. Carregar ID do motorista selecionado
-      const motoristaId = localStorage.getItem('motoristaSelecionadoId');
-      
+      const motoristaId = localStorage.getItem("motoristaSelecionadoId");
+
       if (!motoristaId) {
         console.error("❌ Nenhum motorista selecionado encontrado");
         return;
@@ -98,7 +100,7 @@ export default function CreatePage() {
 
       // 4. Construir a chave do localStorage para buscar os dados do carregamento
       let carregamentosData = null;
-      
+
       // Primeiro, tentar usar o destinoInfo para construir a chave
       if (destinoInfoLocal) {
         const chaveCarregamentos = `carregamentos_${destinoInfoLocal.codigo}_${destinoInfoLocal.facility}`;
@@ -107,12 +109,12 @@ export default function CreatePage() {
           carregamentosData = JSON.parse(carregamentosStr);
         }
       }
-      
+
       // Se não encontrou, tentar buscar no localStorage todas as chaves que começam com "carregamentos_"
       if (!carregamentosData) {
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key.startsWith('carregamentos_')) {
+          if (key && key.startsWith("carregamentos_")) {
             const dataStr = localStorage.getItem(key);
             if (dataStr) {
               const data = JSON.parse(dataStr);
@@ -120,11 +122,11 @@ export default function CreatePage() {
               if (data[motoristaId]) {
                 carregamentosData = data;
                 // Tentar extrair destino e facility da chave
-                const parts = key.split('_');
+                const parts = key.split("_");
                 if (parts.length >= 3 && !destinoInfoLocal) {
                   setDestinoInfo({
                     codigo: parts[1],
-                    facility: parts[2]
+                    facility: parts[2],
                   });
                 }
                 break;
@@ -137,20 +139,23 @@ export default function CreatePage() {
       // 5. Combinar os dados
       if (carregamentosData && carregamentosData[motoristaId]) {
         const dadosCarregamento = carregamentosData[motoristaId];
-        
+
         // Se temos dados do motorista separados, mesclar
         if (motorista) {
-          dadosCarregamento.motorista = motorista;
+          dadosCarregamento.motorista = {
+            ...dadosCarregamento.motorista,
+            ...motorista,
+          };
         }
-        
+
         // Se o destino não foi carregado do localStorage, usar o do carregamento
         if (!destinoInfoLocal && dadosCarregamento.destino) {
           setDestinoInfo({
             codigo: dadosCarregamento.destino,
-            facility: dadosCarregamento.facility
+            facility: dadosCarregamento.facility,
           });
         }
-        
+
         setCarregamento(dadosCarregamento);
         checkCompletion(dadosCarregamento);
       } else if (motorista && destinoInfoLocal) {
@@ -160,12 +165,18 @@ export default function CreatePage() {
           id: Math.floor(10000000 + Math.random() * 90000000).toString(),
           doca: "",
           carga: { gaiolas: "", volumosos: "", manga: "" },
-          horarios: { encostadoDoca: "", inicioCarregamento: "", terminoCarregamento: "", saidaLiberada: "", previsaoChegada: "" },
+          horarios: {
+            encostadoDoca: "",
+            inicioCarregamento: "",
+            terminoCarregamento: "",
+            saidaLiberada: "",
+            previsaoChegada: "",
+          },
           lacres: { traseiro: "", lateral1: "", lateral2: "" },
           motorista: motorista,
           destino: destinoInfoLocal.codigo,
           facility: destinoInfoLocal.facility,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         };
         setCarregamento(newCarregamento);
         checkCompletion(newCarregamento);
@@ -182,41 +193,44 @@ export default function CreatePage() {
   const checkCompletion = (data: CarregamentoData) => {
     // 1. Doca: deve estar preenchida
     const hasDoca = !!data.doca && data.doca.trim() !== "";
-    
+
     // 2. Carga: todos os campos devem ter valores numéricos (incluindo 0)
     // Convertendo para número e verificando se não é NaN
     const gaiolas = Number(data.carga.gaiolas);
     const volumosos = Number(data.carga.volumosos);
     const manga = Number(data.carga.manga);
-    
-    const hasCarga = 
-      !isNaN(gaiolas) && 
-      !isNaN(volumosos) && 
-      !isNaN(manga);
-    
-    // 3. Horários: todos os campos devem estar preenchidos
-    const hasHorarios = 
-      !!data.horarios.encostadoDoca && data.horarios.encostadoDoca.trim() !== "" &&
-      !!data.horarios.inicioCarregamento && data.horarios.inicioCarregamento.trim() !== "" &&
-      !!data.horarios.terminoCarregamento && data.horarios.terminoCarregamento.trim() !== "" &&
-      !!data.horarios.saidaLiberada && data.horarios.saidaLiberada.trim() !== "" &&
-      !!data.horarios.previsaoChegada && data.horarios.previsaoChegada.trim() !== "";
-    
-    // 4. Lacres: apenas o traseiro é obrigatório
-    const hasLacres = !!data.lacres.traseiro && data.lacres.traseiro.trim() !== "";
 
-    const hasStatus = data.motorista.status === 'liberado'
-    
-    console.log('Verificação de completude:', {
+    const hasCarga = !isNaN(gaiolas) && !isNaN(volumosos) && !isNaN(manga);
+
+    // 3. Horários: todos os campos devem estar preenchidos
+    const hasHorarios =
+      !!data.horarios.encostadoDoca &&
+      data.horarios.encostadoDoca.trim() !== "" &&
+      !!data.horarios.inicioCarregamento &&
+      data.horarios.inicioCarregamento.trim() !== "" &&
+      !!data.horarios.terminoCarregamento &&
+      data.horarios.terminoCarregamento.trim() !== "" &&
+      !!data.horarios.saidaLiberada &&
+      data.horarios.saidaLiberada.trim() !== "" &&
+      !!data.horarios.previsaoChegada &&
+      data.horarios.previsaoChegada.trim() !== "";
+
+    // 4. Lacres: apenas o traseiro é obrigatório
+    const hasLacres =
+      !!data.lacres.traseiro && data.lacres.traseiro.trim() !== "";
+
+    const hasStatus = data.motorista.status === "liberado";
+
+    console.log("Verificação de completude:", {
       hasDoca,
       hasCarga,
       hasHorarios,
       hasLacres,
       carga: data.carga,
       horarios: data.horarios,
-      lacres: data.lacres
+      lacres: data.lacres,
     });
-    
+
     setIsComplete(hasDoca && hasCarga && hasHorarios && hasLacres && hasStatus);
   };
 
@@ -240,20 +254,20 @@ export default function CreatePage() {
       await navigator.clipboard.writeText(text);
       return true;
     } catch (err) {
-      console.error('Erro ao copiar para área de transferência:', err);
-      
+      console.error("Erro ao copiar para área de transferência:", err);
+
       try {
-        const textArea = document.createElement('textarea');
+        const textArea = document.createElement("textarea");
         textArea.value = text;
-        textArea.style.position = 'fixed';
-        textArea.style.opacity = '0';
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
         document.body.appendChild(textArea);
         textArea.select();
-        document.execCommand('copy');
+        document.execCommand("copy");
         document.body.removeChild(textArea);
         return true;
       } catch (fallbackErr) {
-        console.error('Fallback também falhou:', fallbackErr);
+        console.error("Fallback também falhou:", fallbackErr);
         return false;
       }
     }
@@ -262,31 +276,33 @@ export default function CreatePage() {
   const handleDespachar = async () => {
     if (!carregamento) return;
 
-    const mensagem = `Veiculo ${getNomeDestino(carregamento.destino)} saindo nesse exato momento. Obs: ${carregamento.carga.gaiolas} Gaiolas, ${carregamento.carga.volumosos} Volumosos e ${carregamento.carga.manga} Manga Palets.`;
+    const mensagem = `Veiculo ${getNomeDestino(carregamento.destino)} (0${carregamento.posicaoVeiculo}) saindo nesse exato momento. Obs: ${carregamento.carga.gaiolas} Gaiolas, ${carregamento.carga.volumosos} Volumosos e ${carregamento.carga.manga} Manga Palets.`;
 
     const copiadoComSucesso = await copyToClipboard(mensagem);
-    
+
     if (copiadoComSucesso) {
-      setCopiado('despachar');
-      
+      setCopiado("despachar");
+
       setTimeout(() => {
         setCopiado(null);
-        window.open('https://chat.whatsapp.com/G5PEe8GbLZWAavzBkpSuKE?mode=gi_t', '_blank');
+        window.open(
+          "https://chat.whatsapp.com/G5PEe8GbLZWAavzBkpSuKE?mode=gi_t",
+          "_blank",
+        );
       }, 1000);
     } else {
-      alert('Não foi possível copiar a mensagem. Tente novamente.');
+      alert("Não foi possível copiar a mensagem. Tente novamente.");
     }
   };
 
   const handleInformacoesXPT = async () => {
     if (!carregamento) return;
-const content = 
-`*ID:* ${carregamento.motorista.travelId}
+    const content = `*ID:* ${carregamento.motorista.travelId}
 *Doca:* (${carregamento.doca || "Não definida"})
-*${carregamento.motorista.tipoVeiculo}:* ${getNomeDestino(carregamento.destino)} 
+*${carregamento.motorista.tipoVeiculo}:* ${getNomeDestino(carregamento.destino)} (0${carregamento.posicaoVeiculo})
 *Condutor:* ${carregamento.motorista.nome}
 *Placa Tração:* ${carregamento.motorista.veiculoTracao}
-${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${carregamento.motorista.veiculoCarga}` : ''}
+${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${carregamento.motorista.veiculoCarga}` : ""}
 
 *Encostado na doca:* ${carregamento.horarios.encostadoDoca || "Não registrado"}
 *Início carregamento:* ${carregamento.horarios.inicioCarregamento || "Não registrado"}
@@ -303,16 +319,19 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
 *Total de manga palete:* ${carregamento.carga.manga}`;
 
     const copiadoComSucesso = await copyToClipboard(content);
-    
+
     if (copiadoComSucesso) {
-      setCopiado('xpt');
-      
+      setCopiado("xpt");
+
       setTimeout(() => {
         setCopiado(null);
-        window.open('https://chat.whatsapp.com/KgobWakeXIx1M0VCGki5dN?mode=gi_t', '_blank');
+        window.open(
+          "https://chat.whatsapp.com/KgobWakeXIx1M0VCGki5dN?mode=gi_t",
+          "_blank",
+        );
       }, 1000);
     } else {
-      alert('Não foi possível copiar as informações. Tente novamente.');
+      alert("Não foi possível copiar as informações. Tente novamente.");
     }
   };
 
@@ -323,69 +342,73 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
   const handleFinalizar = async () => {
     // Validar novamente antes de finalizar
     if (!carregamento) return;
-    
+
     checkCompletion(carregamento);
-    
+
     if (!isComplete) {
-      alert("Por favor, complete todos os campos obrigatórios antes de finalizar.");
+      alert(
+        "Por favor, complete todos os campos obrigatórios antes de finalizar.",
+      );
       return;
     }
 
     const enviado = await enviarParaBanco(carregamento);
 
-    if(enviado){
+    if (enviado) {
       alert("Carregamento finalizado e salvo com sucesso!");
-      localStorage.removeItem('motoristaSelecionadoId');
-    localStorage.removeItem('MotoristaSelecionado');
-    localStorage.removeItem('DestinoAtual');
-    router.push("/carregamento/destino");
-    }else{
+      localStorage.removeItem("motoristaSelecionadoId");
+      localStorage.removeItem("MotoristaSelecionado");
+      localStorage.removeItem("DestinoAtual");
+      router.push("/carregamento/destino");
+    } else {
       alert("Erro ao salvar no banco de dados. Tente novamente.");
     }
-    
   };
 
   const handleEditar = () => {
     if (destinoInfo && carregamento) {
-      router.push(`/carregamento/destino/${carregamento.destino}?facility=${carregamento.facility}`);
+      router.push(
+        `/carregamento/destino/${carregamento.destino}?facility=${carregamento.facility}`,
+      );
     } else {
       router.push("/carregamento/novo");
     }
   };
 
   const enviarParaBanco = async (carregamentoData: CarregamentoData) => {
-  try {
-    // Primeiro, calcular posição baseada em quantos já foram liberados para este destino
-    const chaveBase = `carregamentos_${carregamentoData.destino}_${carregamentoData.facility}`;
-    const carregamentosStr = localStorage.getItem(chaveBase);
-    let liberadosCount = 1;
-    
-    if (carregamentosStr) {
-      const carregamentos = JSON.parse(carregamentosStr);
-      liberadosCount = Object.values(carregamentos).filter(
-        (c: any) => c.status === 'liberado'
-      ).length + 1;
-    }
-    
-    // Atualizar posição localmente
-    const updatedData = {
-      ...carregamentoData,
-      posicaoVeiculo: liberadosCount,
-      status: "liberado" as const
-    };
-    
-    // Preparar dados para o banco
-    const dadosParaBanco = {
-      ...updatedData,
-      operador: localStorage.getItem("operador_nome") || "Não identificado",
-      dataEnvio: new Date().toISOString(),
-      mensagemDespacho: `Veiculo ${getNomeDestino(updatedData.destino)} (${liberadosCount}) saindo nesse exato momento. Obs: ${updatedData.carga.gaiolas} Gaiolas, ${updatedData.carga.volumosos} Volumosos e ${updatedData.carga.manga} Manga Palets.`,
-      mensagemXPT: `*ID:* ${updatedData.motorista.travelId}
+    try {
+      // Primeiro, calcular posição baseada em quantos já foram liberados para este destino
+      const chaveBase = `carregamentos_${carregamentoData.destino}_${carregamentoData.facility}`;
+      const carregamentosStr = localStorage.getItem(chaveBase);
+      let liberadosCount = 1;
+
+      if (carregamentosStr) {
+        const carregamentos = JSON.parse(carregamentosStr);
+        liberadosCount =
+          Object.values(carregamentos).filter(
+            (c: any) => c.status === "liberado",
+          ).length + 1;
+      }
+
+      // Atualizar posição localmente
+      const updatedData = {
+        ...carregamentoData,
+        posicaoVeiculo: liberadosCount,
+        status: "liberado" as const,
+      };
+
+      // Preparar dados para o banco
+      const dadosParaBanco = {
+        ...updatedData,
+        operador: localStorage.getItem("operador_nome") || "Não identificado",
+        dataEnvio: new Date().toISOString(),
+        mensagemDespacho: `Veiculo ${getNomeDestino(updatedData.destino)} (${liberadosCount}) saindo nesse exato momento. Obs: ${updatedData.carga.gaiolas} Gaiolas, ${updatedData.carga.volumosos} Volumosos e ${updatedData.carga.manga} Manga Palets.`,
+        mensagemXPT: `*ID:* ${updatedData.motorista.travelId}
 *Doca:* (${updatedData.doca || "Não definida"})
 *${updatedData.motorista.tipoVeiculo}:* ${getNomeDestino(updatedData.destino)} (${liberadosCount})
 *Condutor:* ${updatedData.motorista.nome}
 *Placa Tração:* ${updatedData.motorista.veiculoTracao}
-${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${updatedData.motorista.veiculoCarga}` : ''}
+${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${updatedData.motorista.veiculoCarga}` : ""}
 
 *Encostado na doca:* ${updatedData.horarios.encostadoDoca || "Não registrado"}
 *Início carregamento:* ${updatedData.horarios.inicioCarregamento || "Não registrado"}
@@ -399,38 +422,40 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
 
 *Total de gaiolas:* ${updatedData.carga.gaiolas}
 *Total de volumosos:* ${updatedData.carga.volumosos}
-*Total de manga palete:* ${updatedData.carga.manga}`
-    };
-    
-    // Enviar para o banco
-    const response = await fetch('/api/carregamento', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(dadosParaBanco),
-    });
-    
-    if (response.ok) {
-      // Atualizar localStorage com status liberado
-      const motoristaId = `${carregamentoData.destino}_${carregamentoData.facility}_${carregamentoData.motorista.nome}_${carregamentoData.motorista.travelId}`;
-      const carregamentosAtualizados = {
-        ...JSON.parse(carregamentosStr || '{}'),
-        [motoristaId]: updatedData
+*Total de manga palete:* ${updatedData.carga.manga}`,
       };
-      
-      localStorage.setItem(chaveBase, JSON.stringify(carregamentosAtualizados));
-      return true;
-    } else {
-      console.error('Erro ao enviar para o banco:', await response.json());
+
+      // Enviar para o banco
+      const response = await fetch("/api/carregamento", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(dadosParaBanco),
+      });
+
+      if (response.ok) {
+        // Atualizar localStorage com status liberado
+        const motoristaId = `${carregamentoData.destino}_${carregamentoData.facility}_${carregamentoData.motorista.nome}_${carregamentoData.motorista.travelId}`;
+        const carregamentosAtualizados = {
+          ...JSON.parse(carregamentosStr || "{}"),
+          [motoristaId]: updatedData,
+        };
+
+        localStorage.setItem(
+          chaveBase,
+          JSON.stringify(carregamentosAtualizados),
+        );
+        return true;
+      } else {
+        console.error("Erro ao enviar para o banco:", await response.json());
+        return false;
+      }
+    } catch (error) {
+      console.error("Erro ao enviar para o banco:", error);
       return false;
     }
-    
-  } catch (error) {
-    console.error('Erro ao enviar para o banco:', error);
-    return false;
-  }
-};
+  };
 
   if (loading) {
     return (
@@ -451,8 +476,12 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
       <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center space-y-4">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
-          <p className="text-gray-600 font-medium">Nenhum carregamento encontrado</p>
-          <p className="text-sm text-gray-500 mb-4">Volte à página de destinos e selecione um motorista.</p>
+          <p className="text-gray-600 font-medium">
+            Nenhum carregamento encontrado
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            Volte à página de destinos e selecione um motorista.
+          </p>
           <button
             onClick={() => router.push("/carregamento/novo")}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -490,7 +519,9 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Banner de Status */}
-        <div className={`mb-8 p-4 rounded-2xl ${isComplete ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'}`}>
+        <div
+          className={`mb-8 p-4 rounded-2xl ${isComplete ? "bg-green-50 border border-green-200" : "bg-yellow-50 border border-yellow-200"}`}
+        >
           <div className="flex items-center gap-3">
             {isComplete ? (
               <CheckCircle className="w-6 h-6 text-green-600" />
@@ -499,13 +530,12 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
             )}
             <div>
               <h3 className="font-bold text-gray-900">
-                {isComplete ? 'Veículo Liberado' : 'Encostado na Doca'}
+                {isComplete ? "Veículo Liberado" : "Encostado na Doca"}
               </h3>
               <p className="text-sm text-gray-600">
-                {isComplete 
-                  ? 'Todas informações completas, pronto para viagem.'
-                  : 'Informações pendentes para liberar o Veículo.'
-                }
+                {isComplete
+                  ? "Todas informações completas, pronto para viagem."
+                  : "Informações pendentes para liberar o Veículo."}
               </p>
             </div>
           </div>
@@ -518,7 +548,8 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
             <div className="flex flex-col md:flex-row md:items-center justify-between">
               <div>
                 <p className="text-blue-100 mt-1">
-                  ID: {carregamento.id} • {new Date(carregamento.timestamp).toLocaleDateString('pt-BR')}
+                  ID: {carregamento.id} •{" "}
+                  {new Date(carregamento.timestamp).toLocaleDateString("pt-BR")}
                 </p>
               </div>
               <div className="mt-4 md:mt-0 flex gap-3">
@@ -528,7 +559,7 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                   disabled={!!copiado}
                 >
                   <Truck className="w-4 h-4" />
-                  {copiado === 'despachar' ? 'Copiado!' : 'Despachar'}
+                  {copiado === "despachar" ? "Copiado!" : "Despachar"}
                 </button>
                 <button
                   onClick={handleInformacoesXPT}
@@ -536,7 +567,7 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                   disabled={!!copiado}
                 >
                   <BookType className="w-4 h-4" />
-                  {copiado === 'xpt' ? 'Copiado!' : 'Informações XPT'}
+                  {copiado === "xpt" ? "Copiado!" : "Informações XPT"}
                 </button>
               </div>
             </div>
@@ -554,14 +585,15 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                     Informações Gerais
                   </h3>
                   <div className="space-y-3">
-
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                         <DoorClosed className="w-4 h-4 text-blue-600" />
                       </div>
                       <div>
                         <div className="text-sm text-gray-600">Doca</div>
-                        <div className="font-semibold text-gray-900">({carregamento.doca || "Não definida"})</div>
+                        <div className="font-semibold text-gray-900">
+                          ({carregamento.doca || "Não definida"})
+                        </div>
                       </div>
                     </div>
 
@@ -572,7 +604,8 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                       <div>
                         <div className="text-sm text-gray-600">Veículo</div>
                         <div className="font-semibold text-gray-900">
-                          {carregamento.motorista.tipoVeiculo}: {getNomeDestino(carregamento.destino)}
+                          {carregamento.motorista.tipoVeiculo}:{" "}
+                          {getNomeDestino(carregamento.destino)}
                         </div>
                       </div>
                     </div>
@@ -591,7 +624,9 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                       </div>
                       <div>
                         <div className="text-sm text-gray-600">Condutor</div>
-                        <div className="font-semibold text-gray-900">{carregamento.motorista.nome}</div>
+                        <div className="font-semibold text-gray-900">
+                          {carregamento.motorista.nome}
+                        </div>
                       </div>
                     </div>
 
@@ -600,22 +635,32 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                         <Truck className="w-4 h-4 text-green-600" />
                       </div>
                       <div>
-                        <div className="text-sm text-gray-600">Placa Tração</div>
-                        <div className="font-semibold text-gray-900">{carregamento.motorista.veiculoTracao}</div>
+                        <div className="text-sm text-gray-600">
+                          Placa Tração
+                        </div>
+                        <div className="font-semibold text-gray-900">
+                          {carregamento.motorista.veiculoTracao}
+                        </div>
                       </div>
                     </div>
 
-                    {carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !== "Não especificado" && (
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                          <Truck className="w-4 h-4 text-green-600" />
+                    {carregamento.motorista.veiculoCarga &&
+                      carregamento.motorista.veiculoCarga !==
+                        "Não especificado" && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                            <Truck className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div>
+                            <div className="text-sm text-gray-600">
+                              Placa Carga
+                            </div>
+                            <div className="font-semibold text-gray-900">
+                              {carregamento.motorista.veiculoCarga}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-sm text-gray-600">Placa Carga</div>
-                          <div className="font-semibold text-gray-900">{carregamento.motorista.veiculoCarga}</div>
-                        </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 </div>
               </div>
@@ -629,24 +674,49 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                   </h3>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Encostado na Doca</span>
-                      <span className="font-semibold text-gray-900">{carregamento.horarios.encostadoDoca || "Não registrado"}</span>
+                      <span className="text-sm text-gray-600">
+                        Encostado na Doca
+                      </span>
+                      <span className="font-semibold text-gray-900">
+                        {carregamento.horarios.encostadoDoca ||
+                          "Não registrado"}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Início Carregamento</span>
-                      <span className="font-semibold text-gray-900">{carregamento.horarios.inicioCarregamento || "Não registrado"}</span>
+                      <span className="text-sm text-gray-600">
+                        Início Carregamento
+                      </span>
+                      <span className="font-semibold text-gray-900">
+                        {carregamento.horarios.inicioCarregamento ||
+                          "Não registrado"}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Término Carregamento</span>
-                      <span className="font-semibold text-gray-900">{carregamento.horarios.terminoCarregamento || "Não registrado"}</span>
+                      <span className="text-sm text-gray-600">
+                        Término Carregamento
+                      </span>
+                      <span className="font-semibold text-gray-900">
+                        {carregamento.horarios.terminoCarregamento ||
+                          "Não registrado"}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Saída Liberada</span>
-                      <span className="font-semibold text-gray-900">{carregamento.horarios.saidaLiberada || "Não registrado"}</span>
+                      <span className="text-sm text-gray-600">
+                        Saída Liberada
+                      </span>
+                      <span className="font-semibold text-gray-900">
+                        {carregamento.horarios.saidaLiberada ||
+                          "Não registrado"}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Previsão de Chegada</span>
-                      <span className="font-semibold text-green-700">{carregamento.horarios.previsaoChegada || "Não calculado"}</span>
+                      <span className="text-sm text-gray-600">
+                        Previsão de Chegada
+                      </span>
+                      <span className="font-semibold text-green-700">
+                        {carregamento.horarios.previsaoChegada ||
+                          "Não calculado"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -664,7 +734,8 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                       <div>
                         <div className="text-sm text-gray-600">Local</div>
                         <div className="font-semibold text-gray-900">
-                          {getNomeDestino(carregamento.destino)} ({carregamento.destino})
+                          {getNomeDestino(carregamento.destino)} (
+                          {carregamento.destino})
                         </div>
                       </div>
                     </div>
@@ -674,7 +745,9 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                       </div>
                       <div>
                         <div className="text-sm text-gray-600">Código</div>
-                        <div className="font-semibold text-gray-900">{carregamento.destino}</div>
+                        <div className="font-semibold text-gray-900">
+                          {carregamento.destino}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -695,19 +768,25 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                 </h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                    <span className="text-sm text-gray-600">Total de Gaiolas</span>
+                    <span className="text-sm text-gray-600">
+                      Total de Gaiolas
+                    </span>
                     <span className="font-semibold text-gray-900 text-xl">
                       {carregamento.carga.gaiolas || ""}
                     </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                    <span className="text-sm text-gray-600">Total de Volumosos</span>
+                    <span className="text-sm text-gray-600">
+                      Total de Volumosos
+                    </span>
                     <span className="font-semibold text-gray-900 text-xl">
                       {carregamento.carga.volumosos || ""}
                     </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                    <span className="text-sm text-gray-600">Total de Manga Palete</span>
+                    <span className="text-sm text-gray-600">
+                      Total de Manga Palete
+                    </span>
                     <span className="font-semibold text-gray-900 text-xl">
                       {carregamento.carga.manga || ""}
                     </span>
@@ -723,16 +802,28 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                 </h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                    <span className="text-sm text-gray-600">Lacre Traseiro</span>
-                    <span className="font-semibold text-gray-900">{carregamento.lacres.traseiro || "Não registrado"}</span>
+                    <span className="text-sm text-gray-600">
+                      Lacre Traseiro
+                    </span>
+                    <span className="font-semibold text-gray-900">
+                      {carregamento.lacres.traseiro || "Não registrado"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                    <span className="text-sm text-gray-600">Lacre Lateral 1</span>
-                    <span className="font-semibold text-gray-900">{carregamento.lacres.lateral1 || "Não registrado"}</span>
+                    <span className="text-sm text-gray-600">
+                      Lacre Lateral 1
+                    </span>
+                    <span className="font-semibold text-gray-900">
+                      {carregamento.lacres.lateral1 || "Não registrado"}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                    <span className="text-sm text-gray-600">Lacre Lateral 2</span>
-                    <span className="font-semibold text-gray-900">{carregamento.lacres.lateral2 || "Não registrado"}</span>
+                    <span className="text-sm text-gray-600">
+                      Lacre Lateral 2
+                    </span>
+                    <span className="font-semibold text-gray-900">
+                      {carregamento.lacres.lateral2 || "Não registrado"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -744,7 +835,10 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="text-sm text-gray-600">
                 <p>Sistema de Expedição • Operação: {carregamento.facility}</p>
-                <p className="mt-1">Gerado em: {new Date(carregamento.timestamp).toLocaleString('pt-BR')}</p>
+                <p className="mt-1">
+                  Gerado em:{" "}
+                  {new Date(carregamento.timestamp).toLocaleString("pt-BR")}
+                </p>
               </div>
               <div className="flex gap-3">
                 <button
@@ -758,8 +852,8 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
                   disabled={!isComplete}
                   className={`px-4 py-2 rounded-lg transition-colors ${
                     isComplete
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      ? "bg-green-600 text-white hover:bg-green-700"
+                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
                   }`}
                 >
                   Finalizar Carregamento
@@ -773,7 +867,10 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
       <footer className="mt-8 py-6 border-t border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center text-gray-500 text-sm">
-            <p>Sistema de Expedição • Carregamento ID: {carregamento.id} • {new Date().getFullYear()}</p>
+            <p>
+              Sistema de Expedição • Carregamento ID: {carregamento.id} •{" "}
+              {new Date().getFullYear()}
+            </p>
           </div>
         </div>
       </footer>
@@ -781,7 +878,9 @@ ${updatedData.motorista.veiculoCarga && updatedData.motorista.veiculoCarga !== "
       {/* Estilos para impressão */}
       <style jsx global>{`
         @media print {
-          header, footer, button {
+          header,
+          footer,
+          button {
             display: none !important;
           }
           .bg-white {

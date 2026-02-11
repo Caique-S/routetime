@@ -60,7 +60,7 @@ export default function OperatorModal({ isOpen, onClose, operador }: OperatorMod
             </h2>
             
             <p className="text-lg text-gray-600 animate-slide-up-delayed">
-              Operador <span className="font-semibold text-blue-600">{operador?.nome}</span>
+              Operador: <span className="font-semibold text-blue-600">{operador?.nome}</span>
             </p>
             
             <p className="text-sm text-gray-500 animate-fade-in">

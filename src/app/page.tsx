@@ -36,10 +36,6 @@ export default function Home() {
     setIsAnimating(true);
   }, [router]);
 
-  // Animação de entrada
-  // useEffect(() => {
-  // setIsAnimating(true);
-  // }, []);
 
   const buscarOperador = async (id: string) => {
     if (!id.trim()) {
