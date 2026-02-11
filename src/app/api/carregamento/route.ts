@@ -65,10 +65,13 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const facility = searchParams.get('facility');
     const status = searchParams.get('status');
+    const motoristaId = searchParams.get('motoristaId')
+
     
     const query: any = {};
     if (facility) query.facility = facility;
     if (status) query.status = status;
+    if (motoristaId) query.motoristaId = motoristaId;
     
     const skip = (page - 1) * limit;
     
