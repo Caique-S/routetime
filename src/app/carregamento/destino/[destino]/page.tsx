@@ -225,7 +225,7 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
     // Atualizar status para "carregando" se encostadoDoca estiver preenchido
     dadosAtualizados = {
       ...carregamentoData,
-      status: 'carregando' as const
+      status: 'carregando' 
     };
   }
   
@@ -273,6 +273,29 @@ const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData['lacre
     // Se mudou a saída liberada, calcular previsão de chegada
     if (tipo === 'saidaLiberada') {
       updatedHorarios.previsaoChegada = calcularPrevisaoChegada(value, destinoCodigo);
+          if (value && value.trim() !== "") {
+      // Atualizar localmente no carregamentoData
+      setCarregamentoData({
+        ...carregamentoData,
+        horarios: updatedHorarios,
+        status: 'liberado'
+      });
+      
+      // Atualizar no estado global usando handleUpdateStatus
+      handleUpdateStatus(selectedMotorista, 'liberado');
+    } else {
+      // Se remover a saída liberada, voltar status para 'carregando'
+      setCarregamentoData({
+        ...carregamentoData,
+        horarios: updatedHorarios,
+        status: 'carregando'
+      });
+      
+      handleUpdateStatus(selectedMotorista, 'carregando');
+    }
+    
+    return; // Já atualizamos o estado, então saímos da função
+  
     }
 
     setCarregamentoData({

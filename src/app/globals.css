@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
-body {
+html,body {
   font-family: Arial, Helvetica, sans-serif;
+    touch-action: pan-y pan-x;        /* impede pinch-zoom em dispositivos touch */
+  zoom: 1;                         /* propriedade não padrão, mas suportada em vários navegadores */
+  -webkit-text-size-adjust: 100%;  /* impede ajuste automático do tamanho do texto no iOS */
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }

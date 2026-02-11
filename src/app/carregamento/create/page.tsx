@@ -205,7 +205,7 @@ export default function CreatePage() {
     // 4. Lacres: apenas o traseiro é obrigatório
     const hasLacres = !!data.lacres.traseiro && data.lacres.traseiro.trim() !== "";
 
-    const hasStatus = data.motorista.status === 'carregando'
+    const hasStatus = data.motorista.status === 'liberado'
     
     console.log('Verificação de completude:', {
       hasDoca,
@@ -335,7 +335,7 @@ ${carregamento.motorista.veiculoCarga && carregamento.motorista.veiculoCarga !==
 
     if(enviado){
       alert("Carregamento finalizado e salvo com sucesso!");
-          localStorage.removeItem('motoristaSelecionadoId');
+      localStorage.removeItem('motoristaSelecionadoId');
     localStorage.removeItem('MotoristaSelecionado');
     localStorage.removeItem('DestinoAtual');
     router.push("/carregamento/destino");
