@@ -432,6 +432,7 @@ const enviarParaBanco = async (carregamentoData: CarregamentoData) => {
       ...carregamentoData,
       motoristaId, // <-- enviar também para o banco
       operador: localStorage.getItem("operador_nome") || "Não identificado",
+      dataCriacao: carregamentoData.timestamp,
       dataEnvio: new Date().toISOString(),
       mensagemDespacho: `Veiculo ${getNomeDestino(carregamentoData.destino)} (${carregamentoData.posicaoVeiculo?.toString().padStart(2, '0')}) saindo nesse exato momento. Obs: ${carregamentoData.carga.gaiolas} Gaiolas, ${carregamentoData.carga.volumosos} Volumosos e ${carregamentoData.carga.manga} Manga Palets.`,
       mensagemXPT: `*ID:* ${carregamentoData.motorista.travelId}

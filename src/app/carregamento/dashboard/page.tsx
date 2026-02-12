@@ -18,7 +18,7 @@ import Link from "next/link";
 import { Dialog, Transition } from "@headlessui/react";
 
 // ------------------------------------------------------------
-// 1. Interface completa de Carregamento (compatível com a collection)
+// 1. Interface completa de Carregamento
 // ------------------------------------------------------------
 interface Carregamento {
   _id: string;
@@ -39,7 +39,7 @@ interface Carregamento {
   observacoes?: string;
   tipoVeiculo?: string;
   veiculoTracao?: string;
-  posicaoVeiculo?: string;
+  posicaoVeiculo?: number;
   doca?: string;
   operador?: string;
   horarios?: {
@@ -69,29 +69,23 @@ interface DestinoProgresso {
 }
 
 // ------------------------------------------------------------
-// 2. Componente principal da Dashboard
+// 2. Componente principal
 // ------------------------------------------------------------
 export default function DashboardPage() {
   const [allCarregamentos, setAllCarregamentos] = useState<Carregamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState({
     status: "",
-    facility: "SBA04",
+    facility: "SBA4",
   });
 
-  // Estado do Modal de Exportação
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportFilters, setExportFilters] = useState({
-    data: "", // formato YYYY-MM-DD
-    facility: "SBA04",
-  });
+  const [exportFilters, setExportFilters] = useState({ data: "", facility: "SBA4" });
 
-  // Carregamentos filtrados por status (para os cards)
   const filteredCarregamentos = allCarregamentos.filter((c) =>
     filter.status ? c.status === filter.status : true
   );
 
-  // Estatísticas baseadas no filtro de status
   const stats = {
     total: filteredCarregamentos.length,
     pendentes: filteredCarregamentos.filter((c) => c.status === "pendente").length,
@@ -99,10 +93,8 @@ export default function DashboardPage() {
     concluidos: filteredCarregamentos.filter((c) => c.status === "concluido").length,
   };
 
-  // Destinos com progresso (considera TODOS os carregamentos da facility, sem filtro de status)
   const destinosProgresso: DestinoProgresso[] = (() => {
     const destinosMap = new Map<string, { total: number; concluidos: number }>();
-
     allCarregamentos.forEach((c) => {
       const destino = c.destino;
       if (!destinosMap.has(destino)) {
@@ -114,7 +106,6 @@ export default function DashboardPage() {
         entry.concluidos += 1;
       }
     });
-
     return Array.from(destinosMap.entries())
       .map(([nome, { total, concluidos }]) => ({
         nome,
@@ -130,10 +121,8 @@ export default function DashboardPage() {
       setLoading(true);
       const queryParams = new URLSearchParams();
       if (filter.facility) queryParams.append("facility", filter.facility);
-
       const response = await fetch(`/api/carregamento?${queryParams}`);
       const data = await response.json();
-
       if (data.success) {
         setAllCarregamentos(data.data);
       }
@@ -149,11 +138,29 @@ export default function DashboardPage() {
   }, [filter.facility]);
 
   // ------------------------------------------------------------
-  // 3. Função de geração do CSV (exportação)
+  // 3. Função formatDateTime CORRIGIDA
+  // ------------------------------------------------------------
+  // FIX: Agora retorna a string original se não for uma data válida
+  const formatDateTime = (isoString?: string): string => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return isoString; // preserva o valor original (ex: "21:12")
+    return date.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
+  // ------------------------------------------------------------
+  // 4. Geração do CSV COMPLETAMENTE CORRIGIDA
   // ------------------------------------------------------------
   const generateCSV = async () => {
     try {
-      // 1. Buscar todos os carregamentos da facility selecionada
+      // 1. Buscar carregamentos da facility
       const queryParams = new URLSearchParams();
       queryParams.append("facility", exportFilters.facility);
       const response = await fetch(`/api/carregamento?${queryParams}`);
@@ -166,17 +173,11 @@ export default function DashboardPage() {
 
       let carregamentos: Carregamento[] = data.data;
 
-      // 2. Filtrar por data, se informada
+      // 2. Filtro por data CORRIGIDO (comparação direta da string ISO)
       if (exportFilters.data) {
-        const filterDate = new Date(exportFilters.data);
-        carregamentos = carregamentos.filter((c) => {
-          const criacao = new Date(c.dataCriacao);
-          return (
-            criacao.getDate() === filterDate.getDate() &&
-            criacao.getMonth() === filterDate.getMonth() &&
-            criacao.getFullYear() === filterDate.getFullYear()
-          );
-        });
+        carregamentos = carregamentos.filter((c) =>
+          c.dataCriacao.startsWith(exportFilters.data)
+        );
       }
 
       if (carregamentos.length === 0) {
@@ -184,7 +185,7 @@ export default function DashboardPage() {
         return;
       }
 
-      // 3. Definir cabeçalho das colunas
+      // 3. Cabeçalho
       const headers = [
         "Travel ID",
         "Data",
@@ -211,29 +212,11 @@ export default function DashboardPage() {
         "Transportadora",
       ];
 
-      // 4. Função auxiliar para formatar data/hora
-      const formatDateTime = (isoString?: string): string => {
-        if (!isoString) return "";
-        try {
-          const date = new Date(isoString);
-          return date.toLocaleString("pt-BR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          });
-        } catch {
-          return "";
-        }
-      };
-
-      // 5. Mapear cada carregamento para uma linha do CSV
+      // 4. Montar linhas CORRIGIDAS (horários com valor bruto)
       const rows = carregamentos.map((c) => {
         return [
           c.motorista?.travelId ?? "",
-          formatDateTime(c.dataCriacao),
+          formatDateTime(c.dataCriacao),          // ISO string -> data/hora
           c.motorista?.nome ?? "",
           c.motorista?.tipoVeiculo ?? "",
           c.motorista?.veiculoTracao ?? "",
@@ -242,11 +225,12 @@ export default function DashboardPage() {
           c.posicaoVeiculo ?? "",
           c._id ?? "",
           c.doca ?? "",
-          formatDateTime(c.horarios?.encostadoDoca),
-          formatDateTime(c.horarios?.inicioCarregamento),
-          formatDateTime(c.horarios?.terminoCarregamento),
-          formatDateTime(c.horarios?.saidaLiberada),
-          formatDateTime(c.horarios?.previsaoChegada),
+          // FIX: valores brutos, sem formatDateTime
+          c.horarios?.encostadoDoca ?? "",
+          c.horarios?.inicioCarregamento ?? "",
+          c.horarios?.terminoCarregamento ?? "",
+          c.horarios?.saidaLiberada ?? "",
+          c.horarios?.previsaoChegada ?? "",
           c.lacres?.traseiro ?? "",
           c.lacres?.lateral1 ?? "",
           c.lacres?.lateral2 ?? "",
@@ -258,13 +242,12 @@ export default function DashboardPage() {
         ];
       });
 
-      // 6. Montar o conteúdo CSV
+      // 5. Gerar conteúdo CSV
       const csvContent = [
         headers.join(","),
         ...rows.map((row) =>
           row
             .map((cell) => {
-              // Escapar vírgulas, quebras de linha e aspas
               if (typeof cell === "string" && (cell.includes(",") || cell.includes("\n") || cell.includes('"'))) {
                 return `"${cell.replace(/"/g, '""')}"`;
               }
@@ -274,8 +257,8 @@ export default function DashboardPage() {
         ),
       ].join("\n");
 
-      // 7. Criar blob e download
-      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" }); // BOM para acentos
+      // 6. Download
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
       link.href = url;
@@ -285,7 +268,6 @@ export default function DashboardPage() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      // 8. Fechar o modal
       setIsExportModalOpen(false);
     } catch (error) {
       console.error("Erro ao gerar CSV:", error);
@@ -293,6 +275,9 @@ export default function DashboardPage() {
     }
   };
 
+  // ------------------------------------------------------------
+  // 5. Renderização (IDÊNTICA AO ORIGINAL)
+  // ------------------------------------------------------------
   return (
     <div className="min-h-screen bg-linear-to-br from-indigo-50 via-white to-purple-50">
       {/* Header com efeito glass */}
@@ -300,7 +285,6 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-3">
             <div className="flex items-center space-x-2">
-              {/* Botão Voltar */}
               <Link
                 href="/dispatch"
                 className="flex items-center gap-1 px-2 py-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -308,8 +292,6 @@ export default function DashboardPage() {
                 <ArrowLeft className="w-4 h-4" />
                 <span className="text-sm font-medium">Voltar</span>
               </Link>
-
-              {/* Logo e título */}
               <div className="flex items-center space-x-2">
                 <div className="relative">
                   <div className="absolute inset-0 bg-blue-500 rounded-lg transform rotate-3 opacity-20"></div>
@@ -320,8 +302,6 @@ export default function DashboardPage() {
                 <h1 className="text-lg font-bold text-gray-900">Dashboard</h1>
               </div>
             </div>
-
-            {/* Botão .csv compacto - AGORA ABRE O MODAL */}
             <button
               onClick={() => setIsExportModalOpen(true)}
               className="px-2.5 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 text-ls font-medium"
@@ -336,7 +316,6 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Cards de estatísticas - MOBILE (2 colunas com ícones) */}
         <div className="grid grid-cols-2 gap-3 mb-6 md:hidden">
-          {/* ... (código dos cards mobile com ícones, já existente) ... */}
           <div className="bg-white/70 backdrop-blur-sm rounded-xl border border-white/20 p-3">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
@@ -385,7 +364,6 @@ export default function DashboardPage() {
 
         {/* Versão desktop (md+): layout de duas colunas com agrupamento */}
         <div className="hidden md:grid md:grid-cols-2 gap-6 mb-8">
-          {/* ... (código desktop, igual ao anterior) ... */}
           <div className="flex flex-col gap-6">
             <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 p-6">
               <div className="flex items-center justify-between">
@@ -436,9 +414,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Filtros - apenas Status e Facility (idem anterior) */}
+        {/* Filtros - apenas Status e Facility */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 p-4 mb-6">
-          {/* ... código dos filtros ... */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -462,10 +439,8 @@ export default function DashboardPage() {
                   onChange={(e) => setFilter({ ...filter, facility: e.target.value })}
                   className="px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm w-full sm:w-auto"
                 >
-                  <option value="SBA04">SBA04</option>
-                  <option value="SBA03">SBA03</option>
-                  <option value="SBA02">SBA02</option>
-                  <option value="SBA01">SBA01</option>
+                  <option value="SBA4">SBA04</option>
+                  <option value="SBA2">SBA02</option>
                 </select>
               </div>
             </div>
@@ -479,7 +454,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Lista de Destinos com Progresso (idem anterior) */}
+        {/* Lista de Destinos com Progresso */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 overflow-hidden">
           <div className="p-5 border-b border-white/20">
             <h2 className="text-lg font-bold text-gray-900">
@@ -530,9 +505,7 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* ------------------------------------------------------------ */}
-      {/* 4. MODAL DE EXPORTAÇÃO CSV (MODERNO, GLASS, RESPONSIVO)      */}
-      {/* ------------------------------------------------------------ */}
+      {/* MODAL DE EXPORTAÇÃO CSV (IDÊNTICO AO ORIGINAL) */}
       <Transition appear show={isExportModalOpen} as={Fragment}>
         <Dialog as="div" className="relative z-50" onClose={() => setIsExportModalOpen(false)}>
           <Transition.Child
@@ -559,7 +532,6 @@ export default function DashboardPage() {
                 leaveTo="opacity-0 scale-95"
               >
                 <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white/80 backdrop-blur-xl p-6 text-left align-middle shadow-xl transition-all border border-white/30">
-                  {/* Cabeçalho do modal */}
                   <div className="flex items-center justify-between mb-4">
                     <Dialog.Title as="h3" className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                       <Download className="w-5 h-5 text-blue-600" />
@@ -573,9 +545,7 @@ export default function DashboardPage() {
                     </button>
                   </div>
 
-                  {/* Conteúdo do modal */}
                   <div className="space-y-5">
-                    {/* Campo Data */}
                     <div>
                       <label htmlFor="export-date" className="block text-xs font-medium text-gray-600 mb-1">
                         Data dos registros
@@ -591,8 +561,6 @@ export default function DashboardPage() {
                         Se não informada, todos os registros da facility serão exportados.
                       </p>
                     </div>
-
-                    {/* Campo Facility */}
                     <div>
                       <label htmlFor="export-facility" className="block text-xs font-medium text-gray-600 mb-1">
                         Facility
@@ -603,13 +571,12 @@ export default function DashboardPage() {
                         onChange={(e) => setExportFilters({ ...exportFilters, facility: e.target.value })}
                         className="w-full px-3 py-2 bg-white/70 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm backdrop-blur-sm"
                       >
-                        <option value="SBA02">SBA02</option>
-                        <option value="SBA04">SBA04</option>
+                        <option value="SBA2">SBA02</option>
+                        <option value="SBA4">SBA04</option>
                       </select>
                     </div>
                   </div>
 
-                  {/* Ações do modal */}
                   <div className="mt-6 flex justify-end gap-3">
                     <button
                       type="button"

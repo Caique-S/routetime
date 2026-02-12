@@ -125,7 +125,7 @@ export default function Home() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="relative group">
               <input
-                type="text"
+                type="password"
                 value={operadorId}
                 onChange={(e) => {
                   setOperadorId(e.target.value);
