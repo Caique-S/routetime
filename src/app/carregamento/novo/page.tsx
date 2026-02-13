@@ -185,6 +185,31 @@ export default function NovoCarregamentoPage() {
     );
   }
 
+  const formatarData = (dataStr: string) => {
+  if (!dataStr) return '';
+  
+  // Se já for ISO (ex: 2025-02-13T10:30:00.000Z)
+  if (dataStr.includes('T')) {
+    return new Date(dataStr).toLocaleDateString('pt-BR');
+  }
+  
+  // Tenta interpretar como MM/DD/YYYY (formato comum em CSVs)
+  const partes = dataStr.split(/[\/\-]/);
+  if (partes.length === 3) {
+    const [mes, dia, ano] = partes;
+    // Verifica se ano tem 4 dígitos
+    if (ano.length === 4 && !isNaN(Number(mes)) && !isNaN(Number(dia))) {
+      const data = new Date(Number(ano), Number(mes) - 1, Number(dia));
+      if (!isNaN(data.getTime())) {
+        return data.toLocaleDateString('pt-BR');
+      }
+    }
+  }
+  
+  // Fallback: retorna a string original
+  return dataStr;
+};
+
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 safe-area">
       {/* Header Fixo */}
@@ -348,10 +373,7 @@ export default function NovoCarregamentoPage() {
                     <div className="flex items-center gap-2 text-xs text-gray-600">
                       <Calendar className="w-3.5 h-3.5" />
                       <span>
-                        Atribuído:{" "}
-                        {new Date(
-                          destino.atribuicao,
-                        ).toLocaleDateString("pt-BR")}
+                        Atribuído:{formatarData(destino.atribuicao)}
                       </span>
                     </div>
                   )}
