@@ -369,14 +369,14 @@ export default function NovoCarregamentoPage() {
                   </div>
 
                   {/* Data do Último Carregamento */}
-                  {destino.atribuicao && (
+                  {/* {destino.atribuicao && (
                     <div className="flex items-center gap-2 text-xs text-gray-600">
                       <Calendar className="w-3.5 h-3.5" />
                       <span>
                         Atribuído:{formatarData(destino.atribuicao)}
                       </span>
                     </div>
-                  )}
+                  )} */}
                 </div>
               );
             })}

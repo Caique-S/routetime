@@ -331,7 +331,7 @@ const handleDespachar = async () => {
     setCopiado('despachar');
     setTimeout(() => {
       setCopiado(null);
-      window.open('https://chat.whatsapp.com/G5PEe8GbLZWAavzBkpSuKE?mode=gi_t', '_blank');
+      window.open('https://chat.whatsapp.com/G5PEe8GbLZWAavzBkpSuKE', '_blank');
     }, 1000);
   } else {
     alert('Não foi possível copiar a mensagem. Tente novamente.');
@@ -382,7 +382,7 @@ ${data.motorista.veiculoCarga && data.motorista.veiculoCarga !== "Não especific
     setCopiado('xpt');
     setTimeout(() => {
       setCopiado(null);
-      window.open('https://chat.whatsapp.com/KgobWakeXIx1M0VCGki5dN?mode=gi_t', '_blank');
+      window.open('https://chat.whatsapp.com/KgobWakeXIx1M0VCGki5dN', '_blank');
     }, 1000);
   } else {
     alert('Não foi possível copiar as informações. Tente novamente.');
