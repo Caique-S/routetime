@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from "react";
-import { QrCode, LogIn, Truck, Scan } from "lucide-react";
+import { QrCode, LogIn, Truck, Scan, Settings } from "lucide-react";
 import OperatorModal from "./components/OperatorModal";
 import QRScanner from "../app/components/QrScanner";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface OperadorData {
   id: string;
@@ -82,7 +83,15 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center p-4 relative">
+            {/* Ícone de configurações - acesso à importação de carregamentos */}
+      <Link
+        href="/admin/import-carregamentos"
+        className="absolute top-4 right-2 z-20 p-2 hover:bg-gray-200 rounded-full transition-colors"
+        title="Importar carregamentos (admin)"
+      >
+        <Settings className="w-8 h-8 text-gray-400" />
+      </Link>
       {/* Background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
