@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import {
   Truck,
   ChartBarBig,
@@ -9,7 +9,9 @@ import {
   LogOut,
   User,
   Bell,
+  X,
 } from "lucide-react";
+import { Dialog, Transition } from "@headlessui/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -26,6 +28,8 @@ export default function Home() {
   const [operadorCargo, setOperadorCargo] = useState("");
   const [operadorData, setOperadorData] = useState<OperadorData | null>(null);
   const [activeCard, setActiveCard] = useState<number | null>(null);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [clearStatus, setClearStatus] = useState<"idle" | "cleaned">("idle");
 
   useEffect(() => {
     setIsAnimating(true);
@@ -91,6 +95,27 @@ export default function Home() {
   const handlePermissionGuide = () => {
     router.push("/guide");
   };
+  // Função para limpar o localStorage (exceto chaves do operador)
+  const handleTemporaryClear = () => {
+    const preserveKeys = ["operador_nome", "operador_cargo", "operador_data"];
+    const keysToRemove: string[] = [];
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && !preserveKeys.includes(key)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    setClearStatus("cleaned");
+  };
+
+  // Ao fechar o modal, resetar o status
+  const handleCloseModal = () => {
+    setIsClearModalOpen(false);
+    setClearStatus("idle");
+  };
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100">
@@ -113,9 +138,12 @@ export default function Home() {
                 </div>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">
+                <span
+                  onClick={() => setIsClearModalOpen(true)}
+                  className="text-xl font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+                >
                   Dispatch Center
-                </h1>
+                </span>
                 <p className="text-xs text-gray-500">
                   Sistema de Gerenciamento
                 </p>
@@ -300,6 +328,86 @@ export default function Home() {
           </Link>
         </div>
       </main>
+
+      {/* Modal de limpeza de armazenamento */}
+      <Transition appear show={isClearModalOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={handleCloseModal}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white/80 backdrop-blur-xl p-6 text-left align-middle shadow-xl transition-all border border-white/30">
+                  <div className="flex items-center justify-between mb-4">
+                    <Dialog.Title
+                      as="h3"
+                      className="text-lg font-semibold text-gray-900"
+                    >
+                      Limpar armazenamento
+                    </Dialog.Title>
+                    <button
+                      onClick={handleCloseModal}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-5">
+                    <p className="text-sm text-gray-600">
+                      Deseja limpar o armazenamento temporário do aplicativo?
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Serão removidos todos os dados temporários, exceto suas
+                      informações de login.
+                    </p>
+                  </div>
+
+                  <div className="mt-6 flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={handleCloseModal}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100/80 hover:bg-gray-200/80 rounded-lg transition-colors backdrop-blur-sm"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTemporaryClear}
+                      disabled={clearStatus === "cleaned"}
+                      className={`px-4 py-2 text-sm font-medium text-white rounded-lg shadow-sm flex items-center gap-2 transition-all ${
+                        clearStatus === "cleaned"
+                          ? "bg-green-500 hover:bg-green-600 cursor-default"
+                          : "bg-blue-600 hover:bg-blue-700"
+                      }`}
+                    >
+                      {clearStatus === "cleaned" ? "Limpo" : "Limpar"}
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
 
       {/* Footer */}
       <footer className="relative z-10 mt-16 py-8 border-t border-gray-200">
