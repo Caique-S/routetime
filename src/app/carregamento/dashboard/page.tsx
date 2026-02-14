@@ -183,9 +183,13 @@ export default function DashboardPage() {
 
       // 2. Filtro por data CORRIGIDO (comparação direta da string ISO)
       if (exportFilters.data) {
-        carregamentos = carregamentos.filter((c) =>
-          c.dataCriacao.startsWith(exportFilters.data)
-        );
+  const start = new Date(exportFilters.data + 'T00:00:00').getTime();
+  const end = start + 24 * 60 * 60 * 1000;
+
+  carregamentos = carregamentos.filter((c) => {
+    const createdAt = new Date(c.dataCriacao).getTime();
+    return createdAt >= start && createdAt < end;
+  });
       }
 
       if (carregamentos.length === 0) {
