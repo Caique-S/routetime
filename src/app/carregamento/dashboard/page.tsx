@@ -17,6 +17,14 @@ import {
 import Link from "next/link";
 import { Dialog, Transition } from "@headlessui/react";
 
+declare global {
+  interface Window {
+    Android?: {
+      saveCsvFile: (content: string, fileName: string) => void;
+    };
+  }
+}
+
 // ------------------------------------------------------------
 // 1. Interface completa de Carregamento
 // ------------------------------------------------------------
@@ -257,22 +265,32 @@ export default function DashboardPage() {
         ),
       ].join("\n");
 
-      // 6. Download
-      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(blob);
-      link.href = url;
-      link.download = `relatorio_${exportFilters.facility}_${exportFilters.data || "todos"}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+    // 6. Download
+    const fileName = `relatorio_${exportFilters.facility}_${exportFilters.data || "todos"}.csv`;
 
+    // Verificar se está no WebView (objeto Android existe)
+    if (typeof window.Android !== 'undefined' && window.Android.saveCsvFile) {
+      window.Android.saveCsvFile(csvContent, fileName);
       setIsExportModalOpen(false);
-    } catch (error) {
-      console.error("Erro ao gerar CSV:", error);
-      alert("Ocorreu um erro ao gerar o relatório.");
+      return;
     }
+
+    // Fallback para navegador normal
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setIsExportModalOpen(false);
+  } catch (error) {
+    console.error("Erro ao gerar CSV:", error);
+    alert("Ocorreu um erro ao gerar o relatório.");
+  }
   };
 
   // ------------------------------------------------------------
