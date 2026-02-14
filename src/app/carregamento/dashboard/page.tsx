@@ -269,8 +269,8 @@ export default function DashboardPage() {
     const fileName = `relatorio_${exportFilters.facility}_${exportFilters.data || "todos"}.csv`;
 
     // Verificar se está no WebView (objeto Android existe)
-    if (typeof window.Android !== 'undefined' && window.Android.saveCsvFile) {
-      window.Android.saveCsvFile(csvContent, fileName);
+    if (typeof window.Android !== 'undefined' &&  (window as any).Android?.saveCsvFile) {
+      (window as any).Android.saveCsvFile(csvContent, fileName);
       setIsExportModalOpen(false);
       return;
     }
