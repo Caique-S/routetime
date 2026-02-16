@@ -26,7 +26,7 @@ declare global {
 }
 
 // ------------------------------------------------------------
-// 1. Interface completa de Carregamento
+// Interfaces
 // ------------------------------------------------------------
 interface Carregamento {
   _id: string;
@@ -41,7 +41,7 @@ interface Carregamento {
     transportadora?: string;
   };
   facility: string;
-  status: "pendente" | "em_andamento" | "concluido" | "cancelado";
+  status: "pendente" | "em_andamento" | "concluido" | "cancelado" | "liberado";
   dataCriacao: string;
   pesoEstimado?: string;
   observacoes?: string;
@@ -77,53 +77,69 @@ interface DestinoProgresso {
 }
 
 // ------------------------------------------------------------
-// 2. Componente principal
+// Funções auxiliares
+// ------------------------------------------------------------
+const getNomeDestino = (codigo: string): string => {
+  const mapeamento: Record<string, string> = {
+    EBA14: "Serrinha",
+    EBA4: "Santo Antônio de Jesus",
+    EBA19: "Itaberaba",
+    EBA3: "Jacobina",
+    EBA2: "Pombal",
+    EBA16: "Senhor do Bonfim",
+    EBA21: "Seabra",
+    EBA6: "Juazeiro",
+    EBA29: "Valença",
+  };
+  return mapeamento[codigo] || codigo;
+};
+
+// Retorna a data atual no formato YYYY-MM-DD (considerando o fuso do navegador)
+const getTodayDateString = (): string => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// ------------------------------------------------------------
+// Componente principal
 // ------------------------------------------------------------
 export default function DashboardPage() {
   const [allCarregamentos, setAllCarregamentos] = useState<Carregamento[]>([]);
+  const [uploadDoDia, setUploadDoDia] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingUpload, setLoadingUpload] = useState(false);
   const [filter, setFilter] = useState({
     status: "",
     facility: "SBA4",
   });
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportFilters, setExportFilters] = useState({ data: "", facility: "SBA4" });
+  const [exportFilters, setExportFilters] = useState({ data: getTodayDateString(), facility: "SBA4" });
 
-  const filteredCarregamentos = allCarregamentos.filter((c) =>
-    filter.status ? c.status === filter.status : true
-  );
-
-  const stats = {
-    total: filteredCarregamentos.length,
-    pendentes: filteredCarregamentos.filter((c) => c.status === "pendente").length,
-    emAndamento: filteredCarregamentos.filter((c) => c.status === "em_andamento").length,
-    concluidos: filteredCarregamentos.filter((c) => c.status === "concluido").length,
+  // Busca o upload da data atual
+  const fetchUploadDoDia = async () => {
+    try {
+      setLoadingUpload(true);
+      const today = getTodayDateString();
+      const response = await fetch(`/api/upload?date=${today}`);
+      const result = await response.json();
+      if (result.success && result.data && result.data.length > 0) {
+        setUploadDoDia(result.data[0]);
+      } else {
+        setUploadDoDia(null);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar upload do dia:', error);
+      setUploadDoDia(null);
+    } finally {
+      setLoadingUpload(false);
+    }
   };
 
-  const destinosProgresso: DestinoProgresso[] = (() => {
-    const destinosMap = new Map<string, { total: number; concluidos: number }>();
-    allCarregamentos.forEach((c) => {
-      const destino = c.destino;
-      if (!destinosMap.has(destino)) {
-        destinosMap.set(destino, { total: 0, concluidos: 0 });
-      }
-      const entry = destinosMap.get(destino)!;
-      entry.total += 1;
-      if (c.status === "concluido") {
-        entry.concluidos += 1;
-      }
-    });
-    return Array.from(destinosMap.entries())
-      .map(([nome, { total, concluidos }]) => ({
-        nome,
-        total,
-        concluidos,
-        progresso: total > 0 ? (concluidos / total) * 100 : 0,
-      }))
-      .sort((a, b) => a.nome.localeCompare(b.nome));
-  })();
-
+  // Busca todos os carregamentos e depois filtra pelos do dia atual
   const fetchCarregamentos = async () => {
     try {
       setLoading(true);
@@ -143,16 +159,86 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchCarregamentos();
+    fetchUploadDoDia();
   }, [filter.facility]);
 
   // ------------------------------------------------------------
-  // 3. Função formatDateTime CORRIGIDA
+  // Filtrar carregamentos apenas do dia atual
   // ------------------------------------------------------------
-  // FIX: Agora retorna a string original se não for uma data válida
+  const hojeStr = getTodayDateString(); // YYYY-MM-DD
+  const inicioHoje = new Date(hojeStr + 'T00:00:00').getTime();
+  const fimHoje = inicioHoje + 24 * 60 * 60 * 1000;
+
+  const carregamentosDoDia = allCarregamentos.filter((c) => {
+    const createdAt = new Date(c.dataCriacao).getTime();
+    return createdAt >= inicioHoje && createdAt < fimHoje;
+  });
+
+  // ------------------------------------------------------------
+  // Normalização de status: considera 'liberado' como concluído
+  // ------------------------------------------------------------
+  const carregamentosNormalizados = carregamentosDoDia.map(c => ({
+    ...c,
+    statusNormalizado: c.status === 'liberado' ? 'concluido' : c.status
+  }));
+
+  // Filtro baseado no status (usando o status normalizado)
+  const filteredCarregamentos = carregamentosNormalizados.filter((c) =>
+    filter.status ? c.statusNormalizado === filter.status : true
+  );
+
+  const stats = {
+    total: filteredCarregamentos.length,
+    pendentes: filteredCarregamentos.filter((c) => c.statusNormalizado === "pendente").length,
+    emAndamento: filteredCarregamentos.filter((c) => c.statusNormalizado === "em_andamento").length,
+    concluidos: filteredCarregamentos.filter((c) => c.statusNormalizado === "concluido").length,
+  };
+
+  // ------------------------------------------------------------
+  // Cálculo dos destinos com progresso (baseado no upload do dia)
+  // ------------------------------------------------------------
+  const destinosProgresso: DestinoProgresso[] = (() => {
+    if (!uploadDoDia || !uploadDoDia.data || uploadDoDia.data.length === 0) return [];
+
+    // Mapa de totais por destino a partir do upload do dia (campo "Destino" ou "destino")
+    const totalPorDestino = new Map<string, number>();
+    uploadDoDia.data.forEach((item: any) => {
+      const destino = item.Destino || item.destino;
+      if (destino) {
+        totalPorDestino.set(destino, (totalPorDestino.get(destino) || 0) + 1);
+      }
+    });
+
+    // Mapa de concluídos a partir dos carregamentos do dia (status 'liberado' ou 'concluido')
+    const concluidosPorDestino = new Map<string, number>();
+    carregamentosDoDia.forEach((c) => {
+      if (c.status === 'liberado' || c.status === 'concluido') {
+        const destino = c.destino;
+        concluidosPorDestino.set(destino, (concluidosPorDestino.get(destino) || 0) + 1);
+      }
+    });
+
+    const destinosArray: DestinoProgresso[] = [];
+    for (const [destino, total] of totalPorDestino.entries()) {
+      const concluidos = concluidosPorDestino.get(destino) || 0;
+      destinosArray.push({
+        nome: getNomeDestino(destino) || destino,
+        total,
+        concluidos,
+        progresso: total > 0 ? (concluidos / total) * 100 : 0,
+      });
+    }
+
+    return destinosArray.sort((a, b) => a.nome.localeCompare(b.nome));
+  })();
+
+  // ------------------------------------------------------------
+  // Função formatDateTime (para exibição)
+  // ------------------------------------------------------------
   const formatDateTime = (isoString?: string): string => {
     if (!isoString) return "";
     const date = new Date(isoString);
-    if (isNaN(date.getTime())) return isoString; // preserva o valor original (ex: "21:12")
+    if (isNaN(date.getTime())) return isoString;
     return date.toLocaleString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
@@ -164,11 +250,10 @@ export default function DashboardPage() {
   };
 
   // ------------------------------------------------------------
-  // 4. Geração do CSV COMPLETAMENTE CORRIGIDA
+  // Geração do CSV (mantida igual, já corrigida anteriormente)
   // ------------------------------------------------------------
   const generateCSV = async () => {
     try {
-      // 1. Buscar carregamentos da facility
       const queryParams = new URLSearchParams();
       queryParams.append("facility", exportFilters.facility);
       const response = await fetch(`/api/carregamento?${queryParams}`);
@@ -181,15 +266,14 @@ export default function DashboardPage() {
 
       let carregamentos: Carregamento[] = data.data;
 
-      // 2. Filtro por data CORRIGIDO (comparação direta da string ISO)
+      // Filtro por data (considerando fuso local)
       if (exportFilters.data) {
-  const start = new Date(exportFilters.data + 'T00:00:00').getTime();
-  const end = start + 24 * 60 * 60 * 1000;
-
-  carregamentos = carregamentos.filter((c) => {
-    const createdAt = new Date(c.dataCriacao).getTime();
-    return createdAt >= start && createdAt < end;
-  });
+        const start = new Date(exportFilters.data + 'T00:00:00').getTime();
+        const end = start + 24 * 60 * 60 * 1000;
+        carregamentos = carregamentos.filter((c) => {
+          const createdAt = new Date(c.dataCriacao).getTime();
+          return createdAt >= start && createdAt < end;
+        });
       }
 
       if (carregamentos.length === 0) {
@@ -197,7 +281,6 @@ export default function DashboardPage() {
         return;
       }
 
-      // 3. Cabeçalho
       const headers = [
         "Travel ID",
         "Data",
@@ -224,11 +307,10 @@ export default function DashboardPage() {
         "Transportadora",
       ];
 
-      // 4. Montar linhas CORRIGIDAS (horários com valor bruto)
       const rows = carregamentos.map((c) => {
         return [
           c.motorista?.travelId ?? "",
-          formatDateTime(c.dataCriacao),          // ISO string -> data/hora
+          formatDateTime(c.dataCriacao),
           c.motorista?.nome ?? "",
           c.motorista?.tipoVeiculo ?? "",
           c.motorista?.veiculoTracao ?? "",
@@ -237,7 +319,6 @@ export default function DashboardPage() {
           c.posicaoVeiculo ?? "",
           c._id ?? "",
           c.doca ?? "",
-          // FIX: valores brutos, sem formatDateTime
           c.horarios?.encostadoDoca ?? "",
           c.horarios?.inicioCarregamento ?? "",
           c.horarios?.terminoCarregamento ?? "",
@@ -254,7 +335,6 @@ export default function DashboardPage() {
         ];
       });
 
-      // 5. Gerar conteúdo CSV
       const csvContent = [
         headers.join(","),
         ...rows.map((row) =>
@@ -269,40 +349,37 @@ export default function DashboardPage() {
         ),
       ].join("\n");
 
-    // 6. Download
-    const fileName = `relatorio_${exportFilters.facility}_${exportFilters.data || "todos"}.csv`;
+      const fileName = `relatorio_${exportFilters.facility}_${exportFilters.data || "todos"}.csv`;
 
-    // Verificar se está no WebView (objeto Android existe)
-    if (typeof window.Android !== 'undefined' &&  (window as any).Android?.saveCsvFile) {
-      (window as any).Android.saveCsvFile(csvContent, fileName);
+      if (typeof window.Android !== 'undefined' && (window as any).Android?.saveCsvFile) {
+        (window as any).Android.saveCsvFile(csvContent, fileName);
+        setIsExportModalOpen(false);
+        return;
+      }
+
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
       setIsExportModalOpen(false);
-      return;
+    } catch (error) {
+      console.error("Erro ao gerar CSV:", error);
+      alert("Ocorreu um erro ao gerar o relatório.");
     }
-
-    // Fallback para navegador normal
-    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    setIsExportModalOpen(false);
-  } catch (error) {
-    console.error("Erro ao gerar CSV:", error);
-    alert("Ocorreu um erro ao gerar o relatório.");
-  }
   };
 
   // ------------------------------------------------------------
-  // 5. Renderização (IDÊNTICA AO ORIGINAL)
+  // Renderização
   // ------------------------------------------------------------
   return (
     <div className="min-h-screen bg-linear-to-br from-indigo-50 via-white to-purple-50">
-      {/* Header com efeito glass */}
+      {/* Header */}
       <header className="bg-white/80 backdrop-blur-md border-b border-white/20 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-3">
@@ -336,19 +413,8 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Cards de estatísticas - MOBILE (2 colunas com ícones) */}
-        <div className="grid grid-cols-2 gap-3 mb-6 md:hidden">
-          <div className="bg-white/70 backdrop-blur-sm rounded-xl border border-white/20 p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
-                <Package className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Total</p>
-                <p className="text-xl font-bold text-gray-900">{stats.total}</p>
-              </div>
-            </div>
-          </div>
+        {/* Cards de estatísticas - MOBILE */}
+        <div className="flex flex-row gap-3 mb-6 md:hidden">
           <div className="bg-white/70 backdrop-blur-sm rounded-xl border border-white/20 p-3">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center shrink-0">
@@ -357,17 +423,6 @@ export default function DashboardPage() {
               <div>
                 <p className="text-xs text-gray-500">Pendentes</p>
                 <p className="text-xl font-bold text-yellow-600">{stats.pendentes}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white/70 backdrop-blur-sm rounded-xl border border-white/20 p-3">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
-                <Truck className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Em Andamento</p>
-                <p className="text-xl font-bold text-blue-600">{stats.emAndamento}</p>
               </div>
             </div>
           </div>
@@ -384,7 +439,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Versão desktop (md+): layout de duas colunas com agrupamento */}
+        {/* Versão desktop */}
         <div className="hidden md:grid md:grid-cols-2 gap-6 mb-8">
           <div className="flex flex-col gap-6">
             <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 p-6">
@@ -436,7 +491,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Filtros - apenas Status e Facility */}
+        {/* Filtros */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 p-4 mb-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -449,9 +504,7 @@ export default function DashboardPage() {
                 >
                   <option value="">Todos os Status</option>
                   <option value="pendente">Pendentes</option>
-                  <option value="em_andamento">Em Andamento</option>
                   <option value="concluido">Concluídos</option>
-                  <option value="cancelado">Cancelados</option>
                 </select>
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -467,7 +520,10 @@ export default function DashboardPage() {
               </div>
             </div>
             <button
-              onClick={fetchCarregamentos}
+              onClick={() => {
+                fetchCarregamentos();
+                fetchUploadDoDia();
+              }}
               className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors self-end md:self-auto"
               title="Atualizar"
             >
@@ -480,13 +536,13 @@ export default function DashboardPage() {
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 overflow-hidden">
           <div className="p-5 border-b border-white/20">
             <h2 className="text-lg font-bold text-gray-900">
-              Destinos · {filter.facility}
+              Destinos · {filter.facility} · {new Date(hojeStr).toLocaleDateString('pt-BR')}
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Progresso de carregamentos concluídos por destino
+              Progresso de carregamentos concluídos por destino (baseado no upload do dia)
             </p>
           </div>
-          {loading ? (
+          {loading || loadingUpload ? (
             <div className="p-10 text-center">
               <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
               <p className="mt-3 text-sm text-gray-600">Carregando destinos...</p>
@@ -496,7 +552,9 @@ export default function DashboardPage() {
               <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-600 font-medium text-sm">Nenhum destino encontrado</p>
               <p className="text-xs text-gray-500 mt-1">
-                Não há carregamentos para esta facility.
+                {!uploadDoDia
+                  ? "Nenhum upload encontrado para hoje."
+                  : "Não há carregamentos programados para esta facility."}
               </p>
             </div>
           ) : (
@@ -527,7 +585,7 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* MODAL DE EXPORTAÇÃO CSV (IDÊNTICO AO ORIGINAL) */}
+      {/* Modal de Exportação CSV */}
       <Transition appear show={isExportModalOpen} as={Fragment}>
         <Dialog as="div" className="relative z-50" onClose={() => setIsExportModalOpen(false)}>
           <Transition.Child
