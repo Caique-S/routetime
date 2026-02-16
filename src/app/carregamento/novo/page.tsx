@@ -1,5 +1,7 @@
-'use client'
+'use client';
 
+import { Suspense } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -11,7 +13,6 @@ import {
   Truck,
   ChevronRight,
   AlertCircle,
-  Loader2,
 } from "lucide-react";
 
 interface UploadData {
@@ -56,7 +57,7 @@ const getNomeDestino = (codigo: string): string => {
   return mapeamento[codigo] || codigo;
 };
 
-export default function NovoCarregamentoPage() {
+function NovoCarregamentoContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const facility = searchParams?.get("facility") || "SBA4";
@@ -154,12 +155,17 @@ export default function NovoCarregamentoPage() {
     return (
       <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto" />
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-gray-600">Carregando destinos...</p>
         </div>
       </div>
     );
   }
+
+  const formatDateToBR = (isoDate: string): string => {
+  const [year, month, day] = isoDate.split('-');
+  return `${day}-${month}-${year}`;
+};
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 safe-area">
@@ -227,7 +233,7 @@ export default function NovoCarregamentoPage() {
             </div>
             <h3 className="font-bold text-gray-900 mb-2">Nenhum destino encontrado para hoje</h3>
             <p className="text-gray-600 mb-6">
-              Não há upload para a data de hoje ({getTodayDateString()}) para a facility {facility}.
+              Não há upload para a data de hoje ({formatDateToBR(getTodayDateString())})  para a facility {facility}.
               <br />
               Faça o upload do arquivo do dia.
             </p>
@@ -302,5 +308,26 @@ export default function NovoCarregamentoPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Componente de fallback para o Suspense
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto" />
+        <p className="text-gray-600">Carregando destinos...</p>
+      </div>
+    </div>
+  );
+}
+
+// Componente principal da página (Server Component)
+export default function NovoCarregamentoPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <NovoCarregamentoContent />
+    </Suspense>
   );
 }
