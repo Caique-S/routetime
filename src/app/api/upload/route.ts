@@ -21,8 +21,97 @@ interface CSVUpload {
 }
 
 export async function POST(request: NextRequest) {
-  // ... (código POST inalterado, igual ao fornecido)
-  // Mantenha o código POST exatamente como você já tem.
+  console.log('=== POST /api/upload iniciado ===');
+
+  try {
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+    const filterColumn = formData.get('filterColumn') as string | null;
+    const filterValue = formData.get('filterValue') as string | null;
+
+    if (!file) {
+      return NextResponse.json(
+        { success: false, error: 'Nenhum arquivo enviado' },
+        { status: 400 }
+      );
+    }
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      return NextResponse.json(
+        { success: false, error: 'Apenas arquivos CSV são permitidos' },
+        { status: 400 }
+      );
+    }
+
+    const fileContent = await file.text();
+
+    const parseResult = parse(fileContent, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (h) => h.trim(),
+    });
+
+    if (parseResult.errors.length > 0) {
+      return NextResponse.json(
+        { success: false, error: 'Erro ao processar CSV', details: parseResult.errors },
+        { status: 400 }
+      );
+    }
+
+    const allData = parseResult.data as any[];
+    let filteredData = allData;
+
+    if (filterColumn && filterValue) {
+      filteredData = allData.filter((row) => {
+        const cellValue = row[filterColumn];
+        return cellValue && String(cellValue).trim() === String(filterValue).trim();
+      });
+    }
+
+    const uploadDocument: CSVUpload = {
+      fileName: file.name,
+      fileSize: file.size,
+      uploadDate: new Date(),
+      data: filteredData,
+      status: 'processado',
+      totalRecords: allData.length,
+      processedRecords: filteredData.length,
+      filterColumn: filterColumn || undefined,
+      filterValue: filterValue || undefined,
+      metadata: {
+        headers: parseResult.meta.fields || [],
+        delimiter: parseResult.meta.delimiter || ',',
+        encoding: 'utf-8',
+      },
+    };
+
+    const client = await clientPromise;
+    const db = client.db('brj_transportes');
+    const collection = db.collection('uploads_atribuicao');
+
+    const insertResult = await collection.insertOne(uploadDocument);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        id: insertResult.insertedId,
+        fileName: file.name,
+        totalRecords: allData.length,
+        processedRecords: filteredData.length,
+      },
+    });
+
+  } catch (error: any) {
+    console.error('Erro no POST:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Erro interno no servidor',
+        message: error.message,
+      },
+      { status: 500 }
+    );
+  }
 }
 
 export async function GET(request: NextRequest) {
