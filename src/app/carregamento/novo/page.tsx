@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Calendar, ClipboardCheck, Loader2, TruckElectric, Users2 } from 'lucide-react';
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -9,7 +9,6 @@ import {
   RefreshCw,
   MapPin,
   Building,
-  Users,
   Truck,
   ChevronRight,
   AlertCircle,
@@ -57,7 +56,23 @@ const getNomeDestino = (codigo: string): string => {
   return mapeamento[codigo] || codigo;
 };
 
-function NovoCarregamentoContent() {
+const getCodigoDestino = (nomeAmigavel: string): string => {
+  const mapeamentoReverso: Record<string, string> = {
+    Serrinha: "EBA14",
+    "Santo Antônio de Jesus": "EBA4",
+    Itaberaba: "EBA19",
+    Jacobina: "EBA3",
+    Pombal: "EBA2",
+    "Senhor do Bonfim": "EBA16",
+    Seabra: "EBA21",
+    Juazeiro: "EBA6",
+    Valença: "EBA29",
+  };
+
+  return mapeamentoReverso[nomeAmigavel] || nomeAmigavel;
+};
+
+function NovoCarregamento() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const facility = searchParams?.get("facility") || "SBA4";
@@ -77,9 +92,7 @@ function NovoCarregamentoContent() {
       setLoading(true);
       setError(null);
       const today = getTodayDateString();
-      const response = await fetch(
-        `/api/upload?facility=${encodeURIComponent(facility)}&date=${today}&limit=1`
-      );
+      const response = await fetch(`/api/upload?facility=${encodeURIComponent(facility)}&date=${today}&limit=1`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -89,6 +102,8 @@ function NovoCarregamentoContent() {
       if (result.success && result.data.length > 0) {
         const latestUpload = result.data[0];
         setUploadData(latestUpload);
+
+        localStorage.setItem("ExpedicaoEditavel", JSON.stringify(latestUpload))
 
         const destinosMap = new Map<string, DestinoInfo>();
 
@@ -117,8 +132,8 @@ function NovoCarregamentoContent() {
             }
           }
         });
-
-        setDestinos(Array.from(destinosMap.values()));
+        const destinosArray = Array.from(destinosMap.values());
+        setDestinos(destinosArray);
       } else {
         setUploadData(null);
         setDestinos([]);
@@ -137,9 +152,10 @@ function NovoCarregamentoContent() {
     fetchUploadData();
   };
 
-  const handleSelectDestino = (destino: DestinoInfo) => {
+  const handleSelectDestino = (destino: DestinoInfo & { codigo?: string } ) => {
+    const codigoDestino = destino.codigo || getCodigoDestino(destino.nome);
     router.push(
-      `/carregamento/destino/${encodeURIComponent(destino.codigo)}?facility=${encodeURIComponent(destino.facility)}`
+      `/carregamento/destino/${encodeURIComponent(codigoDestino)}?facility=${encodeURIComponent(destino.facility)}`
     );
   };
 
@@ -206,13 +222,13 @@ function NovoCarregamentoContent() {
           <div className="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200/50 rounded-2xl p-4 shadow-sm">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 bg-linear-to-br from-blue-100 to-blue-50 rounded-full flex items-center justify-center shrink-0 border border-blue-200/50">
-                <MapPin className="w-5 h-5 text-blue-600" />
+                <ClipboardCheck className="w-7 h-7 text-blue-600" />
               </div>
               <div>
-                <h2 className="font-bold text-gray-900 mb-1">Rotas Encontradas</h2>
+                <h2 className="font-bold text-gray-900 mb-1">Finalizar Operação {facility}</h2>
                 <p className="text-sm text-gray-600">
                   {destinos.length > 0
-                    ? `${destinos.length} rotas disponíveis para carregamento`
+                    ? ""
                     : "Nenhum destino encontrado para hoje. Faça upload do arquivo do dia."}
                 </p>
               </div>
@@ -271,21 +287,27 @@ function NovoCarregamentoContent() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-3">
+  
                   <div className="flex items-center gap-2 px-3 py-2 bg-gray-50/50 rounded-lg border border-gray-200/50">
-                    <Users className="w-4 h-4 text-blue-600" />
-                    <div>
-                      <div className="text-sm font-semibold text-gray-900">{destino.motoristasCount}</div>
-                      <div className="text-xs text-gray-600">Motoristas</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-50/50 rounded-lg border border-gray-200/50">
-                    <Truck className="w-4 h-4 text-green-600" />
+                    {/* <Truck className="w-4 h-4 text-green-600" />
                     <div>
                       <div className="text-sm font-semibold text-gray-900">{destino.veiculosCount}</div>
                       <div className="text-xs text-gray-600">Veículos</div>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
+                {destino.atribuicao && (
+                    <div className="flex items-center gap-3 text-xs text-gray-600">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>
+                        Atribuído:{destino.atribuicao}
+                      </span>
+                      <Truck className="w-4 h-4 text-blue-600" />
+                      <span>
+                        {destino.veiculosCount} Veículos
+                      </span>
+                    </div>
+                  )}
               </div>
             ))}
           </div>
@@ -298,6 +320,10 @@ function NovoCarregamentoContent() {
                 Dados carregados de:{" "}
                 <span className="font-medium text-gray-800">{uploadData.fileName}</span>
                 <br />
+              <span className="text-xs font-medium text-blue-700">
+                Operação: {uploadData.filterValue}
+              </span>
+               <br />
                 Data do upload:{" "}
                 <span className="font-medium text-gray-800">
                   {new Date(uploadData.uploadDate).toLocaleDateString("pt-BR")}
@@ -327,7 +353,7 @@ function LoadingFallback() {
 export default function NovoCarregamentoPage() {
   return (
     <Suspense fallback={<LoadingFallback />}>
-      <NovoCarregamentoContent />
+      <NovoCarregamento />
     </Suspense>
   );
 }

@@ -517,9 +517,9 @@ const motoristasFiltrados = motoristas.filter(motorista => {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">
-                    Destino: {destinoInfo ? destinoInfo.nome : destinoCodigo}
+                    {destinoInfo ? destinoInfo.nome : destinoCodigo}
                   </h1>
-                  <p className="text-1xl text-gray-500">
+                  <p className="text-sm text-gray-500">
                     <Hash className="w-4 h-4 inline mr-1" />
                     Código: {destinoCodigo}
                   </p>
