@@ -41,7 +41,7 @@ interface Carregamento {
     transportadora?: string;
   };
   facility: string;
-  status: "pendente" | "em_andamento" | "concluido" | "cancelado" | "liberado";
+  status?: "em_fila" | "carregando" | "liberado";
   dataCriacao: string;
   pesoEstimado?: string;
   observacoes?: string;
@@ -189,9 +189,9 @@ export default function DashboardPage() {
 
   const stats = {
     total: filteredCarregamentos.length,
-    pendentes: filteredCarregamentos.filter((c) => c.statusNormalizado === "pendente").length,
-    emAndamento: filteredCarregamentos.filter((c) => c.statusNormalizado === "em_andamento").length,
-    concluidos: filteredCarregamentos.filter((c) => c.statusNormalizado === "concluido").length,
+    pendentes: filteredCarregamentos.filter((c) => c.statusNormalizado === "em_fila").length,
+    emAndamento: filteredCarregamentos.filter((c) => c.statusNormalizado === "carregando").length,
+    concluidos: filteredCarregamentos.filter((c) => c.statusNormalizado === "liberado").length,
   };
 
   // ------------------------------------------------------------
@@ -209,10 +209,10 @@ export default function DashboardPage() {
       }
     });
 
-    // Mapa de concluídos a partir dos carregamentos do dia (status 'liberado' ou 'concluido')
+    // Mapa de concluídos a partir dos carregamentos do dia (status 'liberado')
     const concluidosPorDestino = new Map<string, number>();
     carregamentosDoDia.forEach((c) => {
-      if (c.status === 'liberado' || c.status === 'concluido') {
+      if (c.status === 'liberado') {
         const destino = c.destino;
         concluidosPorDestino.set(destino, (concluidosPorDestino.get(destino) || 0) + 1);
       }
@@ -289,6 +289,7 @@ export default function DashboardPage() {
         "Placa de Tração",
         "Placa de Carga",
         "Destino",
+        "Status",
         "Posição de Saída",
         "ID Carregamento",
         "Doca Carregamento",
@@ -316,6 +317,7 @@ export default function DashboardPage() {
           c.motorista?.veiculoTracao ?? "",
           c.motorista?.veiculoCarga ?? "",
           c.destino ?? "",
+          c.status ?? "",
           c.posicaoVeiculo ?? "",
           c._id ?? "",
           c.doca ?? "",
