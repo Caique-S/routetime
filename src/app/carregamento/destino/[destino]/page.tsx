@@ -459,6 +459,7 @@ function DestinoContent() {
 
   const handleSelecionarMotorista = (motorista: any) => {
     const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
+
     localStorage.setItem("motoristaSelecionadoId", motoristaId);
     localStorage.setItem("MotoristaSelecionado", JSON.stringify(motorista));
     localStorage.setItem("DestinoAtual", JSON.stringify(destinoInfo));
@@ -480,19 +481,18 @@ function DestinoContent() {
     );
   }
 
+  const motoristasFiltrados = motoristas.filter((motorista) => {
+    const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
+    const dados = carregamentos[motoristaId];
 
-const motoristasFiltrados = motoristas.filter(motorista => {
-  const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
-  const dados = carregamentos[motoristaId];
-  
-  if (filter === 'active') {
-    // Em andamento: não finalizados OU sem registro (nunca foram finalizados)
-    return !dados?.finalizado;
-  } else {
-    // Finalizados: possuem a flag finalizado = true
-    return dados?.finalizado === true;
-  }
-});
+    if (filter === "active") {
+      // Em andamento: não finalizados OU sem registro (nunca foram finalizados)
+      return !dados?.finalizado;
+    } else {
+      // Finalizados: possuem a flag finalizado = true
+      return dados?.finalizado === true;
+    }
+  });
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 safe-area">
@@ -606,11 +606,14 @@ const motoristasFiltrados = motoristas.filter(motorista => {
                     <div
                       className="cursor-pointer"
                       onClick={() => {
-    // Só permite clique se NÃO estiver na aba finalizados
-    if (filter !== 'finalized' && dadosCarregamento?.finalizado !== true) {
-      handleSelecionarMotorista(motorista);
-    }
-  }}
+                        // Só permite clique se NÃO estiver na aba finalizados
+                        if (
+                          filter !== "finalized" &&
+                          dadosCarregamento?.finalizado !== true
+                        ) {
+                          handleSelecionarMotorista(motorista);
+                        }
+                      }}
                     >
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center space-x-3">
