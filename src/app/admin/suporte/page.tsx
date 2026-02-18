@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Mail, Github, Linkedin, ChevronRight, MessageSquareText } from "lucide-react";
+import { Mail, Github, Linkedin, ChevronRight, MessageSquareText, ChevronLeft } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function SobrePage() {
   const [isAnimating, setIsAnimating] = useState(false);
@@ -34,6 +35,13 @@ export default function SobrePage() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+              <Link
+        href="/"
+        className="fixed top-6 left-6 z-20 p-3 bg-white/30 backdrop-blur-sm rounded-full text-gray-700 hover:text-blue-600 hover:bg-white/50 transition-all duration-300 transform hover:scale-110 group"
+        aria-label="Voltar para a página inicial"
+      >
+        <ChevronLeft className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
+      </Link>
       {/* Background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-bg-blob"></div>
@@ -158,7 +166,7 @@ export default function SobrePage() {
           <div className="flex justify-center">
             <button
               onClick={() => window.open("https://api.whatsapp.com/send/?phone=5575999872330","_blank")}
-              className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white transition-all duration-300 ease-in-out overflow-hidden rounded-2xl bg-linear-to-r from-blue-600 via-blue-700 to-purple-700 hover:from-blue-700 hover:via-blue-800 hover:to-purple-800 shadow-xl hover:shadow-2xl transform hover:-translate-y-1"
+              className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white transition-all duration-300 ease-in-out overflow-hidden rounded-2xl bg-linear-to-r from-blue-600 via-blue-700 to-green-700 hover:from-blue-700 hover:via-blue-800 hover:to-purple-800 shadow-xl hover:shadow-2xl transform hover:-translate-y-1"
             >
               <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-500"></div>
               <span className="relative flex items-center gap-3">
@@ -169,35 +177,17 @@ export default function SobrePage() {
             </button>
           </div>
 
-          {/* Redes sociais */}
-          <div className="flex justify-center items-center space-x-4 mt-10 pt-6 border-t border-white/50">
-            <a
-              href="#"
-              className="p-3 bg-white/30 backdrop-blur-sm rounded-full text-gray-700 hover:text-blue-600 hover:bg-white/50 transition-all duration-300 transform hover:scale-110"
-            >
-              <Github className="w-5 h-5" />
-            </a>
-            <a
-              href="#"
-              className="p-3 bg-white/30 backdrop-blur-sm rounded-full text-gray-700 hover:text-blue-600 hover:bg-white/50 transition-all duration-300 transform hover:scale-110"
-            >
-              <Linkedin className="w-5 h-5" />
-            </a>
-            <a
-              href="#"
-              className="p-3 bg-white/30 backdrop-blur-sm rounded-full text-gray-700 hover:text-blue-600 hover:bg-white/50 transition-all duration-300 transform hover:scale-110"
-            >
-              <Mail className="w-5 h-5" />
-            </a>
-          </div>
-        </div>
 
-        {/* Footer */}
+   
+
+        </div>
+     {/* Footer */}
         <div className="text-center mt-8">
           <p className="text-sm text-gray-500">
             © {new Date().getFullYear()} • Todos os direitos reservados
           </p>
         </div>
+
       </div>
 
       {/* Adicionar estilos no head do documento */}

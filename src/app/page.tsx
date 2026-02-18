@@ -37,6 +37,10 @@ export default function Home() {
     setIsAnimating(true);
   }, [router]);
 
+  const handleSuporte = () => {
+    router.push("/admin/suporte")
+  }
+
 
   const buscarOperador = async (id: string) => {
     if (!id.trim()) {
@@ -200,7 +204,8 @@ export default function Home() {
         <div className="text-center">
           <p className="text-sm text-gray-500">
             Precisa de ajuda?{" "}
-            <button className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
+            <button className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
+            onClick={handleSuporte}>
               Contate o administrador
             </button>
           </p>
