@@ -13,19 +13,24 @@ export async function POST(request: NextRequest) {
     const db = await getDatabase();
     const { nome } = await request.json();
     if (!nome) return NextResponse.json({ erro: 'Nome é obrigatório' }, { status: 400 });
+    
 
-    const agora = new Date();
-    const motorista = {
-      nome,
-      status: 'aguardando',
-      dataChegada: agora.toLocaleDateString('pt-BR'),
-      horaChegada: agora.toLocaleTimeString('pt-BR'),
-      timestampChegada: agora,
-      tempoFila: 0,
-      tempoDescarga: 0,
-      timestampInicioDescarga: null,
-      timestampFimDescarga: null,
-    };
+const agora = new Date();
+const options = { timeZone: 'America/Sao_Paulo' };
+const dataChegada = agora.toLocaleDateString('pt-BR', options);
+const horaChegada = agora.toLocaleTimeString('pt-BR', options);
+
+const motorista = {
+  nome,
+  status: 'aguardando',
+  dataChegada,
+  horaChegada,
+  timestampChegada: agora, // ainda salva o UTC para cálculos
+  tempoFila: 0,
+  tempoDescarga: 0,
+  timestampInicioDescarga: null,
+  timestampFimDescarga: null,
+};
 
     const result = await db.collection('melicages_motoristas').insertOne(motorista);
     const novoMotorista = { ...motorista, _id: result.insertedId };
