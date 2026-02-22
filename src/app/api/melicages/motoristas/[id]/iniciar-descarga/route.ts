@@ -1,84 +1,95 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/app/lib/mongodb';
-import { ObjectId } from 'mongodb';
+import { NextRequest, NextResponse } from "next/server";
+import { getDatabase } from "@/app/lib/mongodb";
+import { ObjectId } from "mongodb";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  console.log('🔍 Rota iniciar-descarga chamada');
-  console.log('📦 params recebido:', params);
-  console.log('🔑 id extraído:', params?.id);
-
   try {
-    const db = await getDatabase();
-    const { id } = params;
-
-    if (!id || id.trim() === '') {
-      console.log('❌ ID vazio ou não fornecido');
-      return NextResponse.json({ erro: 'ID não fornecido' }, { status: 400 });
+    const { id } = await params;
+    if (!id || id.trim() === "") {
+      return NextResponse.json(
+        { success: false, erro: "ID não fornecido" },
+        { status: 400 },
+      );
     }
 
     const cleanId = id.trim();
-    console.log('🧹 ID limpo:', cleanId);
-
-    // Tenta converter para ObjectId (mesmo que isValid falhe)
-    let objectId;
+    let objectId: ObjectId;
     try {
       objectId = new ObjectId(cleanId);
-      console.log('✅ ObjectId criado:', objectId);
-    } catch (err) {
-      console.error('❌ Falha ao criar ObjectId:', err);
-      return NextResponse.json({ erro: 'ID inválido' }, { status: 400 });
+    } catch {
+      return NextResponse.json(
+        { success: false, erro: "ID inválido" },
+        { status: 400 },
+      );
     }
 
+    const db = await getDatabase();
     const motorista = await db
-      .collection('melicages_motoristas')
+      .collection("melicages_motoristas")
       .findOne({ _id: objectId });
-    console.log('📦 Motorista encontrado:', motorista ? 'sim' : 'não');
 
     if (!motorista) {
-      return NextResponse.json({ erro: 'Motorista não encontrado' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, erro: "Motorista não encontrado" },
+        { status: 404 },
+      );
     }
 
-    if (motorista.status !== 'aguardando') {
+    if (motorista.status !== "aguardando") {
       return NextResponse.json(
-        { erro: 'Motorista não está aguardando', statusAtual: motorista.status },
+        {
+          success: false,
+          erro: "Motorista não está aguardando",
+          statusAtual: motorista.status,
+        },
+        { status: 400 },
+      );
+    }
+
+    const { doca } = await request.json();
+    if (!doca || typeof doca !== 'number') {
+      return NextResponse.json(
+        { success: false, erro: "Campo 'doca' obrigatório e deve ser número" },
         { status: 400 }
       );
     }
 
     const agora = new Date();
     const tempoFila = Math.floor(
-      (agora.getTime() - new Date(motorista.timestampChegada).getTime()) / 1000
+      (agora.getTime() - new Date(motorista.timestampChegada).getTime()) / 1000,
     );
 
-    await db.collection('melicages_motoristas').updateOne(
+    await db.collection("melicages_motoristas").updateOne(
       { _id: objectId },
       {
         $set: {
-          status: 'descarregando',
+          status: "descarregando",
           timestampInicioDescarga: agora,
           tempoFila,
+          doca: doca,
+          docaNotifiedAt: motorista.docaNotifiedAt || agora, // mantém se já notificado
         },
-      }
+      },
     );
 
     const atualizado = await db
-      .collection('melicages_motoristas')
+      .collection("melicages_motoristas")
       .findOne({ _id: objectId });
     const { _id, ...rest } = atualizado!;
 
     return NextResponse.json({
       success: true,
-      message: 'Descarga iniciada',
+      message: "Descarga iniciada",
       data: { ...rest, id: _id.toString() },
     });
   } catch (error: any) {
-    console.error('❌ Erro interno:', error);
+    console.error("PUT iniciar-descarga error:", error);
     return NextResponse.json(
-      { erro: 'Erro interno', detalhes: error.message },
-      { status: 500 }
+      { success: false, erro: "Erro interno", detalhes: error.message },
+      { status: 500 },
     );
   }
 }

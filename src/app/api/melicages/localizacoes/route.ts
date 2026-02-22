@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '../../../lib/mongodb';
-
-function serializeDocument(doc: any): any {
-  if (!doc) return null;
-  const { _id, ...rest } = doc;
-  return { ...rest, id: _id.toString() };
-}
+import { getDatabase } from '@/app/lib/mongodb';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +7,10 @@ export async function POST(request: NextRequest) {
     const { motorista, latitude, longitude, timestamp } = await request.json();
 
     if (!motorista || latitude === undefined || longitude === undefined) {
-      return NextResponse.json({ erro: 'Campos obrigatórios: motorista, latitude, longitude' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, erro: 'Campos obrigatórios: motorista, latitude, longitude' },
+        { status: 400 }
+      );
     }
 
     const localizacao = {
@@ -24,10 +21,14 @@ export async function POST(request: NextRequest) {
     };
 
     const result = await db.collection('melicages_localizacoes').insertOne(localizacao);
-    const nova = { ...localizacao, _id: result.insertedId };
+    const nova = { ...localizacao, id: result.insertedId.toString() };
 
-    return NextResponse.json({ success: true, message: 'Localização recebida', data: serializeDocument(nova) }, { status: 201 });
+    return NextResponse.json({ success: true, data: nova }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ erro: 'Erro interno', detalhes: error.message }, { status: 500 });
+    console.error('POST localizacoes error:', error);
+    return NextResponse.json(
+      { success: false, erro: 'Erro interno', detalhes: error.message },
+      { status: 500 }
+    );
   }
 }

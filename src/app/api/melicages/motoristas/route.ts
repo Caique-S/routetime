@@ -1,66 +1,105 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '../../../lib/mongodb';
+import { getDatabase } from '@/app/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-function serializeDocument(doc: any): any {
-  if (!doc) return null;
-  const { _id, ...rest } = doc;
-  return { ...rest, id: _id.toString() };
-}
-
-export async function POST(request: NextRequest) {
+// GET /api/melicages/motoristas
+export async function GET() {
   try {
     const db = await getDatabase();
-    const { nome } = await request.json();
-    if (!nome) return NextResponse.json({ erro: 'Nome é obrigatório' }, { status: 400 });
-    
+    const motoristas = await db
+      .collection('melicages_motoristas')
+      .find({})
+      .sort({ timestampChegada: -1 })
+      .toArray();
 
-const agora = new Date();
-const options = { timeZone: 'America/Sao_Paulo' };
-const dataChegada = agora.toLocaleDateString('pt-BR', options);
-const horaChegada = agora.toLocaleTimeString('pt-BR', options);
+    const data = motoristas.map(({ _id, ...rest }) => ({
+      id: _id.toString(),
+      ...rest,
+    }));
 
-const motorista = {
-  nome,
-  status: 'aguardando',
-  dataChegada,
-  horaChegada,
-  timestampChegada: agora, // ainda salva o UTC para cálculos
-  tempoFila: 0,
-  tempoDescarga: 0,
-  timestampInicioDescarga: null,
-  timestampFimDescarga: null,
-};
-
-    const result = await db.collection('melicages_motoristas').insertOne(motorista);
-    const novoMotorista = { ...motorista, _id: result.insertedId };
-
-    return NextResponse.json({
-      success: true,
-      message: 'Chegada registrada com sucesso',
-      data: serializeDocument(novoMotorista),
-    }, { status: 201 });
+    return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    return NextResponse.json({ erro: 'Erro interno', detalhes: error.message }, { status: 500 });
+    console.error('GET motoristas error:', error);
+    return NextResponse.json(
+      { success: false, erro: 'Erro interno', detalhes: error.message },
+      { status: 500 }
+    );
   }
 }
 
-export async function GET(request: NextRequest) {
+// POST /api/melicages/motoristas
+export async function POST(request: NextRequest) {
   try {
     const db = await getDatabase();
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-    const filtro = status ? { status } : {};
+    const { cpf } = await request.json();
 
-    const motoristas = await db.collection('melicages_motoristas')
-      .find(filtro)
-      .sort({ timestampChegada: -1 })
-      .limit(100)
-      .toArray();
+    if (!cpf) {
+      return NextResponse.json(
+        { success: false, erro: 'CPF é obrigatório' },
+        { status: 400 }
+      );
+    }
 
-    const serialized = motoristas.map(serializeDocument);
-    return NextResponse.json({ success: true, count: serialized.length, data: serialized });
+    // Buscar motorista no cadastro
+    const cadastro = await db.collection('melicages_motoristas_cadastro').findOne({ cpf });
+    if (!cadastro) {
+      return NextResponse.json(
+        { success: false, erro: 'CPF não encontrado no cadastro' },
+        { status: 404 }
+      );
+    }
+
+    // Verificar se já existe um registro ativo para este CPF
+    const ativo = await db.collection('melicages_motoristas').findOne({
+      cpf,
+      status: { $in: ['aguardando', 'descarregando'] }
+    });
+    if (ativo) {
+      return NextResponse.json(
+        { success: false, erro: 'Motorista já está na fila ou descarregando', data: ativo },
+        { status: 409 }
+      );
+    }
+
+    const agora = new Date();
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    };
+    const dataChegada = agora.toLocaleDateString('pt-BR', options);
+    const horaChegada = agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
+    const motorista = {
+      cpf: cadastro.cpf,
+      nome: cadastro.nome,
+      chave_identificacao: cadastro.chave_identificacao,
+      destino: cadastro.destino_xpt, // talvez usar campo destino
+      status: 'aguardando',
+      dataChegada,
+      horaChegada,
+      timestampChegada: agora,
+      tempoFila: 0,
+      tempoDescarga: 0,
+      timestampInicioDescarga: null,
+      timestampFimDescarga: null,
+      doca: null,
+      docaNotifiedAt: null,
+      gaiolas: null,
+      palets: null,
+      mangas: null,
+    };
+
+    const result = await db.collection('melicages_motoristas').insertOne(motorista);
+    const novoMotorista = { ...motorista, id: result.insertedId.toString() };
+
+    return NextResponse.json({ success: true, data: novoMotorista }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ erro: 'Erro interno', detalhes: error.message }, { status: 500 });
+    console.error('POST motoristas error:', error);
+    return NextResponse.json(
+      { success: false, erro: 'Erro interno', detalhes: error.message },
+      { status: 500 }
+    );
   }
 }

@@ -9,6 +9,10 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
+    "@heroicons/react": "^2.2.0",
+    "@zxing/browser": "^0.1.5",
+    "date-fns": "^4.1.0",
+    "framer-motion": "^12.34.3",
     "html5-qrcode": "^2.3.8",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.563.0",
@@ -16,7 +20,11 @@
     "next": "16.1.6",
     "papaparse": "^5.5.3",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-hot-toast": "^2.6.0",
+    "react-qr-code": "^2.0.18",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

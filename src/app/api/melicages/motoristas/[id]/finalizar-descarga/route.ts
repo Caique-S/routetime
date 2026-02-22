@@ -1,39 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '../../../../../lib/mongodb';
+import { getDatabase } from '@/app/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const db = await getDatabase();
-    const { id } = params;
-
-    console.log('📥 ID recebido (finalizar-descarga):', id);
-    const cleanId = id.trim();
-
-    if (!ObjectId.isValid(cleanId)) {
-      try {
-        new ObjectId(cleanId);
-      } catch {
-        return NextResponse.json({ erro: 'ID inválido' }, { status: 400 });
-      }
+    const { id } = await params;
+    if (!id || id.trim() === '') {
+      return NextResponse.json({ success: false, erro: 'ID não fornecido' }, { status: 400 });
     }
 
-    const objectId = new ObjectId(cleanId);
+    const cleanId = id.trim();
+    let objectId: ObjectId;
+    try {
+      objectId = new ObjectId(cleanId);
+    } catch {
+      return NextResponse.json({ success: false, erro: 'ID inválido' }, { status: 400 });
+    }
+
+    const db = await getDatabase();
     const motorista = await db.collection('melicages_motoristas').findOne({ _id: objectId });
 
     if (!motorista) {
-      return NextResponse.json({ erro: 'Motorista não encontrado' }, { status: 404 });
+      return NextResponse.json({ success: false, erro: 'Motorista não encontrado' }, { status: 404 });
     }
 
     if (motorista.status !== 'descarregando') {
       return NextResponse.json(
-        { erro: 'Motorista não está descarregando', statusAtual: motorista.status },
+        { success: false, erro: 'Motorista não está descarregando', statusAtual: motorista.status },
+        { status: 400 }
+      );
+    }
+
+    // Lê os campos do body
+    const { gaiolas, palets, mangas } = await request.json();
+
+    if (gaiolas === undefined || palets === undefined || mangas === undefined) {
+      return NextResponse.json(
+        { success: false, erro: 'Campos obrigatórios: gaiolas, palets, mangas' },
+        { status: 400 }
+      );
+    }
+
+    const gaiolasNum = parseInt(gaiolas, 10);
+    const paletsNum = parseInt(palets, 10);
+    const mangasNum = parseInt(mangas, 10);
+
+    if (isNaN(gaiolasNum) || isNaN(paletsNum) || isNaN(mangasNum)) {
+      return NextResponse.json(
+        { success: false, erro: 'Valores devem ser números inteiros' },
         { status: 400 }
       );
     }
 
     const agora = new Date();
-    const tempoDescarga = Math.floor((agora.getTime() - new Date(motorista.timestampInicioDescarga).getTime()) / 1000);
+    const tempoDescarga = Math.floor(
+      (agora.getTime() - new Date(motorista.timestampInicioDescarga).getTime()) / 1000
+    );
 
     await db.collection('melicages_motoristas').updateOne(
       { _id: objectId },
@@ -42,6 +67,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
           status: 'descarregado',
           timestampFimDescarga: agora,
           tempoDescarga,
+          gaiolas: gaiolasNum,
+          palets: paletsNum,
+          mangas: mangasNum,
         },
       }
     );
@@ -55,9 +83,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       data: { ...rest, id: _id.toString() },
     });
   } catch (error: any) {
-    console.error('❌ Erro interno:', error);
+    console.error('PUT finalizar-descarga error:', error);
     return NextResponse.json(
-      { erro: 'Erro interno', detalhes: error.message },
+      { success: false, erro: 'Erro interno', detalhes: error.message },
       { status: 500 }
     );
   }
