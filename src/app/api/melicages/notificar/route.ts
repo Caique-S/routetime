@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 import { ObjectId } from 'mongodb';
-import { getSocketServer } from '@/app/lib/socket';
+import Ably from 'ably';
+
+// Inicializa o cliente Ably (usando a API key do servidor)
+const ably = new Ably.Rest(process.env.ABLY_API_KEY!);
 
 export async function POST(request: NextRequest) {
   console.log('[API] POST /notificar');
@@ -24,13 +27,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, erro: 'ID inválido' }, { status: 400 });
     }
 
-    // Buscar motorista
+    // Buscar motorista (opcional, apenas para validar existência)
     const motorista = await db.collection('melicages_motoristas').findOne({ _id: objectId });
     if (!motorista) {
       return NextResponse.json({ success: false, erro: 'Motorista não encontrado' }, { status: 404 });
     }
 
-    // Atualizar com a doca e horário da notificação
+    // Atualizar a doca no banco (opcional, para registro)
     const agora = new Date();
     await db.collection('melicages_motoristas').updateOne(
       { _id: objectId },
@@ -43,13 +46,11 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Emitir via WebSocket para o app do motorista
-    const io = getSocketServer();
-    // O motorista deve estar em uma sala com seu ID (ex: `motorista:${motoristaId}`)
-    io.to(`motorista:${motoristaId}`).emit('notificacao-doca', { doca, tempoResposta: 300 });
+    // Publicar a notificação no canal do motorista via Ably
+    const channel = ably.channels.get(`motorista:${motoristaId}`);
+    await channel.publish('notificacao-doca', { doca, tempoResposta: 300 });
 
-    // Emitir atualização da fila para todos os painéis
-    io.emit('atualizacao-fila');
+    console.log(`📢 Notificação enviada para motorista:${motoristaId} via Ably`);
 
     return NextResponse.json({ success: true, message: 'Notificação enviada' });
   } catch (error: any) {

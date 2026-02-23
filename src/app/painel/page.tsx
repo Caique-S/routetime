@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import IniciarDescargaModal from './components/IniciarDescargaModal';
-import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 
 interface Motorista {

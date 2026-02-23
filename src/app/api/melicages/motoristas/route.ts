@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
-import { getSocketServer } from '@/app/lib/socket';
+import ably from '@/app/lib/ably';
 
 export async function GET() {
   console.log('[API] GET /motoristas');
@@ -81,8 +81,8 @@ export async function POST(request: NextRequest) {
     const novoMotorista = { ...motorista, id: result.insertedId.toString() };
 
     // Emite atualização da fila
-    const io = getSocketServer();
-    io.emit('atualizacao-fila');
+    const filaChannel = ably.channels.get('fila');
+await filaChannel.publish('atualizacao-fila', {});
 
     return NextResponse.json({ success: true, data: novoMotorista }, { status: 201 });
   } catch (error: any) {
