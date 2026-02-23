@@ -22,26 +22,26 @@ export default function IniciarDescargaModal({ motorista, onClose, onConfirm }: 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [erro, setErro] = useState('');
 
-  const handleNotificar = async () => {
-    if (!doca) {
-      setErro('Informe a doca');
-      return;
-    }
-    try {
-      const res = await fetch('/api/melicages/notificar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ motoristaId: motorista.id, doca: parseInt(doca) }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.erro);
-      setNotificacaoEnviada(true);
-      toast.success('Notificação enviada ao motorista');
-    } catch (err: any) {
-      toast.error('Erro ao notificar: ' + err.message);
-      setErro(err.message);
-    }
-  };
+const handleNotificar = async () => {
+  if (!doca) {
+    setErro('Informe a doca');
+    return;
+  }
+  try {
+    const res = await fetch('/api/melicages/notificar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motoristaId: motorista.id, doca: parseInt(doca) }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.erro || 'Erro ao notificar');
+    setNotificacaoEnviada(true);
+    toast.success('Notificação enviada ao motorista');
+  } catch (err: any) {
+    toast.error('Erro ao notificar: ' + err.message);
+    setErro(err.message);
+  }
+};
 
   const iniciarScanner = async () => {
     setScannerAtivo(true);
