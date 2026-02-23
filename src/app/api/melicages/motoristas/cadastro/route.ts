@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, erro: 'CPF já cadastrado' }, { status: 409 });
     }
 
-    // Gerar chave de identificação única
     const baseChave = `${nome}_${origem}_${destino_xpt}`.replace(/\s+/g, '_');
     let chave_identificacao = baseChave;
     let contador = 1;

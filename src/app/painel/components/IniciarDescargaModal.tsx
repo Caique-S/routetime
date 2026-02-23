@@ -39,6 +39,7 @@ export default function IniciarDescargaModal({ motorista, onClose, onConfirm }: 
       toast.success('Notificação enviada ao motorista');
     } catch (err: any) {
       toast.error('Erro ao notificar: ' + err.message);
+      setErro(err.message);
     }
   };
 
@@ -57,7 +58,6 @@ export default function IniciarDescargaModal({ motorista, onClose, onConfirm }: 
             setQrValidado(true);
             setScannerAtivo(false);
             toast.success('QR Code validado!');
-            // parar stream
             stream.getTracks().forEach(track => track.stop());
           } else {
             setErro('QR Code não corresponde a este motorista');
@@ -77,7 +77,6 @@ export default function IniciarDescargaModal({ motorista, onClose, onConfirm }: 
     onConfirm(motorista.id, parseInt(doca));
   };
 
-  // Parar scanner ao desmontar
   useEffect(() => {
     return () => {
       if (videoRef.current?.srcObject) {

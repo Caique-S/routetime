@@ -40,9 +40,11 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Emit via WebSocket
+    // Emite para o app do motorista
     const io = getSocketServer();
     io.to(`motorista:${motoristaId}`).emit('notificacao-doca', { doca, tempoResposta: 300 });
+    // Emite atualização da fila para todos
+    io.emit('atualizacao-fila');
 
     return NextResponse.json({ success: true, message: 'Notificação enviada' });
   } catch (error: any) {

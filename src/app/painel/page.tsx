@@ -3,12 +3,11 @@
 import { useEffect, useState } from 'react';
 import IniciarDescargaModal from './components/IniciarDescargaModal';
 import { io } from 'socket.io-client';
+import toast from 'react-hot-toast';
 
 interface Motorista {
   id: string;
   nome: string;
-  // Atenção: o campo pode ser "destino" ou "retorno" conforme o backend
-  // Ajuste conforme necessário. No momento usamos "retorno" (como no código original)
   retorno: string;
   status: 'aguardando' | 'descarregando' | 'descarregado';
   dataChegada: string;
@@ -18,17 +17,12 @@ interface Motorista {
   tempoDescarga: number;
   timestampInicioDescarga?: string;
   timestampFimDescarga?: string;
-  // Campos de produção (adicionados após finalização)
   gaiolas?: number;
   palets?: number;
   mangas?: number;
 }
 
-/**
- * Modal para coletar as quantidades de produção ao finalizar a descarga.
- * - Abre sempre com campos vazios (garantido pelo useEffect).
- * - Valida que todos os campos foram preenchidos com números não negativos.
- */
+// Modal de finalização (igual ao original)
 const FinalizarModal = ({
   visible,
   motoristaId,
@@ -47,7 +41,6 @@ const FinalizarModal = ({
   const [mangas, setMangas] = useState('');
   const [error, setError] = useState('');
 
-  // Resetar campos sempre que o modal for aberto (quando visible se torna true)
   useEffect(() => {
     if (visible) {
       setGaiolas('');
@@ -58,7 +51,6 @@ const FinalizarModal = ({
   }, [visible]);
 
   const handleConfirm = () => {
-    // Verificar se os campos não estão vazios
     if (gaiolas.trim() === '' || palets.trim() === '' || mangas.trim() === '') {
       setError('Todos os campos são obrigatórios');
       return;
@@ -88,7 +80,6 @@ const FinalizarModal = ({
         <p className="mb-4 text-gray-600">
           Motorista: <span className="font-semibold">{motoristaNome}</span>
         </p>
-
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -103,7 +94,6 @@ const FinalizarModal = ({
               placeholder="Quantidade de gaiolas"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Palets <span className="text-red-500">*</span>
@@ -117,7 +107,6 @@ const FinalizarModal = ({
               placeholder="Quantidade de palets"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Mangas <span className="text-red-500">*</span>
@@ -131,9 +120,7 @@ const FinalizarModal = ({
               placeholder="Quantidade de mangas"
             />
           </div>
-
           {error && <p className="text-red-500 text-sm">{error}</p>}
-
           <div className="flex justify-end gap-3 mt-4">
             <button
               onClick={onClose}
@@ -154,21 +141,14 @@ const FinalizarModal = ({
   );
 };
 
-/**
- * Card individual do motorista.
- * Exibe:
- * - Nome, retorno, horários de chegada/início/término
- * - Tempos de fila e descarga (atualizados em tempo real pelo backend)
- * - Se finalizado, mostra a produção e o tempo total desde a chegada
- * - Botões de ação conforme o status
- */
+// Card do motorista
 const MotoristaCard = ({
   motorista,
   onIniciar,
-  onFinalizar, // recebe id e nome para abrir o modal
+  onFinalizar,
 }: {
   motorista: Motorista;
-  onIniciar: (id: string) => void;
+  onIniciar: (motorista: Motorista) => void;
   onFinalizar: (id: string, nome: string) => void;
 }) => {
   const formatarTempo = (segundos: number) => {
@@ -178,7 +158,6 @@ const MotoristaCard = ({
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Calcular tempo total (da chegada até o fim, apenas para finalizados)
   const calcularTempoTotal = (): string | null => {
     if (motorista.status !== 'descarregado' || !motorista.timestampFimDescarga) return null;
     const chegada = new Date(motorista.timestampChegada).getTime();
@@ -188,12 +167,7 @@ const MotoristaCard = ({
   };
 
   const tempoTotal = calcularTempoTotal();
-
-  // Verificar se existem dados de produção
-  const temProducao =
-    motorista.gaiolas !== undefined &&
-    motorista.palets !== undefined &&
-    motorista.mangas !== undefined;
+  const temProducao = motorista.gaiolas !== undefined && motorista.palets !== undefined && motorista.mangas !== undefined;
 
   return (
     <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-500 hover:shadow-lg transition">
@@ -203,8 +177,6 @@ const MotoristaCard = ({
           <p className="text-sm text-gray-600">
             Retorno: {motorista.retorno} • Chegada: {motorista.dataChegada} {motorista.horaChegada}
           </p>
-
-          {/* Horários adicionais (se existirem) */}
           {motorista.timestampInicioDescarga && (
             <p className="text-xs text-gray-500">
               Início descarga: {new Date(motorista.timestampInicioDescarga).toLocaleTimeString('pt-BR')}
@@ -215,24 +187,16 @@ const MotoristaCard = ({
               Término: {new Date(motorista.timestampFimDescarga).toLocaleTimeString('pt-BR')}
             </p>
           )}
-
-          {/* Produção (apenas para finalizados) */}
           {temProducao && (
             <div className="mt-2 text-sm bg-gray-50 p-2 rounded">
               <span className="font-medium">Devolução:</span>{' '}
               Gaiolas {motorista.gaiolas} | Palets {motorista.palets} | Mangas {motorista.mangas}
             </div>
           )}
-
-          {/* Tempo total (apenas para finalizados) */}
           {tempoTotal && (
-            <p className="text-xs font-semibold text-gray-700 mt-1">
-            ⏱️ Tempo total: {tempoTotal}
-            </p>
+            <p className="text-xs font-semibold text-gray-700 mt-1">⏱️ Tempo total: {tempoTotal}</p>
           )}
         </div>
-
-        {/* Badge de status */}
         <span
           className={`px-2 py-1 text-xs rounded-full ${
             motorista.status === 'aguardando'
@@ -250,7 +214,6 @@ const MotoristaCard = ({
         </span>
       </div>
 
-      {/* Tempos de fila e descarga */}
       <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
         <div>
           <span className="text-gray-500">Fila:</span>
@@ -264,10 +227,9 @@ const MotoristaCard = ({
         )}
       </div>
 
-      {/* Botões de ação (apenas para status que permitem ações) */}
       {motorista.status === 'aguardando' && (
         <button
-          onClick={() => onIniciar(motorista.id)}
+          onClick={() => onIniciar(motorista)}
           className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition"
         >
           Iniciar Descarga
@@ -286,9 +248,7 @@ const MotoristaCard = ({
   );
 };
 
-/**
- * Coluna representando um status (aguardando, descarregando, finalizados).
- */
+// Coluna
 const Coluna = ({
   titulo,
   motoristas,
@@ -299,7 +259,7 @@ const Coluna = ({
   titulo: string;
   motoristas: Motorista[];
   cor: string;
-  onIniciar: (id: string) => void;
+  onIniciar: (motorista: Motorista) => void;
   onFinalizar: (id: string, nome: string) => void;
 }) => (
   <div className="flex-1 min-w-75 bg-gray-50 rounded-lg p-4">
@@ -309,12 +269,7 @@ const Coluna = ({
     </h2>
     <div className="space-y-3">
       {motoristas.map((m) => (
-        <MotoristaCard
-          key={m.id}
-          motorista={m}
-          onIniciar={onIniciar}
-          onFinalizar={onFinalizar}
-        />
+        <MotoristaCard key={m.id} motorista={m} onIniciar={onIniciar} onFinalizar={onFinalizar} />
       ))}
       {motoristas.length === 0 && (
         <p className="text-gray-400 text-center py-8">Nenhum motorista</p>
@@ -329,11 +284,13 @@ export default function PainelPage() {
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
-  // Controle do modal
-  const [modalAberto, setModalAberto] = useState(false);
-  const [motoristaSelecionado, setMotoristaSelecionado] = useState<{ id: string; nome: string } | null>(null);
+  // Controle dos modais
+  const [modalIniciarAberto, setModalIniciarAberto] = useState(false);
+  const [motoristaParaIniciar, setMotoristaParaIniciar] = useState<Motorista | null>(null);
 
-  // Busca a lista de motoristas
+  const [modalFinalizarAberto, setModalFinalizarAberto] = useState(false);
+  const [motoristaParaFinalizar, setMotoristaParaFinalizar] = useState<{ id: string; nome: string } | null>(null);
+
   const fetchMotoristas = async () => {
     setLoading(true);
     setError(null);
@@ -345,52 +302,40 @@ export default function PainelPage() {
       setMotoristas(json.data);
     } catch (err: any) {
       setError(err.message);
-      console.error('Erro ao buscar motoristas:', err);
+      toast.error('Erro ao buscar motoristas: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Carregar inicial
   useEffect(() => {
     fetchMotoristas();
   }, []);
 
-  // Auto‑refresh
   useEffect(() => {
     if (!autoRefresh) return;
-    const interval = setInterval(() => {
-      fetchMotoristas();
-    }, 10000);
+    const interval = setInterval(fetchMotoristas, 10000);
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
-  // Iniciar descarga (muda status para 'descarregando')
-  const handleIniciarDescarga = async (id: string) => {
+  const handleIniciarDescarga = async (id: string, doca: number) => {
     try {
       const response = await fetch(`/api/melicages/motoristas/${id}/iniciar-descarga`, {
         method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doca }),
       });
       const json = await response.json();
       if (!response.ok || !json.success) {
         throw new Error(json.erro || 'Erro ao iniciar descarga');
       }
-      // Atualiza o motorista na lista com os dados retornados
-      setMotoristas((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, ...json.data } : m))
-      );
+      setMotoristas((prev) => prev.map((m) => (m.id === id ? { ...m, ...json.data } : m)));
+      toast.success('Descarga iniciada com sucesso!');
     } catch (err: any) {
-      alert(`Erro: ${err.message}`);
+      toast.error('Erro: ' + err.message);
     }
   };
 
-  // Abre o modal para finalizar a descarga
-  const abrirModalFinalizar = (id: string, nome: string) => {
-    setMotoristaSelecionado({ id, nome });
-    setModalAberto(true);
-  };
-
-  // Finaliza a descarga (chamado pelo modal)
   const handleFinalizarDescarga = async (id: string, gaiolas: number, palets: number, mangas: number) => {
     try {
       const response = await fetch(`/api/melicages/motoristas/${id}/finalizar-descarga`, {
@@ -402,15 +347,13 @@ export default function PainelPage() {
       if (!response.ok || !json.success) {
         throw new Error(json.erro || 'Erro ao finalizar descarga');
       }
-      setMotoristas((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, ...json.data } : m))
-      );
+      setMotoristas((prev) => prev.map((m) => (m.id === id ? { ...m, ...json.data } : m)));
+      toast.success('Descarga finalizada com sucesso!');
     } catch (err: any) {
-      alert(`Erro: ${err.message}`);
+      toast.error('Erro: ' + err.message);
     }
   };
 
-  // Separa os motoristas por status
   const aguardando = motoristas.filter((m) => m.status === 'aguardando');
   const descarregando = motoristas.filter((m) => m.status === 'descarregando');
   const finalizados = motoristas.filter((m) => m.status === 'descarregado');
@@ -418,9 +361,8 @@ export default function PainelPage() {
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Cabeçalho com controles */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">🚚 Retorno- SVC</h1>
+          <h1 className="text-3xl font-bold text-gray-800">🚚 Gaiolas</h1>
           <div className="flex gap-3">
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
@@ -440,46 +382,74 @@ export default function PainelPage() {
           </div>
         </div>
 
-        {/* Mensagem de erro */}
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             Erro: {error}
           </div>
         )}
 
-        {/* Colunas Kanban */}
         <div className="flex flex-wrap gap-4">
           <Coluna
             titulo="Aguardando"
             motoristas={aguardando}
             cor="bg-yellow-500"
-            onIniciar={handleIniciarDescarga}
-            onFinalizar={abrirModalFinalizar}
+            onIniciar={(motorista) => {
+              setMotoristaParaIniciar(motorista);
+              setModalIniciarAberto(true);
+            }}
+            onFinalizar={(id, nome) => {
+              setMotoristaParaFinalizar({ id, nome });
+              setModalFinalizarAberto(true);
+            }}
           />
           <Coluna
             titulo="Descarregando"
             motoristas={descarregando}
             cor="bg-blue-500"
-            onIniciar={handleIniciarDescarga}
-            onFinalizar={abrirModalFinalizar}
+            onIniciar={(motorista) => {
+              setMotoristaParaIniciar(motorista);
+              setModalIniciarAberto(true);
+            }}
+            onFinalizar={(id, nome) => {
+              setMotoristaParaFinalizar({ id, nome });
+              setModalFinalizarAberto(true);
+            }}
           />
           <Coluna
             titulo="Finalizados"
             motoristas={finalizados}
             cor="bg-green-500"
-            onIniciar={handleIniciarDescarga}
-            onFinalizar={abrirModalFinalizar}
+            onIniciar={(motorista) => {
+              setMotoristaParaIniciar(motorista);
+              setModalIniciarAberto(true);
+            }}
+            onFinalizar={(id, nome) => {
+              setMotoristaParaFinalizar({ id, nome });
+              setModalFinalizarAberto(true);
+            }}
           />
         </div>
 
-        {/* Modal de finalização */}
+        {/* Modal de Iniciar Descarga */}
+        {modalIniciarAberto && motoristaParaIniciar && (
+          <IniciarDescargaModal
+            motorista={{ id: motoristaParaIniciar.id, nome: motoristaParaIniciar.nome }}
+            onClose={() => {
+              setModalIniciarAberto(false);
+              setMotoristaParaIniciar(null);
+            }}
+            onConfirm={handleIniciarDescarga}
+          />
+        )}
+
+        {/* Modal de Finalizar Descarga */}
         <FinalizarModal
-          visible={modalAberto}
-          motoristaId={motoristaSelecionado?.id || null}
-          motoristaNome={motoristaSelecionado?.nome || ''}
+          visible={modalFinalizarAberto}
+          motoristaId={motoristaParaFinalizar?.id || null}
+          motoristaNome={motoristaParaFinalizar?.nome || ''}
           onClose={() => {
-            setModalAberto(false);
-            setMotoristaSelecionado(null);
+            setModalFinalizarAberto(false);
+            setMotoristaParaFinalizar(null);
           }}
           onConfirm={handleFinalizarDescarga}
         />

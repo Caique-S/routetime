@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
+import { getSocketServer } from '@/app/lib/socket';
 
 export async function GET() {
   console.log('[API] GET /motoristas');
@@ -33,7 +34,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, erro: 'CPF é obrigatório' }, { status: 400 });
     }
 
-    // Buscar motorista no cadastro
     const cadastro = await db.collection('melicages_motoristas_cadastro').findOne({ cpf });
     if (!cadastro) {
       return NextResponse.json(
@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar se já existe um registro ativo
     const ativo = await db.collection('melicages_motoristas').findOne({
       cpf,
       status: { $in: ['aguardando', 'descarregando'] }
@@ -80,6 +79,10 @@ export async function POST(request: NextRequest) {
 
     const result = await db.collection('melicages_motoristas').insertOne(motorista);
     const novoMotorista = { ...motorista, id: result.insertedId.toString() };
+
+    // Emite atualização da fila
+    const io = getSocketServer();
+    io.emit('atualizacao-fila');
 
     return NextResponse.json({ success: true, data: novoMotorista }, { status: 201 });
   } catch (error: any) {

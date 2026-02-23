@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { getSocketServer } from '@/app/lib/socket';
 
 export async function PUT(
   request: NextRequest,
@@ -73,6 +74,10 @@ export async function PUT(
         },
       }
     );
+
+    // Emite atualização da fila
+    const io = getSocketServer();
+    io.emit('atualizacao-fila');
 
     const atualizado = await db.collection('melicages_motoristas').findOne({ _id: objectId });
     const { _id, ...rest } = atualizado!;
