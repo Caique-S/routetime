@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validar ID
     let objectId;
     try {
       objectId = new ObjectId(motoristaId);
@@ -23,11 +24,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, erro: 'ID inválido' }, { status: 400 });
     }
 
+    // Buscar motorista
     const motorista = await db.collection('melicages_motoristas').findOne({ _id: objectId });
     if (!motorista) {
       return NextResponse.json({ success: false, erro: 'Motorista não encontrado' }, { status: 404 });
     }
 
+    // Atualizar com a doca e horário da notificação
     const agora = new Date();
     await db.collection('melicages_motoristas').updateOne(
       { _id: objectId },
@@ -40,15 +43,20 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Emite para o app do motorista
+    // Emitir via WebSocket para o app do motorista
     const io = getSocketServer();
+    // O motorista deve estar em uma sala com seu ID (ex: `motorista:${motoristaId}`)
     io.to(`motorista:${motoristaId}`).emit('notificacao-doca', { doca, tempoResposta: 300 });
-    // Emite atualização da fila para todos
+
+    // Emitir atualização da fila para todos os painéis
     io.emit('atualizacao-fila');
 
     return NextResponse.json({ success: true, message: 'Notificação enviada' });
   } catch (error: any) {
     console.error('[API] POST /notificar error:', error);
-    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, erro: 'Erro interno', detalhes: error.message },
+      { status: 500 }
+    );
   }
 }
