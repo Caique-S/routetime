@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 
 export async function GET() {
+  console.log('[API] GET /config/localizacoes');
   try {
     const db = await getDatabase();
     const config = await db.collection('melicages_localizacoes_config').findOne({});
@@ -14,15 +15,13 @@ export async function GET() {
     const { _id, ...rest } = config;
     return NextResponse.json({ success: true, data: { ...rest, id: _id.toString() } });
   } catch (error: any) {
-    console.error('GET config/localizacao error:', error);
-    return NextResponse.json(
-      { success: false, erro: 'Erro interno', detalhes: error.message },
-      { status: 500 }
-    );
+    console.error('[API] GET /config/localizacoes error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }
 
 export async function PUT(request: NextRequest) {
+  console.log('[API] PUT /config/localizacoes');
   try {
     const db = await getDatabase();
     const body = await request.json();
@@ -35,7 +34,6 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Upsert: atualiza ou cria o documento único
     await db.collection('melicages_localizacoes_config').updateOne(
       {},
       {
@@ -54,10 +52,7 @@ export async function PUT(request: NextRequest) {
     const { _id, ...rest } = updated!;
     return NextResponse.json({ success: true, data: { ...rest, id: _id.toString() } });
   } catch (error: any) {
-    console.error('PUT config/localizacao error:', error);
-    return NextResponse.json(
-      { success: false, erro: 'Erro interno', detalhes: error.message },
-      { status: 500 }
-    );
+    console.error('[API] PUT /config/localizacoes error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

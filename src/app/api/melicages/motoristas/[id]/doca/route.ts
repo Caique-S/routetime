@@ -6,6 +6,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log('[API] PUT /motoristas/[id]/doca');
   try {
     const { id } = await params;
     const db = await getDatabase();
@@ -39,6 +40,7 @@ export async function PUT(
     const { _id, ...rest } = updated!;
     return NextResponse.json({ success: true, data: { id: _id.toString(), ...rest } });
   } catch (error: any) {
-    return NextResponse.json({ success: false, erro: error.message }, { status: 500 });
+    console.error('[API] PUT /motoristas/[id]/doca error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

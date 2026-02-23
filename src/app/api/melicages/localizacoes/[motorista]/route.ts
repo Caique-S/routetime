@@ -5,6 +5,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ motorista: string }> }
 ) {
+  console.log('[API] GET /localizacoes/[motorista]');
   try {
     const { motorista } = await params;
     const db = await getDatabase();
@@ -23,10 +24,7 @@ export async function GET(
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error('GET localizacoes error:', error);
-    return NextResponse.json(
-      { success: false, erro: 'Erro interno', detalhes: error.message },
-      { status: 500 }
-    );
+    console.error('[API] GET /localizacoes/[motorista] error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

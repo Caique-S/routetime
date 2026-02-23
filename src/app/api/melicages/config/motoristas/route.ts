@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 
-
 export async function GET() {
+  console.log('[API] GET /config/motoristas');
   try {
     const db = await getDatabase();
     const config = await db.collection('melicages_motoristas_config').findOne({});
@@ -15,11 +15,13 @@ export async function GET() {
     const { _id, ...rest } = config;
     return NextResponse.json({ success: true, data: { ...rest, id: _id.toString() } });
   } catch (error: any) {
-    return NextResponse.json({ success: false, erro: error.message }, { status: 500 });
+    console.error('[API] GET /config/motoristas error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }
 
 export async function PUT(request: NextRequest) {
+  console.log('[API] PUT /config/motoristas');
   try {
     const db = await getDatabase();
     const body = await request.json();
@@ -39,7 +41,6 @@ export async function PUT(request: NextRequest) {
       updatedAt: new Date(),
     };
 
-    // Se tracking_list foi enviado, converte para array de strings
     if (tracking_list !== undefined) {
       if (!Array.isArray(tracking_list)) {
         return NextResponse.json(
@@ -60,6 +61,7 @@ export async function PUT(request: NextRequest) {
     const { _id, ...rest } = updated!;
     return NextResponse.json({ success: true, data: { ...rest, id: _id.toString() } });
   } catch (error: any) {
-    return NextResponse.json({ success: false, erro: error.message }, { status: 500 });
+    console.error('[API] PUT /config/motoristas error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

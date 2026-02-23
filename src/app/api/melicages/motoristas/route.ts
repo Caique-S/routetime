@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
-import { ObjectId } from 'mongodb';
 
-// GET /api/melicages/motoristas
 export async function GET() {
+  console.log('[API] GET /motoristas');
   try {
     const db = await getDatabase();
     const motoristas = await db
@@ -19,25 +18,19 @@ export async function GET() {
 
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error('GET motoristas error:', error);
-    return NextResponse.json(
-      { success: false, erro: 'Erro interno', detalhes: error.message },
-      { status: 500 }
-    );
+    console.error('[API] GET /motoristas error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }
 
-// POST /api/melicages/motoristas
 export async function POST(request: NextRequest) {
+  console.log('[API] POST /motoristas');
   try {
     const db = await getDatabase();
     const { cpf } = await request.json();
 
     if (!cpf) {
-      return NextResponse.json(
-        { success: false, erro: 'CPF é obrigatório' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, erro: 'CPF é obrigatório' }, { status: 400 });
     }
 
     // Buscar motorista no cadastro
@@ -49,33 +42,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar se já existe um registro ativo para este CPF
+    // Verificar se já existe um registro ativo
     const ativo = await db.collection('melicages_motoristas').findOne({
       cpf,
       status: { $in: ['aguardando', 'descarregando'] }
     });
     if (ativo) {
       return NextResponse.json(
-        { success: false, erro: 'Motorista já está na fila ou descarregando', data: ativo },
+        { success: false, erro: 'Motorista já está na fila ou descarregando' },
         { status: 409 }
       );
     }
 
     const agora = new Date();
-    const options: Intl.DateTimeFormatOptions = {
-      timeZone: 'America/Sao_Paulo',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    };
-    const dataChegada = agora.toLocaleDateString('pt-BR', options);
+    const dataChegada = agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     const horaChegada = agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
     const motorista = {
       cpf: cadastro.cpf,
       nome: cadastro.nome,
       chave_identificacao: cadastro.chave_identificacao,
-      destino: cadastro.destino_xpt, // talvez usar campo destino
+      destino: cadastro.destino_xpt,
       status: 'aguardando',
       dataChegada,
       horaChegada,
@@ -96,10 +83,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: novoMotorista }, { status: 201 });
   } catch (error: any) {
-    console.error('POST motoristas error:', error);
-    return NextResponse.json(
-      { success: false, erro: 'Erro interno', detalhes: error.message },
-      { status: 500 }
-    );
+    console.error('[API] POST /motoristas error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

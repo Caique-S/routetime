@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 
-// GET /api/melicages/motoristas/cadastro/[cpf]
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ cpf: string }> }
 ) {
+  console.log('[API] GET /motoristas/cadastro/[cpf]');
   try {
     const { cpf } = await params;
     const db = await getDatabase();
@@ -21,6 +21,7 @@ export async function GET(
     const { _id, ...rest } = motorista;
     return NextResponse.json({ success: true, data: { id: _id.toString(), ...rest } });
   } catch (error: any) {
-    return NextResponse.json({ success: false, erro: error.message }, { status: 500 });
+    console.error('[API] GET /motoristas/cadastro/[cpf] error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

@@ -1,18 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDatabase } from "@/app/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { NextRequest, NextResponse } from 'next/server';
+import { getDatabase } from '@/app/lib/mongodb';
+import { ObjectId } from 'mongodb';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log('[API] PUT /motoristas/[id]/iniciar-descarga');
   try {
     const { id } = await params;
-    if (!id || id.trim() === "") {
-      return NextResponse.json(
-        { success: false, erro: "ID não fornecido" },
-        { status: 400 },
-      );
+    if (!id || id.trim() === '') {
+      return NextResponse.json({ success: false, erro: 'ID não fornecido' }, { status: 400 });
     }
 
     const cleanId = id.trim();
@@ -20,32 +18,20 @@ export async function PUT(
     try {
       objectId = new ObjectId(cleanId);
     } catch {
-      return NextResponse.json(
-        { success: false, erro: "ID inválido" },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, erro: 'ID inválido' }, { status: 400 });
     }
 
     const db = await getDatabase();
-    const motorista = await db
-      .collection("melicages_motoristas")
-      .findOne({ _id: objectId });
+    const motorista = await db.collection('melicages_motoristas').findOne({ _id: objectId });
 
     if (!motorista) {
-      return NextResponse.json(
-        { success: false, erro: "Motorista não encontrado" },
-        { status: 404 },
-      );
+      return NextResponse.json({ success: false, erro: 'Motorista não encontrado' }, { status: 404 });
     }
 
-    if (motorista.status !== "aguardando") {
+    if (motorista.status !== 'aguardando') {
       return NextResponse.json(
-        {
-          success: false,
-          erro: "Motorista não está aguardando",
-          statusAtual: motorista.status,
-        },
-        { status: 400 },
+        { success: false, erro: 'Motorista não está aguardando' },
+        { status: 400 }
       );
     }
 
@@ -59,37 +45,32 @@ export async function PUT(
 
     const agora = new Date();
     const tempoFila = Math.floor(
-      (agora.getTime() - new Date(motorista.timestampChegada).getTime()) / 1000,
+      (agora.getTime() - new Date(motorista.timestampChegada).getTime()) / 1000
     );
 
-    await db.collection("melicages_motoristas").updateOne(
+    await db.collection('melicages_motoristas').updateOne(
       { _id: objectId },
       {
         $set: {
-          status: "descarregando",
+          status: 'descarregando',
           timestampInicioDescarga: agora,
           tempoFila,
           doca: doca,
-          docaNotifiedAt: motorista.docaNotifiedAt || agora, // mantém se já notificado
+          docaNotifiedAt: motorista.docaNotifiedAt || agora,
         },
-      },
+      }
     );
 
-    const atualizado = await db
-      .collection("melicages_motoristas")
-      .findOne({ _id: objectId });
+    const atualizado = await db.collection('melicages_motoristas').findOne({ _id: objectId });
     const { _id, ...rest } = atualizado!;
 
     return NextResponse.json({
       success: true,
-      message: "Descarga iniciada",
+      message: 'Descarga iniciada',
       data: { ...rest, id: _id.toString() },
     });
   } catch (error: any) {
-    console.error("PUT iniciar-descarga error:", error);
-    return NextResponse.json(
-      { success: false, erro: "Erro interno", detalhes: error.message },
-      { status: 500 },
-    );
+    console.error('[API] PUT /motoristas/[id]/iniciar-descarga error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

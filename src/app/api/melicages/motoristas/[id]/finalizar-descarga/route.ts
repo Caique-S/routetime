@@ -6,6 +6,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log('[API] PUT /motoristas/[id]/finalizar-descarga');
   try {
     const { id } = await params;
     if (!id || id.trim() === '') {
@@ -29,12 +30,11 @@ export async function PUT(
 
     if (motorista.status !== 'descarregando') {
       return NextResponse.json(
-        { success: false, erro: 'Motorista não está descarregando', statusAtual: motorista.status },
+        { success: false, erro: 'Motorista não está descarregando' },
         { status: 400 }
       );
     }
 
-    // Lê os campos do body
     const { gaiolas, palets, mangas } = await request.json();
 
     if (gaiolas === undefined || palets === undefined || mangas === undefined) {
@@ -83,10 +83,7 @@ export async function PUT(
       data: { ...rest, id: _id.toString() },
     });
   } catch (error: any) {
-    console.error('PUT finalizar-descarga error:', error);
-    return NextResponse.json(
-      { success: false, erro: 'Erro interno', detalhes: error.message },
-      { status: 500 }
-    );
+    console.error('[API] PUT /motoristas/[id]/finalizar-descarga error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

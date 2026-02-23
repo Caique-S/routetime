@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 
 export async function POST(request: NextRequest) {
+  console.log('[API] POST /localizacoes');
   try {
     const db = await getDatabase();
     const { motorista, latitude, longitude, timestamp } = await request.json();
@@ -25,10 +26,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: nova }, { status: 201 });
   } catch (error: any) {
-    console.error('POST localizacoes error:', error);
-    return NextResponse.json(
-      { success: false, erro: 'Erro interno', detalhes: error.message },
-      { status: 500 }
-    );
+    console.error('[API] POST /localizacoes error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

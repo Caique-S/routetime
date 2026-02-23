@@ -6,6 +6,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log('[API] PUT /xpts/[id]');
   try {
     const { id } = await params;
     if (!id) return NextResponse.json({ success: false, erro: 'ID não fornecido' }, { status: 400 });
@@ -50,7 +51,7 @@ export async function PUT(
     const { _id, ...rest } = updated!;
     return NextResponse.json({ success: true, data: { id: _id.toString(), ...rest } });
   } catch (error: any) {
-    console.error('PUT xpt error:', error);
+    console.error('[API] PUT /xpts/[id] error:', error);
     return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }
@@ -59,6 +60,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log('[API] DELETE /xpts/[id]');
   try {
     const { id } = await params;
     if (!id) return NextResponse.json({ success: false, erro: 'ID não fornecido' }, { status: 400 });
@@ -79,7 +81,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('DELETE xpt error:', error);
+    console.error('[API] DELETE /xpts/[id] error:', error);
     return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

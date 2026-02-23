@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
-import { ObjectId } from 'mongodb';
 
-// GET /api/melicages/xpts
 export async function GET() {
+  console.log('[API] GET /xpts');
   try {
     const db = await getDatabase();
     const xpts = await db.collection('melicages_xpts').find({}).sort({ cidade: 1 }).toArray();
     const data = xpts.map(({ _id, ...rest }) => ({ id: _id.toString(), ...rest }));
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error('GET xpts error:', error);
+    console.error('[API] GET /xpts error:', error);
     return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }
 
-// POST /api/melicages/xpts
 export async function POST(request: NextRequest) {
+  console.log('[API] POST /xpts');
   try {
     const db = await getDatabase();
     const body = await request.json();
@@ -41,11 +40,10 @@ export async function POST(request: NextRequest) {
     };
 
     const result = await db.collection('melicages_xpts').insertOne(novoXpt);
-    // ✅ Correção: usar result.insertedId para obter o ID gerado
     const data = { id: result.insertedId.toString(), ...novoXpt };
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error: any) {
-    console.error('POST xpt error:', error);
+    console.error('[API] POST /xpts error:', error);
     return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

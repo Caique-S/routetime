@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 import { ObjectId } from 'mongodb';
-import { getSocketServer } from '@/app/lib/socket'; // supondo que teremos um módulo socket
+import { getSocketServer } from '@/app/lib/socket';
 
 export async function POST(request: NextRequest) {
+  console.log('[API] POST /notificar');
   try {
     const db = await getDatabase();
     const { motoristaId, doca } = await request.json();
@@ -39,13 +40,13 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Emitir via WebSocket para o app do motorista
+    // Emit via WebSocket
     const io = getSocketServer();
     io.to(`motorista:${motoristaId}`).emit('notificacao-doca', { doca, tempoResposta: 300 });
 
     return NextResponse.json({ success: true, message: 'Notificação enviada' });
   } catch (error: any) {
-    console.error('POST notificar error:', error);
+    console.error('[API] POST /notificar error:', error);
     return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }

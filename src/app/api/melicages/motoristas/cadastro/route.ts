@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 
-// GET /api/melicages/motoristas/cadastro
 export async function GET() {
+  console.log('[API] GET /motoristas/cadastro');
   try {
     const db = await getDatabase();
     const motoristas = await db
@@ -13,12 +13,13 @@ export async function GET() {
     const data = motoristas.map(({ _id, ...rest }) => ({ id: _id.toString(), ...rest }));
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    return NextResponse.json({ success: false, erro: error.message }, { status: 500 });
+    console.error('[API] GET /motoristas/cadastro error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }
 
-// POST /api/melicages/motoristas/cadastro
 export async function POST(request: NextRequest) {
+  console.log('[API] POST /motoristas/cadastro');
   try {
     const db = await getDatabase();
     const { nome, cpf, telefone, email, origem, destino_xpt } = await request.json();
@@ -30,13 +31,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar se CPF já existe
     const existente = await db.collection('melicages_motoristas_cadastro').findOne({ cpf });
     if (existente) {
-      return NextResponse.json(
-        { success: false, erro: 'CPF já cadastrado' },
-        { status: 409 }
-      );
+      return NextResponse.json({ success: false, erro: 'CPF já cadastrado' }, { status: 409 });
     }
 
     // Gerar chave de identificação única
@@ -64,6 +61,7 @@ export async function POST(request: NextRequest) {
     const data = { id: result.insertedId.toString(), ...novo };
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ success: false, erro: error.message }, { status: 500 });
+    console.error('[API] POST /motoristas/cadastro error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
   }
 }
