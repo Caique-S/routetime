@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   console.log('[API] POST /motoristas');
   try {
     const db = await getDatabase();
-    const { cpf } = await request.json();
+    const { cpf , retorno} = await request.json();
 
     if (!cpf) {
       return NextResponse.json({ success: false, erro: 'CPF é obrigatório' }, { status: 400 });
@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
       nome: cadastro.nome,
       chave_identificacao: cadastro.chave_identificacao,
       destino: cadastro.destino_xpt,
+      retorno: retorno || "",
       status: 'aguardando',
       dataChegada,
       horaChegada,

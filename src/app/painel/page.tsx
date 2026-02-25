@@ -2,26 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import IniciarDescargaModal from './components/IniciarDescargaModal';
+import MotoristaCard from './components/MotoristaCard';
 import toast from 'react-hot-toast';
+import Ably from 'ably';
+import { Motorista } from '../types/Motorista';
 
-interface Motorista {
-  id: string;
-  nome: string;
-  retorno: string;
-  status: 'aguardando' | 'descarregando' | 'descarregado';
-  dataChegada: string;
-  horaChegada: string;
-  timestampChegada: string;
-  tempoFila: number;
-  tempoDescarga: number;
-  timestampInicioDescarga?: string;
-  timestampFimDescarga?: string;
-  gaiolas?: number;
-  palets?: number;
-  mangas?: number;
-}
-
-// Modal de finalização (igual ao original)
+// Modal de finalização (igual ao original, mas adaptado para TypeScript)
 const FinalizarModal = ({
   visible,
   motoristaId,
@@ -140,114 +126,7 @@ const FinalizarModal = ({
   );
 };
 
-// Card do motorista
-const MotoristaCard = ({
-  motorista,
-  onIniciar,
-  onFinalizar,
-}: {
-  motorista: Motorista;
-  onIniciar: (motorista: Motorista) => void;
-  onFinalizar: (id: string, nome: string) => void;
-}) => {
-  const formatarTempo = (segundos: number) => {
-    const hrs = Math.floor(segundos / 3600);
-    const mins = Math.floor((segundos % 3600) / 60);
-    const secs = segundos % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const calcularTempoTotal = (): string | null => {
-    if (motorista.status !== 'descarregado' || !motorista.timestampFimDescarga) return null;
-    const chegada = new Date(motorista.timestampChegada).getTime();
-    const fim = new Date(motorista.timestampFimDescarga).getTime();
-    const totalSeg = Math.floor((fim - chegada) / 1000);
-    return formatarTempo(totalSeg);
-  };
-
-  const tempoTotal = calcularTempoTotal();
-  const temProducao = motorista.gaiolas !== undefined && motorista.palets !== undefined && motorista.mangas !== undefined;
-
-  return (
-    <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-500 hover:shadow-lg transition">
-      <div className="flex justify-between items-start">
-        <div>
-          <h3 className="font-bold text-lg">{motorista.nome}</h3>
-          <p className="text-sm text-gray-600">
-            Retorno: {motorista.retorno} • Chegada: {motorista.dataChegada} {motorista.horaChegada}
-          </p>
-          {motorista.timestampInicioDescarga && (
-            <p className="text-xs text-gray-500">
-              Início descarga: {new Date(motorista.timestampInicioDescarga).toLocaleTimeString('pt-BR')}
-            </p>
-          )}
-          {motorista.timestampFimDescarga && (
-            <p className="text-xs text-gray-500">
-              Término: {new Date(motorista.timestampFimDescarga).toLocaleTimeString('pt-BR')}
-            </p>
-          )}
-          {temProducao && (
-            <div className="mt-2 text-sm bg-gray-50 p-2 rounded">
-              <span className="font-medium">Devolução:</span>{' '}
-              Gaiolas {motorista.gaiolas} | Palets {motorista.palets} | Mangas {motorista.mangas}
-            </div>
-          )}
-          {tempoTotal && (
-            <p className="text-xs font-semibold text-gray-700 mt-1">⏱️ Tempo total: {tempoTotal}</p>
-          )}
-        </div>
-        <span
-          className={`px-2 py-1 text-xs rounded-full ${
-            motorista.status === 'aguardando'
-              ? 'bg-yellow-100 text-yellow-800'
-              : motorista.status === 'descarregando'
-              ? 'bg-blue-100 text-blue-800'
-              : 'bg-green-100 text-green-800'
-          }`}
-        >
-          {motorista.status === 'aguardando'
-            ? '⏳ Aguardando'
-            : motorista.status === 'descarregando'
-            ? '📦 Descarregando'
-            : '✅ Finalizado'}
-        </span>
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-        <div>
-          <span className="text-gray-500">Fila:</span>
-          <span className="ml-1 font-mono">{formatarTempo(motorista.tempoFila)}</span>
-        </div>
-        {motorista.status !== 'aguardando' && (
-          <div>
-            <span className="text-gray-500">Descarga:</span>
-            <span className="ml-1 font-mono">{formatarTempo(motorista.tempoDescarga)}</span>
-          </div>
-        )}
-      </div>
-
-      {motorista.status === 'aguardando' && (
-        <button
-          onClick={() => onIniciar(motorista)}
-          className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition"
-        >
-          Iniciar Descarga
-        </button>
-      )}
-
-      {motorista.status === 'descarregando' && (
-        <button
-          onClick={() => onFinalizar(motorista.id, motorista.nome)}
-          className="mt-3 w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded transition"
-        >
-          Finalizar Descarga
-        </button>
-      )}
-    </div>
-  );
-};
-
-// Coluna
+// Componente de coluna (pode ser separado, mas incluído aqui para completude)
 const Coluna = ({
   titulo,
   motoristas,
@@ -286,10 +165,10 @@ export default function PainelPage() {
   // Controle dos modais
   const [modalIniciarAberto, setModalIniciarAberto] = useState(false);
   const [motoristaParaIniciar, setMotoristaParaIniciar] = useState<Motorista | null>(null);
-
   const [modalFinalizarAberto, setModalFinalizarAberto] = useState(false);
   const [motoristaParaFinalizar, setMotoristaParaFinalizar] = useState<{ id: string; nome: string } | null>(null);
 
+  // Função para buscar motoristas da API
   const fetchMotoristas = async () => {
     setLoading(true);
     setError(null);
@@ -307,16 +186,48 @@ export default function PainelPage() {
     }
   };
 
+  // Configuração do Ably para atualizações em tempo real
   useEffect(() => {
     fetchMotoristas();
+
+    let ablyClient: Ably.Realtime | null = null;
+    let filaChannel: Ably.RealtimeChannel | null = null;
+
+    const setupAbly = async () => {
+      try {
+        const tokenRes = await fetch('/api/ably/token');
+        const tokenRequest = await tokenRes.json();
+        ablyClient = new Ably.Realtime({ authCallback: (_, cb) => cb(null, tokenRequest) });
+        filaChannel = ablyClient.channels.get('fila');
+        filaChannel.subscribe('atualizacao-fila', () => {
+          console.log('📡 Atualização recebida via Ably');
+          fetchMotoristas();
+        });
+      } catch (err) {
+        console.error('❌ Erro ao conectar Ably:', err);
+      }
+    };
+
+    setupAbly();
+
+    return () => {
+      if (filaChannel) {
+        filaChannel.unsubscribe();
+      }
+      if (ablyClient) {
+        ablyClient.close();
+      }
+    };
   }, []);
 
+  // Fallback com setInterval (caso Ably falhe)
   useEffect(() => {
     if (!autoRefresh) return;
-    const interval = setInterval(fetchMotoristas, 10000);
+    const interval = setInterval(fetchMotoristas, 30000); // 30 segundos
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
+  // Handlers
   const handleIniciarDescarga = async (id: string, doca: number) => {
     try {
       const response = await fetch(`/api/melicages/motoristas/${id}/iniciar-descarga`, {
@@ -353,6 +264,7 @@ export default function PainelPage() {
     }
   };
 
+  // Separação por status
   const aguardando = motoristas.filter((m) => m.status === 'aguardando');
   const descarregando = motoristas.filter((m) => m.status === 'descarregando');
   const finalizados = motoristas.filter((m) => m.status === 'descarregado');
@@ -360,8 +272,9 @@ export default function PainelPage() {
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
+        {/* Cabeçalho */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">🚚 Gaiolas</h1>
+          <h1 className="text-3xl font-bold text-gray-800">🚚 Painel de Descarga</h1>
           <div className="flex gap-3">
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
@@ -381,12 +294,14 @@ export default function PainelPage() {
           </div>
         </div>
 
+        {/* Mensagem de erro */}
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             Erro: {error}
           </div>
         )}
 
+        {/* Colunas */}
         <div className="flex flex-wrap gap-4">
           <Coluna
             titulo="Aguardando"
@@ -429,7 +344,7 @@ export default function PainelPage() {
           />
         </div>
 
-        {/* Modal de Iniciar Descarga */}
+        {/* Modais */}
         {modalIniciarAberto && motoristaParaIniciar && (
           <IniciarDescargaModal
             motorista={{ id: motoristaParaIniciar.id, nome: motoristaParaIniciar.nome }}
@@ -441,7 +356,6 @@ export default function PainelPage() {
           />
         )}
 
-        {/* Modal de Finalizar Descarga */}
         <FinalizarModal
           visible={modalFinalizarAberto}
           motoristaId={motoristaParaFinalizar?.id || null}
