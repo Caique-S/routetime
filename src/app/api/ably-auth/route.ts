@@ -4,7 +4,7 @@ import Ably from 'ably';
 export async function GET(req: NextRequest) {
   try {
     const client = new Ably.Rest(process.env.ABLY_API_KEY!);
-    const tokenParams = { clientId: 'melicages' }; // ou extrair do header de autorização
+    const tokenParams = { clientId: 'melicages' }; 
     const tokenRequest = await client.auth.createTokenRequest(tokenParams);
     return NextResponse.json(tokenRequest);
   } catch (error: any) {
