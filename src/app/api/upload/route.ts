@@ -145,8 +145,8 @@ export async function GET(request: NextRequest) {
       query['data'] = {
         $elemMatch: {
           $or: [
-            { Facility: facility },
-            { facility: facility }
+            { facility: facility },
+            { Facility: facility }
           ]
         }
       };

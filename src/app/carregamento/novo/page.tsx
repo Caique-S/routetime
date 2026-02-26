@@ -77,11 +77,13 @@ function NovoCarregamento() {
   const searchParams = useSearchParams();
   const facility = searchParams?.get("facility") || "SBA4";
 
+
   const [loading, setLoading] = useState(true);
   const [uploadData, setUploadData] = useState<UploadData | null>(null);
   const [destinos, setDestinos] = useState<DestinoInfo[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [facilityAtual, setFacilityAtual] = useState(facility)
 
   useEffect(() => {
     fetchUploadData();
@@ -92,12 +94,26 @@ function NovoCarregamento() {
       setLoading(true);
       setError(null);
       const today = getTodayDateString();
-      const response = await fetch(`/api/upload?facility=${encodeURIComponent(facility)}&date=${today}&limit=1`);
-      const result = await response.json();
+      const responseAll = await fetch(`/api/upload?&date=${today}&limit=1`);
+      const resultAll = await responseAll.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao buscar dados");
+      if (!responseAll.ok) {
+        throw new Error(resultAll.error || "Erro ao buscar dados");
       }
+
+      let facilitySearch = facility
+
+         if (resultAll.success && resultAll.data.length > 0) {
+        const ultimoUpload = resultAll.data[0];
+        if (ultimoUpload.filterValue) {
+          facilitySearch = ultimoUpload.filterValue; // usa o filterValue do upload
+        }
+      }
+
+      setFacilityAtual(facilitySearch)
+
+      const response = await fetch(`/api/upload?facility=${encodeURIComponent(facilitySearch)}&date=${today}&limit=1`);
+      const result = await response.json();
 
       if (result.success && result.data.length > 0) {
         const latestUpload = result.data[0];
