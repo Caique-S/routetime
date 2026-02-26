@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { MongoClient } from 'mongodb';
+import { getDatabase } from '../../lib/mongodb';
 
-const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017';
-const client = new MongoClient(uri);
+// const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017';
+
 
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
     
-    await client.connect();
-    const database = client.db('brj_transportes');
+
+    const database = await getDatabase('brj_transportes');
     const collection = database.collection('informacoes_carregamento');
     
     // Adicionar data de criação
@@ -33,7 +33,5 @@ export async function POST(request: NextRequest) {
       { error: 'Erro ao salvar informações' },
       { status: 500 }
     );
-  } finally {
-    await client.close();
   }
 }

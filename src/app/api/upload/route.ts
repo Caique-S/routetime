@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parse } from 'papaparse';
-import clientPromise from '../../lib/mongodb';
+import {getDatabase} from '../../lib/mongodb';
 
 // Interface local se não estiver importando corretamente
 interface CSVUpload {
@@ -85,8 +85,8 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    const client = await clientPromise;
-    const db = client.db('brj_transportes');
+    
+    const db = await getDatabase('brj_transportes');
     const collection = db.collection('uploads_atribuicao');
 
     const insertResult = await collection.insertOne(uploadDocument);
@@ -118,8 +118,8 @@ export async function GET(request: NextRequest) {
   try {
     console.log('=== API UPLOAD GET: Iniciando ===');
 
-    const client = await clientPromise;
-    const db = client.db('brj_transportes');
+    
+    const db = await getDatabase('brj_transportes');
 
     console.log('✓ Conectado ao banco de dados');
 
