@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const db = await getDatabase();
     const { nome, cpf, telefone, email, origem, destino_xpt } = await request.json();
 
-    // destino_xpt é OPCIONAL — não entra na validação obrigatória
+    // destino_xpt é OPCIONAL — não entra na validação obrigatória 
     if (!nome || !cpf || !telefone || !email || !origem) {
       return NextResponse.json(
         { success: false, erro: 'Campos obrigatórios: nome, cpf, telefone, email, origem' },

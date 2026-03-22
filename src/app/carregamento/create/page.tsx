@@ -181,7 +181,7 @@ export default function CreatePage() {
           posicaoVeiculo: 0, // <- adicionado
         };
 
-        // Persistir no localStorage
+        //  Persistir no localStorage 
         const carregamentosExistentes = localStorage.getItem(chaveBase);
         const carregamentosObj = carregamentosExistentes
           ? JSON.parse(carregamentosExistentes)

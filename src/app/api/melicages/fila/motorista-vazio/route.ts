@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
 
     if (!cpf || !nome || latitude === undefined || longitude === undefined) {
       return NextResponse.json(
-        { message: 'Campos obrigatórios: cpf, nome, latitude, longitude' },
+        { message: ' Campos obrigatórios: cpf, nome, latitude, longitude ' },
         { status: 400 }
       );
     }

@@ -77,7 +77,7 @@ export default function IniciarDescargaModal({
   const iniciarScanner = async () => {
     setErro("");
     try {
-      // Tenta câmera traseira; se falhar, usa a frontal (mesmo padrão do QRScanner)
+      // Tenta câmera traseira; se falhar, usa a frontal (mesmo padrão  do QRScanner)
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({

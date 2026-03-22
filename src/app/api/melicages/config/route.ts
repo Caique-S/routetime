@@ -14,7 +14,7 @@ export async function GET() {
       raio: x.raio,
     }));
 
-     // Parâmetros de alarme (pode vir de uma collection de configuração)
+     // Parâmetros de alarme ( pode vir de uma collection de configuração )
      const config = {
        destinos,
        tempoRespostaAlarme: 300, // segundos (5 minutos)

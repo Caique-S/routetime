@@ -15,7 +15,7 @@ export async function GET(request: Request) {
       camera: 'Configure permissões no aplicativo nativo',
       storage: 'Habilite acesso a arquivos nas configurações'
     } : {
-      camera: 'Clique no ícone de câmera na barra de endereço',
+      camera: 'Clique no ícone de câmera na barra de endereço ',
       storage: 'Permita acesso a arquivos quando solicitado'
     }
   });

@@ -65,7 +65,7 @@ export default function AdminOperadoresPage() {
         ...formData,
         // Se CPF foi preenchido, enviar como matricula também
         matricula: formData.cpf || '',
-        // Se código não foi preenchido, enviar como null para gerar automaticamente
+        // Se código não foi preenchido, enviar como null para gerar automaticamente 
         codigo: formData.codigo || null
       };
 

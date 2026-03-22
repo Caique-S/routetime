@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Conectar ao banco de dados
+    //  Conectar ao banco de dados
     console.log('Conectando ao banco de dados...');
     const db = await getDatabase();
     console.log('✅ Conectado ao banco:', db.databaseName);

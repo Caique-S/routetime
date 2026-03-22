@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const database = await getDatabase('brj_transportes');
     const collection = database.collection('informacoes_carregamento');
     
-    // Adicionar data de criação
+    // Adicionar data de criação 
     const dadosCompletos = {
       ...data,
       dataCriacao: new Date(),

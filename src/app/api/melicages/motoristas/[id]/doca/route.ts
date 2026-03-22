@@ -16,7 +16,7 @@ export async function PUT(
 
     if (!doca || typeof doca !== "string") {
       return NextResponse.json(
-        { success: false, erro: 'Campo "doca" obrigatório e deve ser string' },
+        { success: false, erro: ' Campo "doca" obrigatório e deve ser string ' },
         { status: 400 },
       );
     }

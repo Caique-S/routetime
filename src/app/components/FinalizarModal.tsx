@@ -21,7 +21,7 @@ export default function FinalizarModal({ isOpen, onClose, onConfirm }: Finalizar
     const p = parseInt(palets, 10);
     const m = parseInt(mangas, 10);
     if (isNaN(g) || isNaN(p) || isNaN(m) || g < 0 || p < 0 || m < 0) {
-      setError('Preencha todos os campos com números válidos (>=0)');
+      setError(' Preencha todos os campos com números válidos (>=0)');
       return;
     }
     setError('');

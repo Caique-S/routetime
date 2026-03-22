@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import QRScanner from "@/app/components/QrScanner";
 
-// Interfaces
+//  Interfaces
 interface MotoristaInfo {
   nome: string;
   tipoVeiculo: string;

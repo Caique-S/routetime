@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
 
     if (!motorista || latitude === undefined || longitude === undefined) {
       return NextResponse.json(
-        { success: false, erro: 'Campos obrigatórios: motorista, latitude, longitude' },
+        { success: false, erro: ' Campos obrigatórios: motorista, latitude, longitude ' },
         { status: 400 }
       );
     }

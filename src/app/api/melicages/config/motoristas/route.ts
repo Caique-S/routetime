@@ -8,7 +8,7 @@ export async function GET() {
     const config = await db.collection('melicages_motoristas_config').findOne({});
     if (!config) {
       return NextResponse.json(
-        { success: false, erro: 'Configuração de motoristas não encontrada' },
+        { success: false, erro: ' Configuração de motoristas não encontrada ' },
         { status: 404 }
       );
     }

@@ -6,7 +6,7 @@ export async function GET() {
     const db = await getDatabase('brj_transportes');
     const collection = db.collection('uploads_atribuicao');
 
-    // Busca o documento mais recente ordenado por uploadDate decrescente
+    //  Busca o documento mais recente ordenado por uploadDate decrescente
     const latest = await collection
       .find({})
       .sort({ uploadDate: -1 })

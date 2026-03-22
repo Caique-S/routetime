@@ -28,7 +28,7 @@ export default function SobrePage() {
 
   const duplicatedTechnologies = [...technologies, ...technologies];
 
-  // Se não estiver montado, retorna null para evitar hydration mismatch
+  // Se não estiver montado, retorna null para evitar hydration mismatch 
   if (!mounted) {
     return null;
   }

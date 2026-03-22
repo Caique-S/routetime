@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
 
     const total = await db.collection('carregamentos').countDocuments(query);
 
-    // Serializa TODOS os campos (incluindo datas, ObjectIds e subobjetos)
+    // Serializa TODOS os campos (incluindo datas, ObjectIds e subobjetos )
     const serialized = carregamentos.map((c) => serializeDocument(c));
 
     return NextResponse.json({

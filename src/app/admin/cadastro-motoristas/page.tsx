@@ -6,7 +6,7 @@ import { DESTINOS } from '@/app/utils/constants';
 import toast from 'react-hot-toast';
 import QRCode from 'react-qr-code';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 interface MotoristaCadastro {
   id: string;
   nome: string;

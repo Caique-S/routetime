@@ -43,7 +43,7 @@ export async function PUT(
 
     if (motorista.status !== "em_fila") {
       return NextResponse.json(
-        { success: false, erro: `Motorista não está em fila (status atual: ${motorista.status})` },
+        { success: false, erro: ` Motorista não está em fila (status atual: ${motorista.status})` },
         { status: 400 },
       );
     }

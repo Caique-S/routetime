@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { Tab } from '@headlessui/react';
 
-// Interfaces
+//  Interfaces
 interface MotoristaData {
   nome: string;
   tipoVeiculo: string;

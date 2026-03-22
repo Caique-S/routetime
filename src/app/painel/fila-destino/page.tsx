@@ -14,7 +14,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
-// ─── Tipos ───────────────────────────────────────────────────────────────────
+// ─── Tipos  ───────────────────────────────────────────────────────────────────
 
 interface MotoristaFila {
   posicao: number | null;

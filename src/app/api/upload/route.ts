@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parse } from 'papaparse';
 import {getDatabase} from '../../lib/mongodb';
 
-// Interface local se não estiver importando corretamente
+//  Interface local se não estiver importando corretamente
 interface CSVUpload {
   fileName: string;
   fileSize: number;

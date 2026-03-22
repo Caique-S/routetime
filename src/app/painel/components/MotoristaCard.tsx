@@ -14,7 +14,7 @@ export const formatarTempo = (segundos: number): string => {
   return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':');
 };
 
-// Formata hora de um ISO string em horário de Brasília
+// Formata hora de um ISO  string em horário de Brasília
 const formatarHoraBrasil = (iso: string | Date | null | undefined): string => {
   if (!iso) return '—';
   try {

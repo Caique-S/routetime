@@ -18,3 +18,4 @@ export function useWebViewDetection() {
   
   return isWebView;
 }
+

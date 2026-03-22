@@ -3,7 +3,7 @@ import { getDatabase } from '@/app/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 // ── Helper: resolve filtro por ObjectId (quando vem do frontend como id)
-//            ou por CPF (quando vem do app mobile) ─────────────────────────────
+//            ou por CPF (quando vem do app mobile) ────────────────────────────
 function buildFilter(param: string) {
   // ObjectId tem exatamente 24 caracteres hexadecimais
   if (/^[a-f\d]{24}$/i.test(param)) {
@@ -13,7 +13,7 @@ function buildFilter(param: string) {
   return { cpf: param.replace(/\D/g, '') };
 }
 
-// ── GET /api/melicages/motoristas/cadastro/[cpf] ──────────────────────────────
+// ── GET /api/melicages/motoristas/cadastro/[cpf] ───────────────────────────── 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ cpf: string }> }

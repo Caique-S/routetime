@@ -8,7 +8,7 @@ export async function GET() {
     const config = await db.collection('melicages_localizacoes_config').findOne({});
     if (!config) {
       return NextResponse.json(
-        { success: false, erro: 'Configuração de localização não encontrada' },
+        { success: false, erro: ' Configuração de localização não encontrada ' },
         { status: 404 }
       );
     }

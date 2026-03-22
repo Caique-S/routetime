@@ -3,7 +3,7 @@ import { getDatabase } from "@/app/lib/mongodb";
 import { dbFirestore, FIRESTORE_COLLECTION } from "@/app/lib/firebaseAdmin";
 
 const TZ = "America/Sao_Paulo";
-/*
+/* 
 export async function GET(request: NextRequest) {
   console.log("[API] GET /motoristas");
   try {
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     );
   }
 }  
-  */
+   */
 
 export async function GET(request: NextRequest) {
   console.log("[API] GET /motoristas");

@@ -90,7 +90,7 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
         await videoRef.current.play();
         setCameraActive(true);
 
-        // Usar a API de Barcode Detection se disponível (navegadores modernos)
+        //  Usar a API de Barcode Detection se disponível (navegadores modernos)
         if ("BarcodeDetector" in window) {
           detectBarcodes();
         } else {

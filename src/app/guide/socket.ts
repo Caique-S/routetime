@@ -16,5 +16,5 @@ socket.on('connect_error', (err: { message: any; }) => {
   console.log('❌ Erro de conexão:', err.message);
 });
 
-// Mantém o processo rodando
+// Mantém o processo rodando  
 setTimeout(() => {}, 10000);

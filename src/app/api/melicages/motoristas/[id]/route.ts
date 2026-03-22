@@ -18,7 +18,7 @@ export async function GET(
 
     if (!motorista) {
       return NextResponse.json(
-        { success: false, erro: "Motorista não encontrado" },
+        { success: false, erro: " Motorista não encontrado " },
         { status: 404 },
       );
     }

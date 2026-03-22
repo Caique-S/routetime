@@ -32,7 +32,7 @@ interface DestinoInfo {
   atribuicao?: string;
 }
 
-// Função para obter a data atual no formato YYYY-MM-DD (considerando fuso do navegador)
+//  Função para obter a data atual no formato YYYY-MM-DD (considerando fuso do navegador)
 const getTodayDateString = (): string => {
   const today = new Date();
   const year = today.getFullYear();

@@ -30,7 +30,7 @@ const DESTINO_NOMES: Record<string, string> = {
   EBA29: 'Valença',
 };
 
-// Remove acentos e normaliza para comparação fuzzy de nomes
+//  Remove acentos e normaliza para comparação fuzzy de nomes 
 function normalizarNome(nome: string): string {
   return nome
     .normalize('NFD')

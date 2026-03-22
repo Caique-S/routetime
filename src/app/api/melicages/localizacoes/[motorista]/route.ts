@@ -17,7 +17,7 @@ export async function GET(
       .limit(100)
       .toArray();
 
-    const data = localizacoes.map(({ _id, ...rest }) => ({
+    const data = localizacoes.map(({ _id, ...rest }) => ({ 
       id: _id.toString(),
       ...rest,
     }));

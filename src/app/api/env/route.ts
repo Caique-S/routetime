@@ -105,7 +105,7 @@ export async function GET() {
       );
     }
     
-    resultados.mensagem = '❌ Variável MONGODB_URI NÃO encontrada no ambiente';
+    resultados.mensagem = '❌ Variável MONGODB_URI NÃO encontrada no ambiente ';
     
   } catch (error) {
     resultados.mensagem = `Erro durante diagnóstico: ${error}`;

@@ -22,7 +22,7 @@ export async function GET() {
      const { cidade, codigo, latitude, longitude, raio, origin } = body;
      if (!cidade || !codigo || latitude === undefined || longitude === undefined || raio === undefined) {
        return NextResponse.json(
-         { success: false, erro: 'Campos obrigatórios: cidade, codigo, latitude, longitude, raio' },
+         { success: false, erro: ' Campos obrigatórios: cidade, codigo, latitude, longitude, raio' },
          { status: 400 }
        );
      }

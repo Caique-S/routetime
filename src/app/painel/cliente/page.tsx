@@ -6,7 +6,7 @@ import MotoristaCard, { formatarTempo } from '../components/MotoristaCard';
 import toast from 'react-hot-toast';
 import { Motorista } from '../../types/motorista';
 
-// ─── Modal de Finalização (inalterado) ─────────────────────────────────────
+// ─── Modal de Finalização (inalterado)  ─────────────────────────────────────
 const FinalizarModal = ({
   visible, motoristaId, motoristaNome, onClose, onConfirm,
 }: {

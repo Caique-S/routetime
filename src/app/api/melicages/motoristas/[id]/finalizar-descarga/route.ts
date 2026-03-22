@@ -43,7 +43,7 @@ export async function PUT(
 
     if (motorista.status !== "descarregando") {
       return NextResponse.json(
-        { success: false, erro: `Motorista não está descarregando (status atual: ${motorista.status})` },
+        { success: false, erro: ` Motorista não está descarregando (status atual: ${motorista.status})` },
         { status: 400 },
       );
     }

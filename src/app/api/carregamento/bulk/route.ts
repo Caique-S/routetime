@@ -13,18 +13,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Converte campos de data string para Date
+    // Converte campos de data string para Date 
     const documentos = carregamentos.map((item: any) => {
-      // Cria uma cópia para não modificar o original
+      // Cria uma cópia para não modificar o original 
       const doc = { ...item };
 
-      // Converte campos de data, se existirem como string
+      // Converte campos de data, se existirem como string 
       if (typeof doc.dataCriacao === 'string') doc.dataCriacao = new Date(doc.dataCriacao);
       if (typeof doc.dataAtualizacao === 'string') doc.dataAtualizacao = new Date(doc.dataAtualizacao);
       if (typeof doc.timestamp === 'string') doc.timestamp = new Date(doc.timestamp);
       if (typeof doc.dataEnvio === 'string') doc.dataEnvio = new Date(doc.dataEnvio);
 
-      // Remove _id se presente para evitar conflito de duplicata
+      // Remove _id se  presente para evitar conflito de duplicata
       delete doc._id;
 
       return doc;

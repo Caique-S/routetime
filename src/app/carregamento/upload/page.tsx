@@ -14,7 +14,7 @@ export default function UploadPage() {
     text: string;
   } | null>(null);
 
-  // Estados para os filtros
+  //  Estados para os filtros
   const [headers, setHeaders] = useState<string[]>([]);
   const [selectedColumn, setSelectedColumn] = useState<string>("");
   const [columnValues, setColumnValues] = useState<string[]>([]);

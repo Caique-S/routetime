@@ -9,3 +9,4 @@ export const DESTINOS = [
   { label: 'Juazeiro', value: 'EBA6' },
   { label: 'Valença', value: 'EBA29' },
 ];
+
