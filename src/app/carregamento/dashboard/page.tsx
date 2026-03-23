@@ -117,7 +117,11 @@ export default function DashboardPage() {
   });
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportFilters, setExportFilters] = useState({ data: getTodayDateString(), facility: "SBA4" });
+  const [exportFilters, setExportFilters] = useState({ 
+    dataInicio: getTodayDateString(), 
+    dataFim: getTodayDateString(), 
+    facility: "SBA4" 
+  });
 
   // Busca o upload da data atual
   const fetchUploadDoDia = async () => {
@@ -232,34 +236,24 @@ export default function DashboardPage() {
     return destinosArray.sort((a, b) => a.nome.localeCompare(b.nome));
   })();
 
- /*  Data e hora função antiga
- 
-  const formatDateTime = (isoString?: string): string => {
+  const formatDate = (isoString?: string): string => {
     if (!isoString) return "";
     const date = new Date(isoString);
     if (isNaN(date.getTime())) return isoString;
-    return date.toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  }; */
-
-  const formatDate = (isoString?: string): string => {
-  if (!isoString) return "";
-  const date = new Date(isoString);
-  if (isNaN(date.getTime())) return isoString;
-  return date.toLocaleDateString("pt-BR"); // Ex: 16/03/2026
-};
-
+    return date.toLocaleDateString("pt-BR"); // Ex: 16/03/2026
+  };
 
   const generateCSV = async () => {
     try {
       const queryParams = new URLSearchParams();
-      queryParams.append("facility", exportFilters.facility);
+      
+      // Se a facility não estiver vazia, adiciona ao filtro. Caso contrário, traz todas.
+      if (exportFilters.facility.trim() !== "") {
+        queryParams.append("facility", exportFilters.facility.trim());
+      }
+      // Garante que o relatório traga todos os dados do período e não pare no limite padrão de 50
+      queryParams.append("limit", "10000"); 
+
       const response = await fetch(`/api/carregamento?${queryParams}`);
       const data = await response.json();
 
@@ -270,10 +264,12 @@ export default function DashboardPage() {
 
       let carregamentos: Carregamento[] = data.data;
 
-      // Filtro por data (considerando fuso local)
-      if (exportFilters.data) {
-        const start = new Date(exportFilters.data + 'T00:00:00').getTime();
-        const end = start + 24 * 60 * 60 * 1000;
+      // Filtro por período de datas (considerando fuso local)
+      if (exportFilters.dataInicio && exportFilters.dataFim) {
+        const start = new Date(exportFilters.dataInicio + 'T00:00:00').getTime();
+        // Adiciona 24 horas ao dia final para incluir o dia inteiro na busca
+        const end = new Date(exportFilters.dataFim + 'T00:00:00').getTime() + 24 * 60 * 60 * 1000;
+        
         carregamentos = carregamentos.filter((c) => {
           const createdAt = new Date(c.dataCriacao).getTime();
           return createdAt >= start && createdAt < end;
@@ -355,7 +351,8 @@ export default function DashboardPage() {
         ),
       ].join("\n");
 
-      const fileName = `relatorio_${exportFilters.facility}_${exportFilters.data || "todos"}.csv`;
+      const facilityName = exportFilters.facility.trim() || "todas_facilities";
+      const fileName = `relatorio_${facilityName}_${exportFilters.dataInicio}_a_${exportFilters.dataFim}.csv`;
 
       if (typeof window.Android !== 'undefined' && (window as any).Android?.saveCsvFile) {
         (window as any).Android.saveCsvFile(csvContent, fileName);
@@ -632,34 +629,47 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="space-y-5">
-                    <div>
-                      <label htmlFor="export-date" className="block text-xs font-medium text-gray-600 mb-1">
-                        Data dos registros
-                      </label>
-                      <input
-                        type="date"
-                        id="export-date"
-                        value={exportFilters.data}
-                        onChange={(e) => setExportFilters({ ...exportFilters, data: e.target.value })}
-                        className="w-full px-3 py-2 bg-white/70 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm backdrop-blur-sm"
-                      />
-                      <p className="text-xs text-gray-400 mt-1">
-                        Se não informada, todos os registros da facility serão exportados.
-                      </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="export-date-start" className="block text-xs font-medium text-gray-600 mb-1">
+                          Data Inicial
+                        </label>
+                        <input
+                          type="date"
+                          id="export-date-start"
+                          value={exportFilters.dataInicio}
+                          onChange={(e) => setExportFilters({ ...exportFilters, dataInicio: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/70 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm backdrop-blur-sm"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="export-date-end" className="block text-xs font-medium text-gray-600 mb-1">
+                          Data Final
+                        </label>
+                        <input
+                          type="date"
+                          id="export-date-end"
+                          value={exportFilters.dataFim}
+                          onChange={(e) => setExportFilters({ ...exportFilters, dataFim: e.target.value })}
+                          className="w-full px-3 py-2 bg-white/70 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm backdrop-blur-sm"
+                        />
+                      </div>
                     </div>
                     <div>
                       <label htmlFor="export-facility" className="block text-xs font-medium text-gray-600 mb-1">
                         Facility
                       </label>
-                      <select
+                      <input
+                        type="text"
                         id="export-facility"
+                        placeholder="Ex: SBA4"
                         value={exportFilters.facility}
-                        onChange={(e) => setExportFilters({ ...exportFilters, facility: e.target.value })}
-                        className="w-full px-3 py-2 bg-white/70 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm backdrop-blur-sm"
-                      >
-                        <option value="SBA2">SBA02</option>
-                        <option value="SBA4">SBA04</option>
-                      </select>
+                        onChange={(e) => setExportFilters({ ...exportFilters, facility: e.target.value.toUpperCase() })}
+                        className="w-full px-3 py-2 bg-white/70 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm backdrop-blur-sm uppercase"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Deixe vazio para exportar registros de <strong>todas</strong> as facilities.
+                      </p>
                     </div>
                   </div>
 
