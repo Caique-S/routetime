@@ -419,10 +419,10 @@ function DestinoContent() {
 
     switch (destinoCodigo) {
       case "EBA14":
-      case "EBA19":
+      case "EBA4":
         horasAdicionais = 2;
         break;
-      case "EBA4":
+      case "EBA19":
       case "EBA29":
         horasAdicionais = 3;
         break;
