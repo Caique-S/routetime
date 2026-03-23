@@ -539,7 +539,7 @@ export default function DashboardPage() {
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 overflow-hidden">
           <div className="p-5 border-b border-white/20">
             <h2 className="text-lg font-bold text-gray-900">
-              Destinos · {filter.facility} · {new Date(hojeStr).toLocaleDateString('pt-BR')}
+              Destinos · {filter.facility} ·  {hojeStr.split('-').reverse().join('/')}
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
               Progresso de carregamentos concluídos por destino (baseado no upload do dia)
