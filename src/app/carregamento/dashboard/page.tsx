@@ -120,7 +120,7 @@ export default function DashboardPage() {
   const [exportFilters, setExportFilters] = useState({ 
     dataInicio: getTodayDateString(), 
     dataFim: getTodayDateString(), 
-    facility: "SBA4" 
+    facility: "" 
   });
 
   // Busca o upload da data atual
@@ -288,6 +288,7 @@ export default function DashboardPage() {
         "Categoria",
         "Placa de Tração",
         "Placa de Carga",
+        "Facility",
         "Destino",
         "Status",
         "Posição de Saída",
@@ -316,6 +317,7 @@ export default function DashboardPage() {
           c.motorista?.tipoVeiculo ?? "",
           c.motorista?.veiculoTracao ?? "",
           c.motorista?.veiculoCarga ?? "",
+          c.facility ?? "",
           c.destino ?? "",
           c.status ?? "",
           c.posicaoVeiculo ?? "",
