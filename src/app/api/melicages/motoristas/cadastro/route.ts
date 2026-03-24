@@ -1,15 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 
-export async function GET() {
-  console.log('[API] GET /motoristas/cadastro');
+/*
+export async function GET(request: NextRequest) {
+  const transportadoraId = request.headers.get('x-transportadora-id');
+  if (!transportadoraId) {
+    return NextResponse.json({ success: false, erro: 'Não autenticado' }, { status: 401 });
+  }
+
   try {
     const db = await getDatabase();
     const motoristas = await db
       .collection('melicages_motoristas_cadastro')
-      .find({})
+      .find({ transportadora_id: transportadoraId })
       .sort({ nome: 1 })
       .toArray();
+
+    const data = motoristas.map(({ _id, ...rest }) => ({ id: _id.toString(), ...rest }));
+    return NextResponse.json({ success: true, data });
+  } catch (error: any) {
+    console.error('[API] GET /motoristas/cadastro error:', error);
+    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
+  }
+}
+  */
+
+export async function GET(request: NextRequest) {
+  const transportadoraId = request.headers.get('x-transportadora-id');
+  if (!transportadoraId) {
+    return NextResponse.json({ success: false, erro: 'Não autenticado' }, { status: 401 });
+  }
+
+  try {
+    const db = await getDatabase();
+    const motoristas = await db
+      .collection('melicages_motoristas_cadastro')
+      .find({
+        $or: [
+          { transportadora_id: transportadoraId },
+          { transportadora_id: { $exists: false } } // inclui antigos sem campo
+        ]
+      })
+      .sort({ nome: 1 })
+      .toArray();
+
     const data = motoristas.map(({ _id, ...rest }) => ({ id: _id.toString(), ...rest }));
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
@@ -19,12 +53,15 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('[API] POST /motoristas/cadastro');
+  const transportadoraId = request.headers.get('x-transportadora-id');
+  if (!transportadoraId) {
+    return NextResponse.json({ success: false, erro: 'Não autenticado' }, { status: 401 });
+  }
+
   try {
     const db = await getDatabase();
     const { nome, cpf, telefone, email, origem, destino_xpt } = await request.json();
 
-    // destino_xpt é OPCIONAL — não entra na validação obrigatória 
     if (!nome || !cpf || !telefone || !email || !origem) {
       return NextResponse.json(
         { success: false, erro: 'Campos obrigatórios: nome, cpf, telefone, email, origem' },
@@ -32,17 +69,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // CPF salvo sem formatação
     const cpfLimpo = cpf.replace(/\D/g, '');
 
-    const existente = await db
-      .collection('melicages_motoristas_cadastro')
-      .findOne({ cpf: cpfLimpo });
+    // Verifica se CPF já está cadastrado para esta transportadora
+    const existente = await db.collection('melicages_motoristas_cadastro').findOne({
+      cpf: cpfLimpo,
+      transportadora_id: transportadoraId
+    });
     if (existente) {
-      return NextResponse.json({ success: false, erro: 'CPF já cadastrado' }, { status: 409 });
+      return NextResponse.json({ success: false, erro: 'CPF já cadastrado nesta transportadora' }, { status: 409 });
     }
 
-    // chave_identificacao baseada em nome + origem + destino (se houver)
+    // Geração da chave única (opcional)
     const partes = [nome, origem, destino_xpt].filter(Boolean).join('_');
     const baseChave = partes.replace(/\s+/g, '_');
     let chave_identificacao = baseChave;
@@ -50,7 +88,7 @@ export async function POST(request: NextRequest) {
     while (
       await db
         .collection('melicages_motoristas_cadastro')
-        .findOne({ chave_identificacao })
+        .findOne({ chave_identificacao, transportadora_id: transportadoraId })
     ) {
       chave_identificacao = `${baseChave}_${contador}`;
       contador++;
@@ -58,12 +96,13 @@ export async function POST(request: NextRequest) {
 
     const novo = {
       nome,
-      cpf: cpfLimpo,          // salva sem máscara — padrão do sistema
+      cpf: cpfLimpo,
       telefone,
       email,
       origem,
-      destino_xpt: destino_xpt ?? '',   // string vazia quando não informado
+      destino_xpt: destino_xpt ?? '',
       chave_identificacao,
+      transportadora_id: transportadoraId,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -71,7 +110,6 @@ export async function POST(request: NextRequest) {
     const result = await db.collection('melicages_motoristas_cadastro').insertOne(novo);
     const data = { id: result.insertedId.toString(), ...novo };
 
-    console.log(`[API] Motorista cadastrado — id: ${data.id}, nome: ${nome}`);
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error: any) {
     console.error('[API] POST /motoristas/cadastro error:', error);

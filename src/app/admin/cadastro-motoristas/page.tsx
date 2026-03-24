@@ -15,7 +15,13 @@ interface MotoristaCadastro {
   email: string;
   origem: string;
   destino_xpt: string;
+  transportadora_id?: string;   // <-- novo campo
   createdAt?: string;
+}
+
+interface Transportadora {
+  id: string;
+  nome: string;
 }
 
 interface OrigemOption {
@@ -34,9 +40,10 @@ const EMPTY_FORM = {
   email: '',
   origem: ORIGENS[0].value,
   destino_xpt: '',
+  transportadora_id: '',        // <-- novo campo
 };
 
-// ─── Helper: formata CPF ───────────────────────────────────────────────────
+// ─── Helpers (CPF, iniciais, avatar) ────────────────────────────────────────
 const formatCpf = (v: string) => {
   const d = v.replace(/\D/g, '').slice(0, 11);
   if (d.length <= 3) return d;
@@ -45,7 +52,6 @@ const formatCpf = (v: string) => {
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 };
 
-// ─── Helper: iniciais do nome ──────────────────────────────────────────────
 const initials = (nome: string) =>
   nome
     .trim()
@@ -55,7 +61,6 @@ const initials = (nome: string) =>
     .map((p) => p[0].toUpperCase())
     .join('');
 
-// ─── Avatar colors ─────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
   'bg-blue-500', 'bg-emerald-500', 'bg-violet-500',
   'bg-amber-500', 'bg-rose-500', 'bg-cyan-500',
@@ -63,7 +68,7 @@ const AVATAR_COLORS = [
 const avatarColor = (nome: string) =>
   AVATAR_COLORS[nome.charCodeAt(0) % AVATAR_COLORS.length];
 
-// ─── DeleteConfirmModal ────────────────────────────────────────────────────
+// ─── DeleteConfirmModal (sem alterações) ────────────────────────────────────
 function DeleteConfirmModal({
   motorista,
   onCancel,
@@ -119,14 +124,18 @@ function DeleteConfirmModal({
   );
 }
 
-// ─── EditModal ─────────────────────────────────────────────────────────────
+// ─── EditModal (com dropdown de transportadoras) ─────────────────────────────
 function EditModal({
   motorista,
+  transportadoras,
+  authId,
   onCancel,
   onSave,
   loading,
 }: {
   motorista: MotoristaCadastro;
+  transportadoras: Transportadora[];
+  authId: string;
   onCancel: () => void;
   onSave: (id: string, data: Partial<MotoristaCadastro>) => void;
   loading: boolean;
@@ -138,6 +147,7 @@ function EditModal({
     email: motorista.email,
     origem: motorista.origem,
     destino_xpt: motorista.destino_xpt ?? '',
+    transportadora_id: motorista.transportadora_id ?? authId,
   });
 
   const handle = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -213,6 +223,24 @@ function EditModal({
               {DESTINOS.map((d: any) => <option key={d.value} value={d.value}>{d.label}</option>)}
             </select>
           </div>
+
+          {/* Campo Transportadora */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Transportadora <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="transportadora_id"
+              value={form.transportadora_id}
+              onChange={handle}
+              required
+              className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-900 bg-white"
+            >
+              {transportadoras.map((t) => (
+                <option key={t.id} value={t.id}>{t.nome}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex gap-3">
@@ -237,37 +265,38 @@ function EditModal({
   );
 }
 
-// ─── DriverCard ────────────────────────────────────────────────────────────
+// ─── DriverCard (com exibição da transportadora) ────────────────────────────
 function DriverCard({
   m,
+  transportadoras,
   onEdit,
   onDelete,
 }: {
   m: MotoristaCadastro;
+  transportadoras: Transportadora[];
   onEdit: (m: MotoristaCadastro) => void;
   onDelete: (m: MotoristaCadastro) => void;
 }) {
+  const transportadoraNome = transportadoras.find(t => t.id === m.transportadora_id)?.nome || 'Não definida';
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group">
       <div className="p-5">
         <div className="flex items-start gap-4">
-          {/* Avatar */}
           <div className={`w-12 h-12 rounded-xl ${avatarColor(m.nome)} flex items-center justify-center text-white font-bold text-base shrink-0 shadow-sm`}>
             {initials(m.nome)}
           </div>
-
-          {/* Info */}
           <div className="min-w-0 flex-1">
             <h3 className="font-bold text-gray-900 text-base leading-tight truncate">{m.nome}</h3>
             <p className="text-sm text-gray-500 mt-0.5 font-mono">{m.cpf}</p>
           </div>
         </div>
 
-        {/* Details grid */}
         <div className="mt-4 space-y-2">
           <DetailRow icon="📱" label="Telefone" value={m.telefone} />
           <DetailRow icon="✉️" label="E-mail" value={m.email} />
           <DetailRow icon="📍" label="Origem" value={ORIGENS.find(o => o.value === m.origem)?.label ?? m.origem} />
+          <DetailRow icon="🏢" label="Transportadora" value={transportadoraNome} />
           {m.destino_xpt && (
             <DetailRow
               icon="🏁"
@@ -285,7 +314,6 @@ function DriverCard({
         </div>
       </div>
 
-      {/* Actions */}
       <div className="border-t border-gray-100 flex">
         <button
           onClick={() => onEdit(m)}
@@ -321,9 +349,13 @@ function DetailRow({ icon, label, value }: { icon: string; label: string; value:
   );
 }
 
-// ─── Main Page ─────────────────────────────────────────────────────────────
+// ─── Componente Principal ───────────────────────────────────────────────────
 export default function CadastroMotoristaPage() {
   const router = useRouter();
+
+  // Auth
+  const [auth, setAuth] = useState<{ id: string; nome: string } | null>(null);
+  const [transportadoras, setTransportadoras] = useState<Transportadora[]>([]);
 
   // Form state
   const [form, setForm] = useState(EMPTY_FORM);
@@ -335,32 +367,59 @@ export default function CadastroMotoristaPage() {
   const [loadingMotoristas, setLoadingMotoristas] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Edit state
+  // Edit & Delete
   const [editingMotorista, setEditingMotorista] = useState<MotoristaCadastro | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
-
-  // Delete state
   const [deletingMotorista, setDeletingMotorista] = useState<MotoristaCadastro | null>(null);
   const [loadingDelete, setLoadingDelete] = useState(false);
 
-  // ── Fetch list ────────────────────────────────────────────────────────────
-  const fetchMotoristas = async () => {
-    setLoadingMotoristas(true);
+  // Restore session
+  useEffect(() => {
+    const saved = sessionStorage.getItem('carrier_auth');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      setAuth(parsed);
+    }
+  }, []);
+
+  // Fetch transportadoras (para selects)
+  const fetchTransportadoras = async () => {
     try {
-      const res = await fetch('/api/melicages/motoristas/cadastro');
+      const res = await fetch('/api/melicages/transportadoras');
       const data = await res.json();
-      if (!data.success) throw new Error(data.erro || 'Erro ao buscar motoristas');
-      setMotoristas(data.data ?? []);
-    } catch (err: any) {
-      toast.error('Erro ao carregar motoristas: ' + err.message);
-    } finally {
-      setLoadingMotoristas(false);
+      if (data.success) setTransportadoras(data.data);
+    } catch (error) {
+      console.error('Erro ao buscar transportadoras', error);
     }
   };
 
-  useEffect(() => { fetchMotoristas(); }, []);
+  // Fetch motoristas (sem filtro de transportadora)
+ const fetchMotoristas = async (transportadoraId: string) => {
+  setLoadingMotoristas(true);
+  try {
+    const res = await fetch('/api/melicages/motoristas/cadastro', {
+      headers: { 'x-transportadora-id': transportadoraId } // <-- header obrigatório
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.erro || 'Erro ao buscar motoristas');
+    setMotoristas(data.data ?? []);
+  } catch (err: any) {
+    toast.error('Erro ao carregar motoristas: ' + err.message);
+  } finally {
+    setLoadingMotoristas(false);
+  }
+};
 
-  // ── Filtered list ─────────────────────────────────────────────────────────
+useEffect(() => {
+  if (auth) {
+    fetchTransportadoras();
+    fetchMotoristas(auth.id); // <-- passa o ID
+    setForm((prev) => ({ ...prev, transportadora_id: auth.id }));
+  }
+}, [auth]);
+
+
+  // Filtered list
   const motoristasFiltered = motoristas.filter((m) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
@@ -371,7 +430,7 @@ export default function CadastroMotoristaPage() {
     );
   });
 
-  // ── Register new ──────────────────────────────────────────────────────────
+  // Handlers
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: name === 'cpf' ? formatCpf(value) : value }));
@@ -379,18 +438,22 @@ export default function CadastroMotoristaPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth) return;
     setLoading(true);
     try {
       const response = await fetch('/api/melicages/motoristas/cadastro', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-transportadora-id': auth.id, // mantido para compatibilidade
+        },
         body: JSON.stringify(form),
       });
       const data = await response.json();
       if (!data.success) throw new Error(data.erro);
       setMotoristaCadastrado({ id: data.data.id, nome: data.data.nome });
       toast.success('Motorista cadastrado com sucesso!');
-      fetchMotoristas(); // atualiza a lista
+      fetchMotoristas(auth.id);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -398,20 +461,23 @@ export default function CadastroMotoristaPage() {
     }
   };
 
-  // ── Edit ──────────────────────────────────────────────────────────────────
   const handleSaveEdit = async (id: string, data: Partial<MotoristaCadastro>) => {
+    if (!auth) return;
     setLoadingEdit(true);
     try {
       const res = await fetch(`/api/melicages/motoristas/cadastro/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-transportadora-id': auth.id,
+        },
         body: JSON.stringify(data),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.erro || 'Erro ao atualizar');
       toast.success('Motorista atualizado!');
       setEditingMotorista(null);
-      fetchMotoristas();
+      fetchMotoristas(auth.id);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -419,19 +485,19 @@ export default function CadastroMotoristaPage() {
     }
   };
 
-  // ── Delete ────────────────────────────────────────────────────────────────
   const handleConfirmDelete = async () => {
-    if (!deletingMotorista) return;
+    if (!auth || !deletingMotorista) return;
     setLoadingDelete(true);
     try {
       const res = await fetch(`/api/melicages/motoristas/cadastro/${deletingMotorista.id}`, {
         method: 'DELETE',
+        headers: { 'x-transportadora-id': auth.id },
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.erro || 'Erro ao excluir');
       toast.success('Motorista excluído!');
       setDeletingMotorista(null);
-      fetchMotoristas();
+      fetchMotoristas(auth.id);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -439,9 +505,24 @@ export default function CadastroMotoristaPage() {
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
+  // Auth handlers
+  const handleAuth = (carrier: { id: string; nome: string }) => {
+    sessionStorage.setItem('carrier_auth', JSON.stringify(carrier));
+    setAuth(carrier);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('carrier_auth');
+    setAuth(null);
+    setMotoristas([]);
+    setMotoristaCadastrado(null);
+  };
+
+  // Render condicional
+  if (!auth) {
+    return <AuthModal onAuthenticated={handleAuth} />;
+  }
+
   return (
     <>
       <style>{`
@@ -453,7 +534,7 @@ export default function CadastroMotoristaPage() {
       `}</style>
 
       <div className="min-h-screen bg-linear-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
-        {/* ── Top bar ─────────────────────────────────────────────────────── */}
+        {/* Top bar */}
         <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -464,25 +545,35 @@ export default function CadastroMotoristaPage() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-gray-900">Cadastro de Motoristas</h1>
-                <p className="text-xs text-gray-500">{motoristas.length} motorista{motoristas.length !== 1 ? 's' : ''} cadastrado{motoristas.length !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-gray-500">{motoristas.length} motorista{motoristas.length !== 1 ? 's' : ''}</p>
               </div>
             </div>
-            <button
-              onClick={() => router.back()}
-              className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1.5 transition"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Voltar
-            </button>
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-blue-700 bg-blue-50 px-3 py-1 rounded-full">
+                {auth.nome}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="text-xs text-red-500 underline hover:text-red-700"
+              >
+                Sair
+              </button>
+              <button
+                onClick={() => router.back()}
+                className="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1.5 transition"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Voltar
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-
-            {/* ── Left: Form ──────────────────────────────────────────────── */}
+            {/* Formulário de cadastro */}
             <div className="lg:col-span-2">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden sticky top-24">
                 <div className="bg-linear-to-r from-blue-600 to-blue-700 px-6 py-5">
@@ -494,7 +585,6 @@ export default function CadastroMotoristaPage() {
                   </p>
                 </div>
 
-                {/* ── QR Code View ─────────────────────────────────────── */}
                 {motoristaCadastrado ? (
                   <div className="p-6 text-center">
                     <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -504,23 +594,20 @@ export default function CadastroMotoristaPage() {
                     </div>
                     <p className="font-bold text-gray-900 text-xl mb-1">{motoristaCadastrado.nome}</p>
                     <p className="text-sm text-gray-500 mb-6">Cadastrado com sucesso</p>
-
                     <div className="flex justify-center p-4 bg-gray-50 rounded-2xl mb-4 border border-gray-100">
                       <QRCode value={motoristaCadastrado.id} size={180} />
                     </div>
                     <p className="text-xs text-gray-400 mb-6 leading-relaxed">
                       Este QR Code deve ser usado pelo motorista no app para iniciar a descarga.
                     </p>
-
                     <button
-                      onClick={() => { setMotoristaCadastrado(null); setForm(EMPTY_FORM); }}
+                      onClick={() => { setMotoristaCadastrado(null); setForm({ ...EMPTY_FORM, transportadora_id: auth.id }); }}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-xl font-semibold transition"
                     >
                       Cadastrar outro motorista
                     </button>
                   </div>
                 ) : (
-                  /* ── Registration Form ─────────────────────────────── */
                   <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <FormField label="Nome completo" name="nome" value={form.nome} onChange={handleChange} required placeholder="Nome completo do motorista" />
                     <FormField label="CPF" name="cpf" value={form.cpf} onChange={handleChange} required placeholder="000.000.000-00" />
@@ -544,8 +631,7 @@ export default function CadastroMotoristaPage() {
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Destino XPT
-                        <span className="text-gray-400 font-normal text-xs ml-1">(opcional)</span>
+                        Destino XPT <span className="text-gray-400 font-normal text-xs">(opcional)</span>
                       </label>
                       <select
                         name="destino_xpt"
@@ -555,6 +641,23 @@ export default function CadastroMotoristaPage() {
                       >
                         <option value="">— Sem destino definido —</option>
                         {(DESTINOS as any[]).map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        Transportadora <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="transportadora_id"
+                        value={form.transportadora_id}
+                        onChange={handleChange}
+                        required
+                        className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-900 bg-white text-sm"
+                      >
+                        {transportadoras.map((t) => (
+                          <option key={t.id} value={t.id}>{t.nome}</option>
+                        ))}
                       </select>
                     </div>
 
@@ -577,9 +680,8 @@ export default function CadastroMotoristaPage() {
               </div>
             </div>
 
-            {/* ── Right: List ──────────────────────────────────────────────── */}
+            {/* Lista de motoristas */}
             <div className="lg:col-span-3 space-y-5">
-              {/* Search + header */}
               <div className="flex items-center gap-3">
                 <div className="relative flex-1">
                   <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -594,7 +696,7 @@ export default function CadastroMotoristaPage() {
                   />
                 </div>
                 <button
-                  onClick={fetchMotoristas}
+                  onClick={() => fetchMotoristas(auth.id)}
                   disabled={loadingMotoristas}
                   className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-sm disabled:opacity-50"
                   title="Atualizar lista"
@@ -605,7 +707,6 @@ export default function CadastroMotoristaPage() {
                 </button>
               </div>
 
-              {/* List */}
               {loadingMotoristas ? (
                 <div className="flex flex-col items-center justify-center py-20 text-gray-400">
                   <div className="w-10 h-10 border-3 border-gray-200 border-t-blue-500 rounded-full animate-spin mb-4" style={{ borderWidth: 3 }} />
@@ -636,6 +737,7 @@ export default function CadastroMotoristaPage() {
                       <DriverCard
                         key={m.id}
                         m={m}
+                        transportadoras={transportadoras}
                         onEdit={setEditingMotorista}
                         onDelete={setDeletingMotorista}
                       />
@@ -648,10 +750,12 @@ export default function CadastroMotoristaPage() {
         </div>
       </div>
 
-      {/* ── Modals ──────────────────────────────────────────────────────────── */}
+      {/* Modais */}
       {editingMotorista && (
         <EditModal
           motorista={editingMotorista}
+          transportadoras={transportadoras}
+          authId={auth.id}
           onCancel={() => setEditingMotorista(null)}
           onSave={handleSaveEdit}
           loading={loadingEdit}
@@ -669,7 +773,7 @@ export default function CadastroMotoristaPage() {
   );
 }
 
-// ─── Reusable FormField ────────────────────────────────────────────────────
+// ─── FormField ─────────────────────────────────────────────────────────────
 function FormField({
   label, name, value, onChange, required, placeholder, type = 'text',
 }: {
@@ -691,6 +795,90 @@ function FormField({
         placeholder={placeholder}
         className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-900 text-sm placeholder:text-gray-400"
       />
+    </div>
+  );
+}
+
+// ─── Auth Modal (sem alterações) ──────────────────────────────────────────
+function AuthModal({ onAuthenticated }: { onAuthenticated: (carrier: { id: string; nome: string }) => void }) {
+  const [carriers, setCarriers] = useState<{ id: string; nome: string }[]>([]);
+  const [selectedId, setSelectedId] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/melicages/transportadoras')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) setCarriers(data.data);
+        else toast.error('Erro ao carregar transportadoras');
+      })
+      .catch(() => toast.error('Erro de conexão'));
+  }, []);
+
+  const handleLogin = async () => {
+    if (!selectedId || !password) {
+      toast.error('Selecione uma transportadora e informe a senha');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/melicages/transportadoras/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carrierId: selectedId, password }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        onAuthenticated(data.carrier);
+      } else {
+        toast.error(data.erro || 'Falha na autenticação');
+      }
+    } catch (err) {
+      toast.error('Erro ao conectar ao servidor');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-fadeIn">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Acesso Restrito</h2>
+        <p className="text-gray-500 mb-6 text-sm">Selecione sua transportadora para gerenciar motoristas.</p>
+
+        <div className="space-y-4">
+          <select
+            className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500"
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+          >
+            <option value="">Selecione uma transportadora</option>
+            {carriers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="password"
+            placeholder="Senha da transportadora"
+            className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+          />
+
+          <button
+            onClick={handleLogin}
+            disabled={loading}
+            className="w-full bg-blue-600 text-white p-3 rounded-xl font-bold hover:bg-blue-700 transition disabled:opacity-50"
+          >
+            {loading ? 'Verificando...' : 'Confirmar Acesso'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
