@@ -29,27 +29,71 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ param: string }> }
 ) {
-  const transportadoraId = request.headers.get('x-transportadora-id');
-  if (!transportadoraId) {
-    return NextResponse.json({ success: false, erro: 'Não autenticado' }, { status: 401 });
-  }
-
   try {
     const { param } = await params;
     const db = await getDatabase();
+    const isCpf = /^\d{11}$/.test(param.replace(/\D/g, ''));
+    const isObjectId = /^[a-f\d]{24}$/i.test(param);
+
+    // ✅ Busca por CPF (app do motorista): não exige autenticação
+    if (isCpf) {
+      const cpfLimpo = param.replace(/\D/g, '');
+      const motorista = await db
+        .collection('melicages_motoristas_cadastro')
+        .findOne({ cpf: cpfLimpo });
+
+      if (!motorista) {
+        return NextResponse.json(
+          { success: false, erro: 'Motorista não encontrado' },
+          { status: 404 }
+        );
+      }
+
+      const { _id, ...rest } = motorista;
+      return NextResponse.json({
+        success: true,
+        data: { id: _id.toString(), ...rest },
+      });
+    }
+
+    // 🔒 Busca por ID (painel da transportadora): exige autenticação
+    const transportadoraId = request.headers.get('x-transportadora-id');
+    if (!transportadoraId) {
+      return NextResponse.json(
+        { success: false, erro: 'Não autenticado' },
+        { status: 401 }
+      );
+    }
+
+    if (!isObjectId) {
+      return NextResponse.json(
+        { success: false, erro: 'Parâmetro inválido' },
+        { status: 400 }
+      );
+    }
+
     const motorista = await db
       .collection('melicages_motoristas_cadastro')
       .findOne(buildFilter(param, transportadoraId));
 
     if (!motorista) {
-      return NextResponse.json({ success: false, erro: 'Motorista não encontrado' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, erro: 'Motorista não encontrado' },
+        { status: 404 }
+      );
     }
 
     const { _id, ...rest } = motorista;
-    return NextResponse.json({ success: true, data: { id: _id.toString(), ...rest } });
+    return NextResponse.json({
+      success: true,
+      data: { id: _id.toString(), ...rest },
+    });
   } catch (error: any) {
     console.error('[API] GET /motoristas/cadastro/[param] error:', error);
-    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, erro: 'Erro interno' },
+      { status: 500 }
+    );
   }
 }
 
