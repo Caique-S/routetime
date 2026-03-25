@@ -263,12 +263,6 @@ export default function PainelPage() {
           </div>
         )}
 
-        {/*
-          LAYOUT RESPONSIVO:
-          - Mobile (< sm): flex-col → colunas empilhadas verticalmente
-          - Desktop (≥ sm): flex-row flex-wrap → colunas lado a lado,
-            quebra para baixo quando não há espaço (sem scroll horizontal)
-        */}
         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
           <Coluna titulo="Em Fila"      motoristas={emFila}       cor="bg-amber-400" {...handlers} />
           <Coluna titulo="Descarregando" motoristas={descarregando} cor="bg-blue-500"  {...handlers} />
@@ -279,7 +273,7 @@ export default function PainelPage() {
       {/* Modais */}
       {modalIniciarAberto && motoristaParaIniciar && (
         <IniciarDescargaModal
-          motorista={{ id: motoristaParaIniciar.id, nome: motoristaParaIniciar.nome }}
+          motorista={{ id: motoristaParaIniciar.id, nome: motoristaParaIniciar.nome, doca: motoristaParaIniciar.doca ?? undefined }}
           onClose={() => { setModalIniciarAberto(false); setMotoristaParaIniciar(null); }}
           onConfirm={handleIniciarDescarga}
         />

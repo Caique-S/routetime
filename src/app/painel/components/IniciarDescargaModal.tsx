@@ -10,7 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 interface Props {
-  motorista: { id: string; nome: string };
+  motorista: { id: string; nome: string; doca?: string };
   onClose: () => void;
   onConfirm: (id: string, doca: string) => void;
 }
@@ -20,8 +20,8 @@ export default function IniciarDescargaModal({
   onClose,
   onConfirm,
 }: Props) {
-  const [doca, setDoca] = useState("");
-  const [notificacaoEnviada, setNotificacaoEnviada] = useState(false);
+  const [doca, setDoca] = useState(motorista.doca || "");
+  const [notificacaoEnviada, setNotificacaoEnviada] = useState(!!motorista.doca);
   const [qrValidado, setQrValidado] = useState(false);
   const [scannerAtivo, setScannerAtivo] = useState(false);
   const [erro, setErro] = useState("");
