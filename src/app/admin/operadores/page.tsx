@@ -53,6 +53,17 @@ export default function AdminOperadoresPage() {
       setOperadoresLoading(false);
     }
   };
+  const maskCPF = (cpf: string) => {
+  if (!cpf) return '';
+  const digits = cpf.replace(/\D/g, '');
+  if (digits.length !== 11) return cpf;
+  return '***.***.' + digits.slice(6, 9) + '-' + digits.slice(9);
+};
+
+const maskCodigo = (codigo: string) => {
+  if (!codigo || !codigo.startsWith('OP')) return codigo;
+  return 'OP' + '*'.repeat(codigo.length - 2);
+};
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -388,7 +399,7 @@ export default function AdminOperadoresPage() {
                       <td className="px-6 py-4">
                         <div className="space-y-1">
                           <div className="text-sm font-medium text-gray-900">
-                            {operador.codigo || 'Sem código'}
+                           {maskCodigo(operador.codigo) || 'Sem código'}
                           </div>
                           <div className="text-xs text-gray-500 font-mono truncate max-w-50" title={operador._id}>
                             ID: {operador._id.substring(0, 8)}...
@@ -403,7 +414,7 @@ export default function AdminOperadoresPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">{operador.cargo}</td>
                       <td className="px-6 py-4 text-sm text-gray-600 font-mono">
-                        {formatarCPF(operador.cpf || operador.matricula || '') || 'Não informado'}
+                        {maskCPF(operador.cpf || operador.matricula || '') || 'Não informado'}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${operador.ativo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>

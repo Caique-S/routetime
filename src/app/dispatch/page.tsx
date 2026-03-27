@@ -283,6 +283,48 @@ export default function Home() {
               </div>
             </div>
           </Link>
+          {/* Card de Controle*/}
+          <Link href="/carregamento/operacoes" passHref>
+            <div
+              className={`bg-white rounded-2xl shadow-xl p-8 border border-gray-200/50 hover:shadow-2xl hover:border-orange-300 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer ${activeCard === 2 ? "ring-2 ring-orange-500 ring-opacity-50" : ""}`}
+              onMouseEnter={() => handleCardHover(2)}
+              onMouseLeave={handleCardLeave}
+            >
+              <div className="relative mb-6">
+                <div className="absolute -top-2 -left-2 w-16 h-16 bg-orange-100 rounded-2xl transform rotate-12 opacity-50"></div>
+                <div className="relative w-14 h-14 bg-linear-to-br from-orange-600 to-orange-700 rounded-xl flex items-center justify-center shadow-lg">
+                  <Truck className="w-7 h-7 text-white" />
+                </div>
+              </div>
+
+              <h3 className="text-xl font-bold text-gray-900 mb-3">
+                Gerenciamento de Operações
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Gerencie as operações de carregamento. Acompanhe o status em
+                tempo real.
+              </p>
+
+              <div className="flex items-center text-orange-600 font-medium">
+                <span>Acessar</span>
+                <div className="ml-2 transform group-hover:translate-x-2 transition-transform">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 7l5 5m0 0l-5 5m5-5H6"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </Link>
 
           {/* Card Upload CSV */}
           <Link href="/carregamento/upload" passHref>

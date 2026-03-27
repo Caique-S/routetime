@@ -3,86 +3,77 @@ import { getDatabase } from '../../lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 export async function GET(request: NextRequest) {
-  console.log('=== API OPERADOR: Buscando operador ===');
+  console.log('=== API OPERADOR: GET ===');
   
   try {
-    // Obter parâmetros da URL
     const { searchParams } = new URL(request.url);
     const operadorId = searchParams.get('id');
     
-    console.log('Parâmetros recebidos:', { operadorId });
-    
-    if (!operadorId) {
-      console.error('❌ ID do operador não fornecido');
-      return NextResponse.json(
-        { error: 'ID do operador é obrigatório' },
-        { status: 400 }
-      );
-    }
-
-    //  Conectar ao banco de dados
-    console.log('Conectando ao banco de dados...');
     const db = await getDatabase();
-    console.log('✅ Conectado ao banco:', db.databaseName);
-
-    // Verificar se o ID é um ObjectId válido
-    if (!ObjectId.isValid(operadorId)) {
-      console.error('❌ ID não é um ObjectId válido:', operadorId);
-      return NextResponse.json(
-        { error: 'ID do operador inválido' },
-        { status: 400 }
-      );
+    const collection = db.collection('operadores');
+    
+    // Se foi passado um ID, busca um operador específico
+    if (operadorId) {
+      console.log('Buscando operador por ID:', operadorId);
+      
+      if (!ObjectId.isValid(operadorId)) {
+        return NextResponse.json({ error: 'ID do operador inválido' }, { status: 400 });
+      }
+      
+      const operador = await collection.findOne({ _id: new ObjectId(operadorId) });
+      if (!operador) {
+        return NextResponse.json({ error: 'Operador não encontrado' }, { status: 404 });
+      }
+      
+      const responseData = {
+        id: operador._id.toString(),
+        operador: {
+          nome: operador.nome || 'Operador',
+          cargo: operador.cargo || 'Operador de Expedição',
+          dataDeCadastro: operador.dataDeCadastro 
+            ? new Date(operador.dataDeCadastro).toISOString() 
+            : new Date().toISOString(),
+          codigo: operador.codigo || '',
+          email: operador.email || '',
+          telefone: operador.telefone || '',
+          permissoes: operador.permissoes || ''
+        },
+      };
+      return NextResponse.json(responseData);
     }
-
-    // Buscar operador pelo _id
-    const objectId = new ObjectId(operadorId);
-    const operador = await db.collection('operadores').findOne({ 
-      _id: objectId 
+    
+    // Se não foi passado ID, retorna a lista de todos os operadores
+    console.log('Buscando todos os operadores');
+    const operadores = await collection.find({}).sort({ dataDeCadastro: -1 }).toArray();
+    
+    const operadoresFormatados = operadores.map(op => ({
+      _id: op._id.toString(),
+      nome: op.nome,
+      cargo: op.cargo,
+      codigo: op.codigo,
+      cpf: op.cpf,
+      matricula: op.matricula,
+      email: op.email,
+      telefone: op.telefone,
+      permissoes: op.permissoes,
+      ativo: op.ativo,
+      dataDeCadastro: op.dataDeCadastro ? new Date(op.dataDeCadastro).toISOString() : new Date().toISOString(),
+    }));
+    
+    return NextResponse.json({
+      success: true,
+      data: operadoresFormatados,
     });
-
-    console.log('Resultado da busca:', operador);
-
-    if (!operador) {
-      console.error('❌ Operador não encontrado');
-      return NextResponse.json(
-        { error: 'Operador não encontrado' },
-        { status: 404 }
-      );
-    }
-
-    // Formatar a resposta
-    const responseData = {
-      id: operador._id.toString(),
-      operador: {
-        nome: operador.nome || 'Operador',
-        cargo: operador.cargo || 'Operador de Expedição',
-        dataDeCadastro: operador.dataDeCadastro 
-          ? new Date(operador.dataDeCadastro).toISOString() 
-          : new Date().toISOString(),
-        // Incluir outros campos úteis
-        codigo: operador.codigo || '',
-        email: operador.email || '',
-        telefone: operador.telefone || ''
-      },
-    };
-
-    console.log('✅ Operador encontrado:', responseData.operador.nome);
     
-    return NextResponse.json(responseData);
-
   } catch (error: any) {
-    console.error('❌ Erro ao buscar operador:', error);
-    console.error('Stack trace:', error.stack);
-    
+    console.error('❌ Erro no GET /api/operador:', error);
     return NextResponse.json(
-      { 
-        error: 'Erro interno do servidor',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
+      { error: 'Erro interno do servidor', details: error.message },
       { status: 500 }
     );
   }
 }
+
 
 // Método POST para criar operador
 export async function POST(request: NextRequest) {
