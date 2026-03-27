@@ -263,7 +263,7 @@ export default function PainelPage() {
  const exportarCSV = () => {
     const cabecalhos = [
       'Data',
-      'CPF',
+     // 'CPF',
       'Motorista',
       'Retorno',
       'Chegada',
@@ -320,11 +320,11 @@ export default function PainelPage() {
       const tempoFilaFormatado = m.tempoFila ? formatarHHMMSS(m.tempoFila) : '';
 
       // CPF com TAB para forçar o Excel a tratar como TEXTO e manter os zeros
-      const cpfFormatado = m.cpf ? `\t${m.cpf}` : '';
+      //const cpfFormatado = m.cpf ? `\t${m.cpf}` : '';
 
       return [
         dataChegada,
-        cpfFormatado,
+       // cpfFormatado,
         m.nome || '',
         m.destino || '',
         horaChegada,
