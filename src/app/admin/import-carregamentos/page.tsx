@@ -355,10 +355,10 @@ export default function ImportCarregamentosPage() {
     const payload = {
       ...formData,
       // Converter datetime-local para ISO
-      timestamp: formData.timestamp ? new Date(new Date(formData.timestamp).getTime() - 3 * 60 * 60 * 1000).toISOString() : undefined,
-      dataCriacao: formData.dataCriacao ? new Date(new Date(formData.dataCriacao).getTime() - 3 * 60 * 60 * 1000).toISOString() : undefined,
-      dataEnvio: formData.dataEnvio ? new Date(new Date(formData.dataEnvio).getTime() - 3 * 60 * 60 * 1000).toISOString() : undefined,
-      dataAtualizacao: formData.dataAtualizacao ? new Date(new Date(formData.dataAtualizacao).getTime() - 3 * 60 * 60 * 1000).toISOString() : undefined,
+      timestamp: formData.timestamp ? new Date(formData.timestamp).toISOString() : undefined,
+      dataCriacao: formData.dataCriacao ? new Date(formData.dataCriacao).toISOString() : undefined,
+      dataEnvio: formData.dataEnvio ? new Date(formData.dataEnvio).toISOString() : undefined,
+      dataAtualizacao: formData.dataAtualizacao ? new Date(formData.dataAtualizacao).toISOString() : undefined, 
       motorista: {
         ...formData.motorista,
         travelId: Number(formData.motorista.travelId) || formData.motorista.travelId,

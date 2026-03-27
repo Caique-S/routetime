@@ -170,8 +170,8 @@ export default function DashboardPage() {
   // Filtrar carregamentos apenas do dia atual
   // ------------------------------------------------------------
   const hojeStr = getTodayDateString(); // YYYY-MM-DD
-  const inicioHoje = new Date(hojeStr + 'T00:00:00').getTime();
-  const fimHoje = inicioHoje + 24 * 60 * 60 * 1000;
+  const inicioHoje = new Date(hojeStr + 'T00:00:00-03:00').getTime();
+  const fimHoje = new Date(hojeStr + 'T23:59:59-03:00').getTime();
 
   const carregamentosDoDia = allCarregamentos.filter((c) => {
     const createdAt = new Date(c.dataCriacao).getTime();
@@ -665,7 +665,7 @@ export default function DashboardPage() {
                         type="text"
                         id="export-facility"
                         placeholder="Ex: SBA4"
-                        value=""
+                        value={exportFilters.facility}
                         onChange={(e) => setExportFilters({ ...exportFilters, facility: e.target.value.toUpperCase() })}
                         className="w-full px-3 py-2 bg-white/70 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm backdrop-blur-sm uppercase"
                       />
