@@ -14,7 +14,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
-// ─── Tipos  ───────────────────────────────────────────────────────────────────
 
 interface MotoristaFila {
   posicao: number | null;
@@ -46,7 +45,6 @@ interface ApiResponse {
   error?: string;
 }
 
-// ─── Helpers visuais ─────────────────────────────────────────────────────────
 
 const INTERVALO_REFRESH_MS = 30_000; // 30 segundos
 
@@ -302,8 +300,8 @@ export default function FilaDestinoPainelPage() {
             {/* Título e metadados */}
             <div>
               <div className="flex items-center gap-3">
-                <Link href="/painel" className="text-gray-400 hover:text-gray-600 text-sm transition">
-                  ← Painel
+                <Link href="/carregamento/operacoes" className="text-gray-400 hover:text-gray-600 text-sm transition">
+                  ← Voltar
                 </Link>
                 <h1 className="text-lg sm:text-xl font-bold text-gray-900">
                   🗺️ Filas por Destino

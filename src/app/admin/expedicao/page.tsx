@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
 
@@ -354,6 +355,12 @@ export default function CarregamentosPage() {
     <div className="min-h-screen bg-gray-100">
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-4">
+                                <Link
+              href="/carregamento/operacoes"
+              className="text-blue-400 self-center hover:text-blue-600 text-lg transition"
+            >
+              Voltar
+            </Link>
           <div className="flex flex-wrap justify-between items-center gap-3">
             <div>
               <h1 className="text-xl font-bold text-gray-900">
