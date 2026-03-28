@@ -2,13 +2,25 @@
 
 import Link from 'next/link';
 import { ArrowLeft, Users, UserCog, ClipboardList, Settings, Route, Package, Truck } from 'lucide-react';
-import { useState } from 'react';
+import { useState , useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function ConexoesPage() {
+
+  const router = useRouter()
   const [activeCard, setActiveCard] = useState<number | null>(null);
 
   const handleCardHover = (cardId: number) => setActiveCard(cardId);
   const handleCardLeave = () => setActiveCard(null);
+
+    useEffect(() => {
+      const operadorNome = localStorage.getItem("operador_nome");
+      const operadorCargo = localStorage.getItem("operador_cargo");
+  
+      if (!operadorNome && !operadorCargo) {
+        router.push("/dispatch");
+      }
+    }, [router]);
 
   return (
     <div className="min-h-screen bg-linear-to-br from-indigo-50 via-white to-purple-50">
