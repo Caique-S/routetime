@@ -18,7 +18,7 @@ export default function ConexoesPage() {
       const operadorCargo = localStorage.getItem("operador_cargo");
   
       if (!operadorNome && !operadorCargo) {
-        router.push("/dispatch");
+        router.push("/");
       }
     }, [router]);
 
