@@ -30,6 +30,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "server.js", "src/app/api/melicages/motoristas/oldroute.00"  ],
+, "server.js", "src/app/api/melicage/motoristas/oldroute.00"  ],
   "exclude": ["node_modules"]
 }

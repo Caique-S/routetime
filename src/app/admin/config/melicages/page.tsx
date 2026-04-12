@@ -96,9 +96,9 @@ export default function AdminConfigPage() {
     hideToast();
     try {
       const [localRes, motoristaRes, xptsRes] = await Promise.all([
-        fetch("/api/melicages/config/localizacoes"),
-        fetch("/api/melicages/config/motoristas"),
-        fetch("/api/melicages/xpts"),
+        fetch("/api/melicage/config/localizacoes"),
+        fetch("/api/melicage/config/motoristas"),
+        fetch("/api/melicage/xpts"),
       ]);
 
       if (localRes.ok) {
@@ -147,7 +147,7 @@ export default function AdminConfigPage() {
     setSavingLocal(true);
     hideToast();
     try {
-      const response = await fetch("/api/melicages/config/localizacoes", {
+      const response = await fetch("/api/melicage/config/localizacoes", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(localConfig),
@@ -172,7 +172,7 @@ export default function AdminConfigPage() {
     setSavingMotorista(true);
     hideToast();
     try {
-      const response = await fetch("/api/melicages/config/motoristas", {
+      const response = await fetch("/api/melicage/config/motoristas", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(motoristaConfig),
@@ -262,13 +262,13 @@ export default function AdminConfigPage() {
     try {
       let response;
       if (editingXpt) {
-        response = await fetch(`/api/melicages/xpts/${editingXpt.id}`, {
+        response = await fetch(`/api/melicage/xpts/${editingXpt.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
       } else {
-        response = await fetch("/api/melicages/xpts", {
+        response = await fetch("/api/melicage/xpts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -293,7 +293,7 @@ export default function AdminConfigPage() {
   const deleteXpt = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este XPT?")) return;
     try {
-      const response = await fetch(`/api/melicages/xpts/${id}`, {
+      const response = await fetch(`/api/melicage/xpts/${id}`, {
         method: "DELETE",
       });
       if (response.ok) {

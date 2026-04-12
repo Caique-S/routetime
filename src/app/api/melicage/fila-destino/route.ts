@@ -1,18 +1,3 @@
-// app/api/melicages/fila-destino/route.ts
-//
-// Endpoint: GET /api/melicages/fila-destino
-//
-// Lógica:
-//  1. Busca o último upload CSV do MongoDB
-//  2. Busca todos os motoristas ativos via endpoint existente
-//  3. Cruza pelo campo "ID do motorista 1" (chave_identificacao) com
-//     fallback para nome normalizado
-//  4. Calcula o "horário de prontidão" de cada motorista:
-//       - status aguardando_carregamento → timestampChegada   (chegou vazio)
-//       - status descarregado           → timestampFimDescarga (gaiolas descarregadas)
-//       - status descarregando / em_fila → não pronto ainda
-//       - não encontrado no sistema      → não chegou
-//  5. Para cada destino, devolve a lista ordenada por prontidão
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
@@ -80,7 +65,7 @@ export async function GET(request: NextRequest) {
     // Usamos o host da própria request para montar a URL sem hardcode
     const host = request.headers.get('host') ?? 'localhost:3000';
     const protocol = host.startsWith('localhost') ? 'http' : 'https';
-    const motoristaUrl = `${protocol}://${host}/api/melicages/motoristas`;
+    const motoristaUrl = `${protocol}://${host}/api/melicage/motoristas`;
 
     let motoristas: any[] = [];
     try {

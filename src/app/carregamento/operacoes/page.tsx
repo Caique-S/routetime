@@ -194,7 +194,7 @@ export default function ConexoesPage() {
           </Link>
 
           {/* Card: Configurações */}
-          <Link href="/admin/config/melicages" passHref>
+          <Link href="/admin/config/melicage" passHref>
             <div
               className={`bg-white rounded-2xl shadow-xl p-6 border border-gray-200/50 hover:shadow-2xl hover:border-gray-400 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer ${activeCard === 4 ? 'ring-2 ring-gray-500 ring-opacity-50' : ''}`}
               onMouseEnter={() => handleCardHover(4)}

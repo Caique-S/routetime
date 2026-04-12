@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 
-const APP_NAME = 'melicages-admin';
+const APP_NAME = 'melicage-admin';
 
 function getOrCreateAdminApp(): admin.app.App {
 

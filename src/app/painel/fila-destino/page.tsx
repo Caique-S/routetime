@@ -240,7 +240,7 @@ export default function FilaDestinoPainelPage() {
     setErro(null);
 
     try {
-      const res = await fetch('/api/melicages/fila-destino', { cache: 'no-store' });
+      const res = await fetch('/api/melicage/fila-destino', { cache: 'no-store' });
       const json: ApiResponse = await res.json();
 
       if (!res.ok || !json.success) {

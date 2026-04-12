@@ -1,29 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 
-/*
-export async function GET(request: NextRequest) {
-  const transportadoraId = request.headers.get('x-transportadora-id');
-  if (!transportadoraId) {
-    return NextResponse.json({ success: false, erro: 'Não autenticado' }, { status: 401 });
-  }
-
-  try {
-    const db = await getDatabase();
-    const motoristas = await db
-      .collection('melicages_motoristas_cadastro')
-      .find({ transportadora_id: transportadoraId })
-      .sort({ nome: 1 })
-      .toArray();
-
-    const data = motoristas.map(({ _id, ...rest }) => ({ id: _id.toString(), ...rest }));
-    return NextResponse.json({ success: true, data });
-  } catch (error: any) {
-    console.error('[API] GET /motoristas/cadastro error:', error);
-    return NextResponse.json({ success: false, erro: 'Erro interno' }, { status: 500 });
-  }
-}
-  */
 
 export async function GET(request: NextRequest) {
   const transportadoraId = request.headers.get('x-transportadora-id');

@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
 
   } catch (error: any) {
-    console.error('[ERRO] POST /api/melicages/fila/motorista-vazio', error);
+    console.error('[ERRO] POST /api/melicage/fila/motorista-vazio', error);
     return NextResponse.json(
       { message: 'Erro interno do servidor', error: error.message },
       { status: 500 }

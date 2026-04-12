@@ -189,7 +189,7 @@ export default function PainelPage() {
       setError(null);
       try {
         const res = await fetch(
-          `/api/melicages/motoristas?tipo=gaiolas&data=${dataSelecionada}`,
+          `/api/melicage/motoristas?tipo=gaiolas&data=${dataSelecionada}`,
         );
         if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
         const json = await res.json();
@@ -234,7 +234,7 @@ export default function PainelPage() {
   const handleIniciarDescarga = async (id: string, doca: string) => {
     try {
       const res = await fetch(
-        `/api/melicages/motoristas/${id}/iniciar-descarga`,
+        `/api/melicage/motoristas/${id}/iniciar-descarga`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -261,7 +261,7 @@ export default function PainelPage() {
   ) => {
     try {
       const res = await fetch(
-        `/api/melicages/motoristas/${id}/finalizar-descarga`,
+        `/api/melicage/motoristas/${id}/finalizar-descarga`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

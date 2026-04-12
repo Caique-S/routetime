@@ -510,7 +510,7 @@ export default function CadastroMotoristaPage() {
   // Fetch transportadoras (para selects)
   const fetchTransportadoras = async () => {
     try {
-      const res = await fetch("/api/melicages/transportadoras");
+      const res = await fetch("/api/melicage/transportadoras");
       const data = await res.json();
       if (data.success) setTransportadoras(data.data);
     } catch (error) {
@@ -522,7 +522,7 @@ export default function CadastroMotoristaPage() {
   const fetchMotoristas = async (transportadoraId: string) => {
     setLoadingMotoristas(true);
     try {
-      const res = await fetch("/api/melicages/motoristas/cadastro", {
+      const res = await fetch("/api/melicage/motoristas/cadastro", {
         headers: { "x-transportadora-id": transportadoraId }, // <-- header obrigatório
       });
       const data = await res.json();
@@ -571,7 +571,7 @@ export default function CadastroMotoristaPage() {
     if (!auth) return;
     setLoading(true);
     try {
-      const response = await fetch("/api/melicages/motoristas/cadastro", {
+      const response = await fetch("/api/melicage/motoristas/cadastro", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -598,7 +598,7 @@ export default function CadastroMotoristaPage() {
     if (!auth) return;
     setLoadingEdit(true);
     try {
-      const res = await fetch(`/api/melicages/motoristas/cadastro/${id}`, {
+      const res = await fetch(`/api/melicage/motoristas/cadastro/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -623,7 +623,7 @@ export default function CadastroMotoristaPage() {
     setLoadingDelete(true);
     try {
       const res = await fetch(
-        `/api/melicages/motoristas/cadastro/${deletingMotorista.id}`,
+        `/api/melicage/motoristas/cadastro/${deletingMotorista.id}`,
         {
           method: "DELETE",
           headers: { "x-transportadora-id": auth.id },
@@ -1094,7 +1094,7 @@ function AuthModal({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch("/api/melicages/transportadoras")
+    fetch("/api/melicage/transportadoras")
       .then((res) => res.json())
       .then((data) => {
         if (data.success) setCarriers(data.data);
@@ -1110,7 +1110,7 @@ function AuthModal({
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/melicages/transportadoras/login", {
+      const res = await fetch("/api/melicage/transportadoras/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ carrierId: selectedId, password }),

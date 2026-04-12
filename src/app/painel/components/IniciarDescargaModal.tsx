@@ -53,7 +53,7 @@ export default function IniciarDescargaModal({
     setLoadingNotificar(true);
     try {
       const res = await fetch(
-        `/api/melicages/motoristas/${motorista.id}/doca`,
+        `/api/melicage/motoristas/${motorista.id}/doca`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

@@ -296,7 +296,7 @@ export default function PainelPage() {
       if (!silent) setLoading(true);
       setError(null);
       try {
-        const url = `/api/melicages/motoristas?tipo=gaiolas&data=${dataSelecionada}`;
+        const url = `/api/melicage/motoristas?tipo=gaiolas&data=${dataSelecionada}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
         const json = await res.json();

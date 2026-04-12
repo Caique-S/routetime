@@ -23,7 +23,7 @@ export default function CadastroTransportadoraPage() {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/melicages/transportadoras', {
+      const res = await fetch('/api/melicage/transportadoras', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome: form.nome, senha: form.senha }),
