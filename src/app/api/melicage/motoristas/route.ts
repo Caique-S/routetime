@@ -3,39 +3,6 @@ import { getDatabase } from "@/app/lib/mongodb";
 import { dbFirestore, FIRESTORE_COLLECTION } from "@/app/lib/firebaseAdmin";
 
 const TZ = "America/Sao_Paulo";
-/* 
-export async function GET(request: NextRequest) {
-  console.log("[API] GET /motoristas");
-  try {
-    const { searchParams } = new URL(request.url);
-    const tipo = searchParams.get("tipo"); // "gaiolas", "vazio" ou null
-
-    const db = await getDatabase();
-    const collection = db.collection("melicages_motoristas");
-
-    // Se tipo foi informado, filtra; senão busca todos (comportamento atual)
-    const query = tipo ? { tipo } : {};
-
-    const motoristas = await collection
-      .find(query)
-      .sort({ timestampChegada: -1 })
-      .toArray();
-
-    const data = motoristas.map(({ _id, ...rest }) => ({
-      id: _id.toString(),
-      ...rest,
-    }));
-
-    return NextResponse.json({ success: true, data });
-  } catch (error: any) {
-    console.error("[API] GET /motoristas error:", error);
-    return NextResponse.json(
-      { success: false, erro: "Erro interno" },
-      { status: 500 }
-    );
-  }
-}  
-   */
 
 export async function GET(request: NextRequest) {
   console.log("[API] GET /motoristas");

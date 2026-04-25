@@ -1,3 +1,4 @@
+// app/painel/view/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -7,7 +8,7 @@ import { useLiveTimer } from "@/app/hooks/useLiveTimer";
 import { formatarTempo } from "../components/MotoristaCard";
 import Link from "next/link";
 
-// ─── Componente de card apenas para exibição (sem botões de ação) ──────────
+// ─── Componente de card (mantido igual ao original, sem botões de ação) ──────────
 const MotoristaCardExibicao = ({
   motorista,
   posicao,
@@ -15,6 +16,7 @@ const MotoristaCardExibicao = ({
   motorista: Motorista;
   posicao?: number;
 }) => {
+  // (mesmo código do original, não alterado)
   const tempoFilaAoVivo = useLiveTimer(
     motorista.status === "em_fila" ? motorista.timestampChegada : null,
   );
@@ -139,9 +141,8 @@ const MotoristaCardExibicao = ({
         <div className="bg-gray-50 rounded-lg p-2.5">
           <p className="text-xs text-gray-500 mb-0.5">⏱ Tempo em fila</p>
           <p
-            className={`font-mono font-bold text-xl tabular-nums ${
-              motorista.status === "em_fila" ? cfg.timerCor : "text-gray-500"
-            }`}
+            className={`font-mono font-bold text-xl tabular-nums ${motorista.status === "em_fila" ? cfg.timerCor : "text-gray-500"
+              }`}
           >
             {formatarTempo(tempoFilaExibido)}
           </p>
@@ -149,19 +150,18 @@ const MotoristaCardExibicao = ({
 
         {(motorista.status === "descarregando" ||
           motorista.status === "descarregado") && (
-          <div className="bg-gray-50 rounded-lg p-2.5">
-            <p className="text-xs text-gray-500 mb-0.5">🚛 Descarga</p>
-            <p
-              className={`font-mono font-bold text-xl tabular-nums ${
-                motorista.status === "descarregando"
-                  ? cfg.timerCor
-                  : "text-gray-500"
-              }`}
-            >
-              {formatarTempo(tempoDescargaExibido)}
-            </p>
-          </div>
-        )}
+            <div className="bg-gray-50 rounded-lg p-2.5">
+              <p className="text-xs text-gray-500 mb-0.5">🚛 Descarga</p>
+              <p
+                className={`font-mono font-bold text-xl tabular-nums ${motorista.status === "descarregando"
+                    ? cfg.timerCor
+                    : "text-gray-500"
+                  }`}
+              >
+                {formatarTempo(tempoDescargaExibido)}
+              </p>
+            </div>
+          )}
       </div>
 
       {/* Tempo total */}
@@ -219,7 +219,7 @@ const MotoristaCardExibicao = ({
                 Math.floor(
                   (new Date(motorista.timestampInicioDescarga).getTime() -
                     new Date(motorista.docaNotifiedAt).getTime()) /
-                    1000,
+                  1000,
                 ),
               );
               const h = Math.floor(diffSegundos / 3600)
@@ -283,20 +283,23 @@ export default function PainelPage() {
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [dataSelecionada, setDataSelecionada] = useState(() => {
-    const hoje = new Date();
-    const year = hoje.getFullYear();
-    const month = String(hoje.getMonth() + 1).padStart(2, "0");
-    const day = String(hoje.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  });
+
+  // Estado do período
+  const hoje = new Date().toISOString().split("T")[0];
+  const [dataInicio, setDataInicio] = useState(hoje);
+  const [dataFim, setDataFim] = useState(hoje);
 
   const fetchMotoristas = useCallback(
     async (silent = false) => {
       if (!silent) setLoading(true);
       setError(null);
       try {
-        const url = `/api/melicage/motoristas?tipo=gaiolas&data=${dataSelecionada}`;
+        const params = new URLSearchParams();
+        params.append("tipo", "gaiolas");
+        params.append("dataInicio", dataInicio);
+        params.append("dataFim", dataFim);
+
+        const url = `/api/melicage/motoristas/filadescarga?${params.toString()}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
         const json = await res.json();
@@ -323,7 +326,7 @@ export default function PainelPage() {
         if (!silent) setLoading(false);
       }
     },
-    [dataSelecionada],
+    [dataInicio, dataFim],
   );
 
   useEffect(() => {
@@ -339,14 +342,13 @@ export default function PainelPage() {
   const exportarCSV = () => {
     const cabecalhos = [
       "Data",
-      // 'CPF',
       "Motorista",
       "Retorno",
       "Chegada",
       "Doca",
-      "Motorista Notificado", // Apenas Hora
-      "Inicio de Descarga", // Apenas Hora
-      "Término de Descarga", // Apenas Hora
+      "Motorista Notificado",
+      "Inicio de Descarga",
+      "Término de Descarga",
       "Tempo em Fila",
       "Tempo em Doca (Notif -> Início)",
       "Gaiolas",
@@ -354,7 +356,6 @@ export default function PainelPage() {
       "Manga Pallets",
     ];
 
-    // Função auxiliar interna para garantir o formato HH:MM:SS exato
     const formatarHHMMSS = (segundosTotais: number) => {
       const s = Math.max(0, Math.floor(segundosTotais));
       const h = Math.floor(s / 3600)
@@ -378,7 +379,6 @@ export default function PainelPage() {
         ? new Date(m.timestampChegada).toLocaleTimeString("pt-BR")
         : "";
 
-      // Extraindo apenas a HORA dos eventos
       const horaNotificado = m.docaNotifiedAt
         ? new Date(m.docaNotifiedAt).toLocaleTimeString("pt-BR")
         : "";
@@ -391,7 +391,6 @@ export default function PainelPage() {
         ? new Date(m.timestampFimDescarga).toLocaleTimeString("pt-BR")
         : "";
 
-      // Cálculo corrigido do Tempo em Doca (Notificação até o Início real)
       let tempoAteInicio = "";
       if (m.docaNotifiedAt && m.timestampInicioDescarga) {
         const diffSeg =
@@ -401,15 +400,10 @@ export default function PainelPage() {
         tempoAteInicio = formatarHHMMSS(diffSeg);
       }
 
-      // Tempo em Fila formatado como HH:MM:SS
       const tempoFilaFormatado = m.tempoFila ? formatarHHMMSS(m.tempoFila) : "";
-
-      // CPF com TAB para forçar o Excel a tratar como TEXTO e manter os zeros
-      //const cpfFormatado = m.cpf ? `\t${m.cpf}` : '';
 
       return [
         dataChegada,
-        // cpfFormatado,
         m.nome || "",
         m.destino || "",
         horaChegada,
@@ -431,14 +425,16 @@ export default function PainelPage() {
       )
       .join("\n");
 
-    // O "\uFEFF" é o BOM (Byte Order Mark) para o Excel reconhecer acentos e caracteres especiais
     const blob = new Blob(["\uFEFF" + csvContent], {
       type: "text/csv;charset=utf-8;",
     });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `relatorio_descarga_${dataSelecionada}.csv`);
+    link.setAttribute(
+      "download",
+      `relatorio_descarga_${dataInicio}_a_${dataFim}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -455,12 +451,15 @@ export default function PainelPage() {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-3 flex justify-between items-center gap-3 flex-wrap">
           <div>
-            <div className="flex flex-row gap-8 flex-nowrap w-100 " >
-              <Link href="/carregamento/operacoes" className="text-gray-400  hover:text-gray-600 text-sm transition">
+            <div className="flex flex-row gap-8 flex-nowrap w-100">
+              <Link
+                href="/carregamento/operacoes"
+                className="text-gray-400 hover:text-gray-600 text-sm transition"
+              >
                 ← Voltar
               </Link>
-              <h1 className="text-lg sm:text-xl  self-center font-bold text-gray-900">
-              🚚 Controle de Descarga
+              <h1 className="text-lg sm:text-xl self-center font-bold text-gray-900">
+                🚚 Controle de Descarga
               </h1>
             </div>
             <p className="text-xs text-gray-500">
@@ -471,13 +470,28 @@ export default function PainelPage() {
                 : "Carregando..."}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={dataSelecionada}
-              onChange={(e) => setDataSelecionada(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
-            />
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Filtro de período */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-500 whitespace-nowrap">
+                De:
+              </label>
+              <input
+                type="date"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+                className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-blue-500 focus:border-blue-500"
+              />
+              <label className="text-xs text-gray-500 whitespace-nowrap">
+                Até:
+              </label>
+              <input
+                type="date"
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+                className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
             <button
               onClick={exportarCSV}
               className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition"
@@ -486,11 +500,10 @@ export default function PainelPage() {
             </button>
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
-                autoRefresh
+              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${autoRefresh
                   ? "bg-green-100 text-green-700"
                   : "bg-gray-100 text-gray-500"
-              }`}
+                }`}
             >
               {autoRefresh ? "🔄 Auto (10s)" : "⏸️ Pausado"}
             </button>
@@ -518,6 +531,17 @@ export default function PainelPage() {
           <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">
             ✅ {finalizados.length} finalizados
           </span>
+          <Link
+            href="/painel/inspecionar"
+            className=" flex flex-row text-gray-400 hover:text-indigo-500 gap-1 transition-colors px-2 py-1"
+            title="Inspecionar dados"
+          > 
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            inspecionar
+          </Link>
         </div>
       </div>
 
