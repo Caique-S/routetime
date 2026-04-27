@@ -47,11 +47,15 @@ import {
   Pie,
   Cell,
   ResponsiveContainer,
+  AreaChart,
+  Area,
 } from "recharts";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
 } from "@/components/ui/chart";
 import {
   RefreshCw,
@@ -168,7 +172,7 @@ export default function AnalyserPage() {
   const [periodoPredefinido, setPeriodoPredefinido] = useState("hoje");
   const [dataInicio, setDataInicio] = useState(getTodayStr());
   const [dataFim, setDataFim] = useState(getTodayStr());
-  const [facilitySelecionada] = useState("SBA4");
+  const [facilitySelecionada] = useState("");
 
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -176,6 +180,9 @@ export default function AnalyserPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTitle, setDrawerTitle] = useState("");
   const [drawerData, setDrawerData] = useState<CarregamentoData[]>([]);
+
+  // Filtro de facility para o gráfico de liberados
+  const [chartFacility, setChartFacility] = useState("todas");
 
   // Atualiza datas conforme período
   useEffect(() => {
@@ -221,13 +228,16 @@ export default function AnalyserPage() {
         if (json.success && json.data) {
           const inicio = new Date(`${dataInicio}T00:00:00-03:00`).getTime();
           const fim = new Date(`${dataFim}T23:59:59-03:00`).getTime();
-          carregamentosApi = json.data
-            .filter((c: CarregamentoData) => {
-              const d = c.dataCriacao || c.timestamp || "";
-              if (!d) return false;
-              const ts = new Date(d).getTime();
-              return ts >= inicio && ts <= fim;
-            })
+          carregamentosApi = json.data.filter((c: CarregamentoData) => {
+            const d = c.dataCriacao || c.timestamp || "";
+            if (!d) return false;
+
+            // Se a string da API não termina com Z nem com fuso (+ ou -), injetamos o local
+            const dateStr = (d.includes('Z') || d.includes('-03:00')) ? d : `${d}-03:00`;
+            const ts = new Date(dateStr).getTime();
+
+            return ts >= inicio && ts <= fim;
+          })
             .map((c: any) => ({ ...c, finalizado: true }));
         }
       } catch (e) {
@@ -248,7 +258,7 @@ export default function AnalyserPage() {
                 carregamentosLocal.push({ ...car, motoristaId: mid, finalizado: false });
               }
             }
-          } catch {}
+          } catch { }
         }
       }
 
@@ -331,14 +341,93 @@ export default function AnalyserPage() {
     .sort((a, b) => b.value - a.value);
 
   const trendData = useMemo(() => {
-    if (dataInicio === dataFim) return [];
+    // Removi a trava de dataInicio === dataFim para que o gráfico 
+    // mostre o ponto único caso o usuário filtre apenas um dia.
     const map: Record<string, number> = {};
+
     carregamentos.forEach(c => {
-      const d = (c.dataCriacao || c.timestamp || "").substring(0, 10);
-      if (d) map[d] = (map[d] || 0) + 1;
+      const rawDate = c.dataCriacao || c.timestamp;
+      if (!rawDate) return;
+
+      // Converte a string (UTC ou local) para um objeto Date
+      const dateObj = new Date(rawDate);
+
+      // Extrai a data no formato YYYY-MM-DD respeitando o fuso local.
+      // Isso evita que registros após as 21h pulem para o dia seguinte.
+      const d = dateObj.toLocaleDateString("en-CA");
+
+      if (d) {
+        map[d] = (map[d] || 0) + 1;
+      }
     });
-    return Object.entries(map).map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date));
-  }, [carregamentos, dataInicio, dataFim]);
+
+    return Object.entries(map)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [carregamentos]);
+
+  // ---- NOVA SEÇÃO: Dados para o gráfico de liberados por facility ----
+  const facilitiesDisponiveis = useMemo(
+    () => Array.from(new Set(carregamentos.map(c => c.facility))).sort(),
+    [carregamentos]
+  );
+
+  const chartLiberadosData = useMemo(() => {
+    // Agrupa liberados por data (YYYY-MM-DD) e facility
+    const agrupado: Record<string, Record<string, number>> = {};
+    carregamentos
+      .filter(c => c.status && ["liberado", "not_used"].includes(c.status))
+      .forEach(c => {
+        const rawDate = c.dataCriacao || c.timestamp;
+        if (!rawDate) return;
+
+        // Converte a string (independente de ser UTC) para o fuso local do navegador
+        const dateObj = new Date(rawDate);
+
+        // Formata como YYYY-MM-DD respeitando o fuso de Brasília
+        // O local 'en-CA' produz o formato 2026-04-27
+        const date = dateObj.toLocaleDateString("en-CA");
+
+        if (!agrupado[date]) agrupado[date] = {};
+        const fac = c.facility || "Desconhecido";
+        agrupado[date][fac] = (agrupado[date][fac] || 0) + 1;
+      });
+
+    // Cria array de objetos com todas as facilities
+    const datas = Object.keys(agrupado).sort();
+    return datas.map(date => {
+      const entry: any = { date };
+      facilitiesDisponiveis.forEach(fac => {
+        entry[fac] = agrupado[date][fac] || 0;
+      });
+      return entry;
+    });
+  }, [carregamentos, facilitiesDisponiveis]);
+
+  // Config dinâmica para o ChartContainer
+  const liberadosChartConfig = useMemo(() => {
+    const cores = ["#3b82f6", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#14b8a6"];
+    const config: any = {};
+    facilitiesDisponiveis.forEach((fac, i) => {
+      config[fac] = {
+        label: fac,
+        color: cores[i % cores.length],
+      };
+    });
+    return config;
+  }, [facilitiesDisponiveis]);
+
+  // Filtro para exibir apenas a facility selecionada (ou todas)
+  const filteredChartData = useMemo(() => {
+    if (chartFacility === "todas") return chartLiberadosData;
+    return chartLiberadosData.map(entry => ({
+      date: entry.date,
+      [chartFacility]: entry[chartFacility] || 0,
+    }));
+  }, [chartLiberadosData, chartFacility]);
+
+  // Áreas que devem aparecer
+  const areasAtivas = chartFacility === "todas" ? facilitiesDisponiveis : [chartFacility];
 
   if (loading) {
     return (
@@ -408,37 +497,86 @@ export default function AnalyserPage() {
           </Card>
         )}
 
-        {/* Cards de métricas – sem DrawerTrigger, abrimos o Drawer controlado */}
+        {/* Cards de métricas */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            title="Total"
-            value={stats.total}
-            subtitle="viagens"
-            icon={<Activity className="h-5 w-5" />}
-            onClick={() => abrirDetalhes("Todas as viagens", carregamentos)}
-          />
-          <MetricCard
-            title="Em Andamento"
-            value={stats.emFila + stats.carregando}
-            subtitle={`${stats.emFila} fila, ${stats.carregando} carregando`}
-            icon={<Truck className="h-5 w-5" />}
-            onClick={() => abrirDetalhes("Em andamento", carregamentos.filter(c => !c.finalizado))}
-          />
-          <MetricCard
-            title="Concluídos"
-            value={stats.finalizados}
-            subtitle={`${stats.liberados} liberados`}
-            icon={<CheckCircle className="h-5 w-5" />}
-            onClick={() => abrirDetalhes("Concluídos", carregamentos.filter(c => c.finalizado))}
-          />
-          <MetricCard
-            title="Volumes"
-            value={stats.gaiolas}
-            subtitle={`${stats.volumosos} vol. / ${stats.manga} manga`}
-            icon={<Box className="h-5 w-5" />}
-            onClick={() => abrirDetalhes("Com carga", carregamentos.filter(c => parseInt(c.carga?.gaiolas) > 0))}
-          />
+          <MetricCard title="Total" value={stats.total} subtitle="viagens" icon={<Activity className="h-5 w-5" />} onClick={() => abrirDetalhes("Todas as viagens", carregamentos)} />
+          <MetricCard title="Em Andamento" value={stats.emFila + stats.carregando} subtitle={`${stats.emFila} fila, ${stats.carregando} carregando`} icon={<Truck className="h-5 w-5" />} onClick={() => abrirDetalhes("Em andamento", carregamentos.filter(c => !c.finalizado))} />
+          <MetricCard title="Concluídos" value={stats.finalizados} subtitle={`${stats.liberados} liberados`} icon={<CheckCircle className="h-5 w-5" />} onClick={() => abrirDetalhes("Concluídos", carregamentos.filter(c => c.finalizado))} />
+          <MetricCard title="Volumes" value={stats.gaiolas} subtitle={`${stats.volumosos} vol. / ${stats.manga} manga`} icon={<Box className="h-5 w-5" />} onClick={() => abrirDetalhes("Com carga", carregamentos.filter(c => parseInt(c.carga?.gaiolas) > 0))} />
         </div>
+
+                  {/* ---- NOVO: Gráfico interativo de liberados por facility ---- */}
+          <Card>
+            <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
+              <div className="grid flex-1 gap-1">
+                <CardTitle>Liberações diárias por Facility</CardTitle>
+                <CardDescription>
+                  {chartFacility === "todas"
+                    ? "Veículos liberados por dia (todas as facilities)"
+                    : `Veículos liberados por dia – ${chartFacility}`}
+                </CardDescription>
+              </div>
+              <Select value={chartFacility} onValueChange={setChartFacility}>
+                <SelectTrigger className="w-[180px] rounded-lg sm:ml-auto">
+                  <SelectValue placeholder="Selecione a facility" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="todas" className="rounded-lg">Todas</SelectItem>
+                  {facilitiesDisponiveis.map(fac => (
+                    <SelectItem key={fac} value={fac} className="rounded-lg">{fac}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+              <ChartContainer config={liberadosChartConfig} className="aspect-auto h-[250px] w-full">
+                <AreaChart data={filteredChartData}>
+                  <defs>
+                    {areasAtivas.map(fac => (
+                      <linearGradient key={fac} id={`fill-${fac}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={`var(--color-${fac})`} stopOpacity={0.1} />
+                        <stop offset="95%" stopColor={`var(--color-${fac})`} stopOpacity={0.0} />
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    minTickGap={32}
+                    tickFormatter={(value) => {
+                      const date = new Date(value + "T00:00:00-03:00");
+                      return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+                    }}
+                  />
+                  <ChartTooltip
+                    cursor={false}
+                    content={
+                      <ChartTooltipContent
+                        labelFormatter={(value) => {
+                          const date = new Date(value + "T00:00:00-03:00");
+                          return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+                        }}
+                        indicator="dot"
+                      />
+                    }
+                  />
+                  {areasAtivas.map(fac => (
+                    <Area
+                      key={fac}
+                      dataKey={fac}
+                      type="natural"
+                      fill={`url(#fill-${fac})`}
+                      stroke={`var(--color-${fac})`}
+                    />
+                  ))}
+                  {chartFacility === "todas" && <ChartLegend content={<ChartLegendContent />} />}
+                </AreaChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
 
         {/* Abas */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -452,10 +590,7 @@ export default function AnalyserPage() {
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
-                <CardHeader>
-                  <CardTitle>Distribuição de Status</CardTitle>
-                  <CardDescription>Visão atual do fluxo</CardDescription>
-                </CardHeader>
+                <CardHeader><CardTitle>Distribuição de Status</CardTitle><CardDescription>Visão atual do fluxo</CardDescription></CardHeader>
                 <CardContent>
                   <ChartContainer config={{}} className="h-80 w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -465,9 +600,7 @@ export default function AnalyserPage() {
                         <YAxis allowDecimals={false} />
                         <ChartTooltip content={<ChartTooltipContent />} />
                         <Bar dataKey="value" name="Viagens">
-                          {statusData.map((entry, i) => (
-                            <Cell key={i} fill={entry.color} />
-                          ))}
+                          {statusData.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -477,16 +610,17 @@ export default function AnalyserPage() {
 
               {trendData.length > 1 && (
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Tendência Diária</CardTitle>
-                    <CardDescription>Viagens por dia no período</CardDescription>
-                  </CardHeader>
+                  <CardHeader><CardTitle>Tendência Diária</CardTitle><CardDescription>Viagens por dia no período</CardDescription></CardHeader>
                   <CardContent>
                     <ChartContainer config={{}} className="h-80 w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={trendData}>
                           <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
+                          <XAxis dataKey="date"
+                            tickFormatter={(value) => {
+                              const [year, month, day] = value.split("-");
+                              return `${day}/${month}`;
+                            }} />
                           <YAxis allowDecimals={false} />
                           <ChartTooltip content={<ChartTooltipContent />} />
                           <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2} name="Viagens" />
@@ -502,26 +636,16 @@ export default function AnalyserPage() {
           <TabsContent value="times" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>Tempo Médio de Carregamento</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>Tempo Médio de Carregamento</CardTitle></CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold">
-                    {stats.tempoCar !== null ? `${Math.floor(stats.tempoCar / 60)}h ${stats.tempoCar % 60}m` : "--"}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Baseado em {carregamentos.filter(c => c.horarios?.inicioCarregamento && c.horarios?.terminoCarregamento).length} registros
-                  </p>
+                  <div className="text-3xl font-bold">{stats.tempoCar !== null ? `${Math.floor(stats.tempoCar / 60)}h ${stats.tempoCar % 60}m` : "--"}</div>
+                  <p className="text-sm text-muted-foreground mt-1">Baseado em {carregamentos.filter(c => c.horarios?.inicioCarregamento && c.horarios?.terminoCarregamento).length} registros</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader>
-                  <CardTitle>Tempo Médio de Espera</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>Tempo Médio de Espera</CardTitle></CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold">
-                    {stats.tempoEsp !== null ? `${Math.floor(stats.tempoEsp / 60)}h ${stats.tempoEsp % 60}m` : "--"}
-                  </div>
+                  <div className="text-3xl font-bold">{stats.tempoEsp !== null ? `${Math.floor(stats.tempoEsp / 60)}h ${stats.tempoEsp % 60}m` : "--"}</div>
                 </CardContent>
               </Card>
             </div>
@@ -530,27 +654,14 @@ export default function AnalyserPage() {
           <TabsContent value="distribution" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
-                <CardHeader>
-                  <CardTitle>Destinos</CardTitle>
-                  <CardDescription>Clique na fatia para detalhar</CardDescription>
-                </CardHeader>
+                <CardHeader><CardTitle>Destinos</CardTitle><CardDescription>Clique na fatia para detalhar</CardDescription></CardHeader>
                 <CardContent>
                   <ChartContainer config={{}} className="h-80 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie
-                          data={destinosPie}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={100}
-                          label
-                          onClick={(e) => abrirDetalhes(`Destino: ${e.name}`, carregamentos.filter(c => getNomeDestino(c.destino) === e.name))}
-                        >
-                          {destinosPie.map((_, i) => (
-                            <Cell key={i} fill={`hsl(${i * 40}, 70%, 60%)`} />
-                          ))}
+                        <Pie data={destinosPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label
+                          onClick={(e) => abrirDetalhes(`Destino: ${e.name}`, carregamentos.filter(c => getNomeDestino(c.destino) === e.name))}>
+                          {destinosPie.map((_, i) => (<Cell key={i} fill={`hsl(${i * 40}, 70%, 60%)`} />))}
                         </Pie>
                         <ChartTooltip content={<ChartTooltipContent />} />
                       </PieChart>
@@ -559,9 +670,7 @@ export default function AnalyserPage() {
                 </CardContent>
               </Card>
               <Card>
-                <CardHeader>
-                  <CardTitle>Tipos de Veículo</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>Tipos de Veículo</CardTitle></CardHeader>
                 <CardContent>
                   <ChartContainer config={{}} className="h-80 w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -581,20 +690,12 @@ export default function AnalyserPage() {
 
           <TabsContent value="history">
             <Card>
-              <CardHeader>
-                <CardTitle>Últimos Carregamentos</CardTitle>
-                <CardDescription>{carregamentos.length} registros no período</CardDescription>
-              </CardHeader>
+              <CardHeader><CardTitle>Últimos Carregamentos</CardTitle><CardDescription>{carregamentos.length} registros no período</CardDescription></CardHeader>
               <CardContent className="overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Travel ID</TableHead>
-                      <TableHead>Destino</TableHead>
-                      <TableHead>Motorista</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Saída</TableHead>
-                      <TableHead>Previsão</TableHead>
+                      <TableHead>Travel ID</TableHead><TableHead>Destino</TableHead><TableHead>Motorista</TableHead><TableHead>Status</TableHead><TableHead>Saída</TableHead><TableHead>Previsão</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -618,6 +719,7 @@ export default function AnalyserPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
       </main>
 
       {/* Drawer único (sem hook use-mobile) */}
@@ -626,9 +728,7 @@ export default function AnalyserPage() {
           <DrawerHeader className="flex items-center justify-between border-b pb-3">
             <div>
               <DrawerTitle>{drawerTitle}</DrawerTitle>
-              <DrawerDescription>
-                {drawerData.length} registro{drawerData.length !== 1 ? "s" : ""}
-              </DrawerDescription>
+              <DrawerDescription>{drawerData.length} registro{drawerData.length !== 1 ? "s" : ""}</DrawerDescription>
             </div>
             <Button variant="ghost" size="icon" onClick={() => setDrawerOpen(false)}>
               <X className="h-5 w-5" />
