@@ -215,7 +215,7 @@ function DestinoContent() {
     if (existingData) {
       const statusCorrigido =
         existingData.horarios?.encostadoDoca &&
-        existingData.horarios.encostadoDoca.trim() !== ""
+          existingData.horarios.encostadoDoca.trim() !== ""
           ? "carregando"
           : existingData.status || "emFila";
       setCarregamentoData({
@@ -246,35 +246,65 @@ function DestinoContent() {
     }
   };
 
+      const enviarIncremental = async (
+      motoristaId: string,
+      payload: Partial<CarregamentoData> & { status?: string; timestamps?: any }
+    ) => {
+      try {
+        await fetch('/api/carregamento', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ motoristaId, ...payload }),
+        });
+      } catch (error) {
+        console.warn('Erro ao enviar parcialmente, dados permanecem no localStorage', error);
+      }
+    };
+
   const handleCloseModal = () => {
     setActiveModal(null);
     setSelectedMotorista(null);
     setCarregamentoData(null);
   };
 
-  const handleSaveModal = () => {
-    if (!selectedMotorista || !carregamentoData) return;
+ const handleSaveModal = () => {
+  if (!selectedMotorista || !carregamentoData) return;
 
-    const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
+  const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
+  const agora = new Date().toISOString();
 
-    let dadosAtualizados = { ...carregamentoData };
+  let dadosAtualizados = { ...carregamentoData };
+  let timestamps = { ...carregamentoData.timestamps }; // Preserva timestamps existentes
 
-    if (
-      (activeModal === "horarios" ||
-        activeModal === "carga" ||
-        activeModal === "lacres") &&
-      carregamentoData.horarios.encostadoDoca?.trim() !== ""
-    ) {
+  // ─── Determina novo status e timestamps ──────────────────
+
+  // 1. Modal "doca": transição para "emDoca"
+  if (activeModal === "doca") {
+    if (dadosAtualizados.doca && dadosAtualizados.status !== "carregando" && dadosAtualizados.status !== "liberado") {
+      dadosAtualizados.status = "emDoca";
+      if (!timestamps.aguardando) {
+        timestamps.aguardando = dadosAtualizados.timestamp; // timestamp inicial do carregamento
+      }
+      if (!timestamps.emDoca) {
+        timestamps.emDoca = agora;
+      }
+    }
+  }
+  // 2. Outros modais (horarios, carga, lacres): transição para "carregando" ou "liberado"
+  else if (activeModal === "horarios" || activeModal === "carga" || activeModal === "lacres") {
+    if (dadosAtualizados.horarios?.encostadoDoca?.trim() !== "") {
       const saidaLiberada =
-        carregamentoData.horarios.saidaLiberada?.trim() &&
-        carregamentoData.lacres.traseiro?.trim();
+        dadosAtualizados.horarios?.saidaLiberada?.trim() &&
+        dadosAtualizados.lacres?.traseiro?.trim();
 
       if (saidaLiberada) {
-        // --- STATUS LIBERADO ---
+        // Liberado
+        dadosAtualizados.status = "liberado";
+
+        // Posição do veículo
         const chaveCarregamentos = `carregamentos_${destinoCodigo}_${facility}`;
         const carregamentosSalvos = localStorage.getItem(chaveCarregamentos);
         let liberadosCount = 0;
-
         if (carregamentosSalvos) {
           try {
             const parsed = JSON.parse(carregamentosSalvos);
@@ -286,41 +316,55 @@ function DestinoContent() {
             console.error("Erro ao ler carregamentos salvos:", e);
           }
         }
+        dadosAtualizados.posicaoVeiculo = liberadosCount + 1;
 
-        const novaPosicao = liberadosCount + 1;
-
-        dadosAtualizados = {
-          ...carregamentoData,
-          status: "liberado",
-          posicaoVeiculo: novaPosicao,
-        };
+        // Timestamps: garante que todos os anteriores estejam preenchidos
+        timestamps.aguardando = timestamps.aguardando || dadosAtualizados.timestamp;
+        timestamps.emDoca = timestamps.emDoca || agora;
+        timestamps.carregando = timestamps.carregando || agora;
+        timestamps.finalizado = agora;
       } else {
-        // --- STATUS CARREGANDO ---
-        dadosAtualizados = {
-          ...carregamentoData,
-          status: "carregando",
-          posicaoVeiculo: undefined, // ✅ em vez de delete
-        };
+        // Carregando
+        dadosAtualizados.status = "carregando";
+        dadosAtualizados.posicaoVeiculo = undefined;
+
+        timestamps.aguardando = timestamps.aguardando || dadosAtualizados.timestamp;
+        timestamps.emDoca = timestamps.emDoca || agora;
+        if (!timestamps.carregando) {
+          timestamps.carregando = agora;
+        }
       }
     } else {
-      // Se a condição não for atendida, mantém o status atual, mas remove a posição se não for liberado
+      // Se não tem encostadoDoca, remove posicaoVeiculo se não for liberado
       if (dadosAtualizados.status !== "liberado") {
-        dadosAtualizados.posicaoVeiculo = undefined; // ✅ em vez de delete
+        dadosAtualizados.posicaoVeiculo = undefined;
       }
     }
+  }
 
-    const updatedCarregamentos = {
-      ...carregamentos,
-      [motoristaId]: dadosAtualizados,
-    };
+  // Atualiza os timestamps no objeto
+  dadosAtualizados.timestamp = timestamps;
 
-    setCarregamentos(updatedCarregamentos);
-    localStorage.setItem(
-      `carregamentos_${destinoCodigo}_${facility}`,
-      JSON.stringify(updatedCarregamentos),
-    );
-    handleCloseModal();
+  // ─── Envio incrementtal para o banco ───────────────────
+  enviarIncremental(motoristaId, {
+    ...dadosAtualizados,
+    status: dadosAtualizados.status,
+  });
+
+  // ─── Atualização do localStorage ───────────────────────
+  const updatedCarregamentos = {
+    ...carregamentos,
+    [motoristaId]: dadosAtualizados,
   };
+
+  setCarregamentos(updatedCarregamentos);
+  localStorage.setItem(
+    `carregamentos_${destinoCodigo}_${facility}`,
+    JSON.stringify(updatedCarregamentos),
+  );
+
+  handleCloseModal();
+};
 
   const handleDocaChange = (value: string) => {
     if (carregamentoData) {
@@ -443,6 +487,7 @@ function DestinoContent() {
         horasAdicionais = 0;
     }
 
+
     const saida = new Date();
     saida.setHours(hours + horasAdicionais, minutes);
 
@@ -541,11 +586,10 @@ function DestinoContent() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setFilter("active")}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
-                    filter === "active"
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${filter === "active"
                       ? "bg-blue-600 text-white shadow-md"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
+                    }`}
                 >
                   🚛 Pendentes
                   <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
@@ -560,11 +604,10 @@ function DestinoContent() {
                 </button>
                 <button
                   onClick={() => setFilter("finalized")}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
-                    filter === "finalized"
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${filter === "finalized"
                       ? "bg-gray-700 text-white shadow-md"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
+                    }`}
                 >
                   ✅ Finalizados
                   <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
@@ -594,13 +637,12 @@ function DestinoContent() {
                   <div
                     key={index}
                     className={`bg-white rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 p-6 text-left group
-                    ${
-                      dadosCarregamento?.status === "carregando"
+                    ${dadosCarregamento?.status === "carregando"
                         ? "border-orange-400"
                         : dadosCarregamento?.status === "liberado"
                           ? "border-green-500"
                           : "border-gray-200"
-                    }
+                      }
                     `}
                   >
                     <div
@@ -619,13 +661,12 @@ function DestinoContent() {
                         <div className="flex items-center space-x-3">
                           <div className="w-12 h-12 bg-linear-to-br from-blue-100 to-blue-50 rounded-lg flex items-center justify-center">
                             <Users
-                              className={`w-6 h-6 ${
-                                dadosCarregamento?.status === "carregando"
+                              className={`w-6 h-6 ${dadosCarregamento?.status === "carregando"
                                   ? "text-orange-500"
                                   : dadosCarregamento?.status === "liberado"
                                     ? "text-green-500"
                                     : "text-blue-600"
-                              }`}
+                                }`}
                             />
                           </div>
                           <div>
@@ -698,11 +739,10 @@ function DestinoContent() {
                             e.stopPropagation();
                             handleOpenModal("doca", motorista);
                           }}
-                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
-                            dadosCarregamento?.doca
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${dadosCarregamento?.doca
                               ? "bg-blue-100 text-blue-700 border border-blue-300"
                               : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
-                          }`}
+                            }`}
                         >
                           <DoorClosed className="w-4 h-4" />
                           {dadosCarregamento?.doca
@@ -717,13 +757,12 @@ function DestinoContent() {
                             e.stopPropagation();
                             handleOpenModal("carga", motorista);
                           }}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                            dadosCarregamento?.carga?.gaiolas &&
-                            dadosCarregamento?.carga?.volumosos &&
-                            dadosCarregamento?.carga?.manga
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${dadosCarregamento?.carga?.gaiolas &&
+                              dadosCarregamento?.carga?.volumosos &&
+                              dadosCarregamento?.carga?.manga
                               ? "bg-green-100 text-green-700 border border-green-300"
                               : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
-                          }`}
+                            }`}
                         >
                           <Box className="w-4 h-4" />
                           Carga
@@ -734,11 +773,10 @@ function DestinoContent() {
                             e.stopPropagation();
                             handleOpenModal("horarios", motorista);
                           }}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                            dadosCarregamento?.horarios?.encostadoDoca
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${dadosCarregamento?.horarios?.encostadoDoca
                               ? "bg-orange-100 text-orange-700 border border-orange-300"
                               : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
-                          }`}
+                            }`}
                         >
                           <Clock className="w-4 h-4" />
                           Horários
@@ -749,11 +787,10 @@ function DestinoContent() {
                             e.stopPropagation();
                             handleOpenModal("lacres", motorista);
                           }}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                            dadosCarregamento?.lacres?.traseiro
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${dadosCarregamento?.lacres?.traseiro
                               ? "bg-purple-100 text-purple-700 border border-purple-300"
                               : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
-                          }`}
+                            }`}
                         >
                           <Tag className="w-4 h-4" />
                           Lacres
@@ -812,11 +849,10 @@ function DestinoContent() {
                   <button
                     key={num}
                     onClick={() => handleDocaChange(num.toString())}
-                    className={`p-3 text-center rounded-lg border-2 transition-all ${
-                      carregamentoData.doca === num.toString()
+                    className={`p-3 text-center rounded-lg border-2 transition-all ${carregamentoData.doca === num.toString()
                         ? "bg-blue-600 text-white border-blue-600"
                         : "bg-gray-100 border-gray-300 hover:bg-gray-200"
-                    }`}
+                      }`}
                   >
                     {num}
                   </button>
@@ -1049,11 +1085,10 @@ function DestinoContent() {
                         handleLacreChange("traseiro", e.target.value)
                       }
                       placeholder="Ex: 4476646"
-                      className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${
-                        carregamentoData.lacres.traseiro.length === 7
+                      className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${carregamentoData.lacres.traseiro.length === 7
                           ? "border-green-500 bg-green-50"
                           : "border-gray-300"
-                      }`}
+                        }`}
                       maxLength={7}
                       inputMode="numeric"
                     />
@@ -1089,11 +1124,10 @@ function DestinoContent() {
                         handleLacreChange("lateral1", e.target.value)
                       }
                       placeholder="Ex: 4476647"
-                      className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${
-                        carregamentoData.lacres.lateral1.length === 7
+                      className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${carregamentoData.lacres.lateral1.length === 7
                           ? "border-green-500 bg-green-50"
                           : "border-gray-300"
-                      }`}
+                        }`}
                       maxLength={7}
                       inputMode="numeric"
                     />
@@ -1129,11 +1163,10 @@ function DestinoContent() {
                         handleLacreChange("lateral2", e.target.value)
                       }
                       placeholder="Ex: 4476649"
-                      className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${
-                        carregamentoData.lacres.lateral2.length === 7
+                      className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${carregamentoData.lacres.lateral2.length === 7
                           ? "border-green-500 bg-green-50"
                           : "border-gray-300"
-                      }`}
+                        }`}
                       maxLength={7}
                       inputMode="numeric"
                     />

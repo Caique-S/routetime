@@ -218,7 +218,9 @@ export default function Home() {
               <h3 className="text-xl font-bold text-gray-900 mb-3">
                 Expedição
               </h3>
-              <p className="text-gray-600 mb-6">Carregamento</p>
+              <p className="text-gray-600 mb-6">
+                Gerencie as rotas disponíveis para Expedir.
+              </p>
 
               <div className="flex items-center text-blue-600 font-medium">
                 <span>Acessar</span>
@@ -259,8 +261,7 @@ export default function Home() {
                 Dashboard
               </h3>
               <p className="text-gray-600 mb-6">
-                Visualize métricas detalhadas das operações. Acompanhe o
-                desempenho em tempo real.
+                Visualize métricas detalhadas das operações.
               </p>
 
               <div className="flex items-center text-green-600 font-medium">
@@ -301,8 +302,7 @@ export default function Home() {
                 Gerenciamento de Operações
               </h3>
               <p className="text-gray-600 mb-6">
-                Gerencie as operações de carregamento. Acompanhe o status em
-                tempo real.
+                Gerencie as expedições. Acompanhe o status em tempo real.
               </p>
 
               <div className="flex items-center text-orange-600 font-medium">
@@ -329,8 +329,8 @@ export default function Home() {
           {/* Card Upload CSV */}
           <Link href="/carregamento/upload" passHref>
             <div
-              className={`bg-white rounded-2xl shadow-xl p-8 border border-gray-200/50 hover:shadow-2xl hover:border-purple-300 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer ${activeCard === 2 ? "ring-2 ring-purple-500 ring-opacity-50" : ""}`}
-              onMouseEnter={() => handleCardHover(2)}
+              className={`bg-white rounded-2xl shadow-xl p-8 border border-gray-200/50 hover:shadow-2xl hover:border-purple-300 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer ${activeCard === 3 ? "ring-2 ring-purple-500 ring-opacity-50" : ""}`}
+              onMouseEnter={() => handleCardHover(3)}
               onMouseLeave={handleCardLeave}
             >
               <div className="relative mb-6">

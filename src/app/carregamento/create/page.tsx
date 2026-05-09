@@ -504,9 +504,9 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
 
       // 3. Enviar para o banco
       const response = await fetch("/api/carregamento", {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dadosParaBanco),
+        body: JSON.stringify({ ...dadosParaBanco, motoristaId }),
       });
 
       if (response.ok) {
@@ -564,11 +564,11 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
         dataEnvio: new Date().toISOString(),
       };
 
-      const response = await fetch("/api/carregamento", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dadosParaBanco),
-      });
+  const response = await fetch("/api/carregamento", {
+  method: "PUT",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ ...dadosParaBanco, motoristaId }),
+});
 
       if (response.ok) {
         // Marcar como finalizado no localStorage
@@ -790,7 +790,7 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
 
                     {carregamento.motorista.veiculoCarga &&
                       carregamento.motorista.veiculoCarga !==
-                        "Não especificado" && (
+                      "Não especificado" && (
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
                             <Truck className="w-4 h-4 text-green-600" />
@@ -988,22 +988,20 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
                 <button
                   disabled={isComplete}
                   onClick={handleNotUsed}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    isComplete
+                  className={`px-4 py-2 rounded-lg transition-colors ${isComplete
                       ? "bg-gray-200 text-gray-500 cursor-not-allowed"
                       : "bg-red-500 text-white "
-                  }`}
+                    }`}
                 >
                   {copiado === "notused" ? "Copiado!" : "Not Used"}
                 </button>
                 <button
                   onClick={handleFinalizar}
                   disabled={!isComplete}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    isComplete
+                  className={`px-4 py-2 rounded-lg transition-colors ${isComplete
                       ? "bg-green-600 text-white hover:bg-green-700"
                       : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                  }`}
+                    }`}
                 >
                   Finalizar Carregamento
                 </button>

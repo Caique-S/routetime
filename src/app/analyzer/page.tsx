@@ -12,8 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Drawer,
-  DrawerClose,
+  Drawer, 
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
@@ -69,6 +68,7 @@ import {
   Activity,
   X,
 } from "lucide-react";
+import KanbanBoard from "./kanban-board";
 
 // ---------- Interfaces ----------
 interface CarregamentoData {
@@ -109,6 +109,18 @@ interface CarregamentoData {
   timestamp: string;
   finalizado?: boolean;
   dataCriacao?: string;
+  timestamps?: {
+    aguardando?: string;   // ISO
+    emDoca?: string;
+    carregando?: string;
+    finalizado?: string;
+  };
+  tempos?: {
+    aguardando?: number;   // segundos
+    emDoca?: number;
+    carregando?: number;
+    total?: number;
+  };
 }
 
 // ---------- Utilitários ----------
@@ -172,7 +184,8 @@ export default function AnalyserPage() {
   const [periodoPredefinido, setPeriodoPredefinido] = useState("hoje");
   const [dataInicio, setDataInicio] = useState(getTodayStr());
   const [dataFim, setDataFim] = useState(getTodayStr());
-  const [facilitySelecionada] = useState("");
+  const [facilitySelecionada, setFacilitySelecionada] = useState("");
+  const [kanbanFacility, setKanbanFacility] = useState<string>("todas");
 
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -183,6 +196,28 @@ export default function AnalyserPage() {
 
   // Filtro de facility para o gráfico de liberados
   const [chartFacility, setChartFacility] = useState("todas");
+
+/*  useEffect(() => {
+    async function loadInitialFacility() {
+      try {
+        const today = getTodayStr();
+        const res = await fetch(`/api/upload?date=${today}&limit=1`);
+        const json = await res.json();
+        if (json.success && json.data && json.data.length > 0) {
+          const upload = json.data[0];
+          if (upload.filterValue) {
+            setFacilitySelecionada(upload.filterValue);
+          }
+        }
+      } catch (e) {
+        console.warn("Falha ao obter facility inicial:", e);
+      }
+    }
+    loadInitialFacility();
+  }, []); // executa apenas na montagem
+
+  */
+
 
   // Atualiza datas conforme período
   useEffect(() => {
@@ -220,7 +255,7 @@ export default function AnalyserPage() {
       setLoading(true);
       setError(null);
 
-      const params = new URLSearchParams({ limit: "10000", facility: facilitySelecionada });
+      const params = new URLSearchParams({ limit: "10000" });
       let carregamentosApi: CarregamentoData[] = [];
       try {
         const res = await fetch(`/api/carregamento?${params}`);
@@ -269,7 +304,7 @@ export default function AnalyserPage() {
     } finally {
       setLoading(false);
     }
-  }, [dataInicio, dataFim, facilitySelecionada]);
+  }, [dataInicio, dataFim]);
 
   useEffect(() => { fetchDashboardData(); }, [fetchDashboardData]);
 
@@ -502,87 +537,88 @@ export default function AnalyserPage() {
           <MetricCard title="Total" value={stats.total} subtitle="viagens" icon={<Activity className="h-5 w-5" />} onClick={() => abrirDetalhes("Todas as viagens", carregamentos)} />
           <MetricCard title="Em Andamento" value={stats.emFila + stats.carregando} subtitle={`${stats.emFila} fila, ${stats.carregando} carregando`} icon={<Truck className="h-5 w-5" />} onClick={() => abrirDetalhes("Em andamento", carregamentos.filter(c => !c.finalizado))} />
           <MetricCard title="Concluídos" value={stats.finalizados} subtitle={`${stats.liberados} liberados`} icon={<CheckCircle className="h-5 w-5" />} onClick={() => abrirDetalhes("Concluídos", carregamentos.filter(c => c.finalizado))} />
-          <MetricCard title="Volumes" value={stats.gaiolas} subtitle={`${stats.volumosos} vol. / ${stats.manga} manga`} icon={<Box className="h-5 w-5" />} onClick={() => abrirDetalhes("Com carga", carregamentos.filter(c => parseInt(c.carga?.gaiolas) > 0))} />
+          <MetricCard title="Gaiolas" value={stats.gaiolas} subtitle={`${stats.volumosos} vol. / ${stats.manga} manga`} icon={<Box className="h-5 w-5" />} onClick={() => abrirDetalhes("Com carga", carregamentos.filter(c => parseInt(c.carga?.gaiolas) > 0))} />
         </div>
 
-                  {/* ---- NOVO: Gráfico interativo de liberados por facility ---- */}
-          <Card>
-            <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
-              <div className="grid flex-1 gap-1">
-                <CardTitle>Liberações diárias por Facility</CardTitle>
-                <CardDescription>
-                  {chartFacility === "todas"
-                    ? "Veículos liberados por dia (todas as facilities)"
-                    : `Veículos liberados por dia – ${chartFacility}`}
-                </CardDescription>
-              </div>
-              <Select value={chartFacility} onValueChange={setChartFacility}>
-                <SelectTrigger className="w-[180px] rounded-lg sm:ml-auto">
-                  <SelectValue placeholder="Selecione a facility" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="todas" className="rounded-lg">Todas</SelectItem>
-                  {facilitiesDisponiveis.map(fac => (
-                    <SelectItem key={fac} value={fac} className="rounded-lg">{fac}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardHeader>
-            <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-              <ChartContainer config={liberadosChartConfig} className="aspect-auto h-[250px] w-full">
-                <AreaChart data={filteredChartData}>
-                  <defs>
-                    {areasAtivas.map(fac => (
-                      <linearGradient key={fac} id={`fill-${fac}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={`var(--color-${fac})`} stopOpacity={0.1} />
-                        <stop offset="95%" stopColor={`var(--color-${fac})`} stopOpacity={0.0} />
-                      </linearGradient>
-                    ))}
-                  </defs>
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    minTickGap={32}
-                    tickFormatter={(value) => {
-                      const date = new Date(value + "T00:00:00-03:00");
-                      return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-                    }}
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={
-                      <ChartTooltipContent
-                        labelFormatter={(value) => {
-                          const date = new Date(value + "T00:00:00-03:00");
-                          return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-                        }}
-                        indicator="dot"
-                      />
-                    }
-                  />
+        {/* ---- NOVO: Gráfico interativo de liberados por facility ---- */}
+        <Card>
+          <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
+            <div className="grid flex-1 gap-1">
+              <CardTitle>Liberações diárias por Facility</CardTitle>
+              <CardDescription>
+                {chartFacility === "todas"
+                  ? "Veículos liberados por dia (todas as facilities)"
+                  : `Veículos liberados por dia – ${chartFacility}`}
+              </CardDescription>
+            </div>
+            <Select value={chartFacility} onValueChange={setChartFacility}>
+              <SelectTrigger className="w-[180px] rounded-lg sm:ml-auto">
+                <SelectValue placeholder="Selecione a facility" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="todas" className="rounded-lg">Todas</SelectItem>
+                {facilitiesDisponiveis.map(fac => (
+                  <SelectItem key={fac} value={fac} className="rounded-lg">{fac}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
+            <ChartContainer config={liberadosChartConfig} className="aspect-auto h-[250px] w-full">
+              <AreaChart data={filteredChartData}>
+                <defs>
                   {areasAtivas.map(fac => (
-                    <Area
-                      key={fac}
-                      dataKey={fac}
-                      type="natural"
-                      fill={`url(#fill-${fac})`}
-                      stroke={`var(--color-${fac})`}
-                    />
+                    <linearGradient key={fac} id={`fill-${fac}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={`var(--color-${fac})`} stopOpacity={0.1} />
+                      <stop offset="95%" stopColor={`var(--color-${fac})`} stopOpacity={0.0} />
+                    </linearGradient>
                   ))}
-                  {chartFacility === "todas" && <ChartLegend content={<ChartLegendContent />} />}
-                </AreaChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
+                </defs>
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  minTickGap={32}
+                  tickFormatter={(value) => {
+                    const date = new Date(value + "T00:00:00-03:00");
+                    return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+                  }}
+                />
+                <ChartTooltip
+                  cursor={false}
+                  content={
+                    <ChartTooltipContent
+                      labelFormatter={(value) => {
+                        const date = new Date(value + "T00:00:00-03:00");
+                        return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+                      }}
+                      indicator="dot"
+                    />
+                  }
+                />
+                {areasAtivas.map(fac => (
+                  <Area
+                    key={fac}
+                    dataKey={fac}
+                    type="natural"
+                    fill={`url(#fill-${fac})`}
+                    stroke={`var(--color-${fac})`}
+                  />
+                ))}
+                {chartFacility === "todas" && <ChartLegend content={<ChartLegendContent />} />}
+              </AreaChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
 
         {/* Abas */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full max-w-md mb-4">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="times">Tempos</TabsTrigger>
+            <TabsTrigger value="expedition">Tempo Médio</TabsTrigger>
+            <TabsTrigger value="kanban">📋 Expedição</TabsTrigger>
             <TabsTrigger value="distribution">Destinos</TabsTrigger>
             <TabsTrigger value="history">Histórico</TabsTrigger>
           </TabsList>
@@ -633,7 +669,7 @@ export default function AnalyserPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="times" className="space-y-6">
+          <TabsContent value="expedition" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
                 <CardHeader><CardTitle>Tempo Médio de Carregamento</CardTitle></CardHeader>
@@ -649,6 +685,26 @@ export default function AnalyserPage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="kanban">
+            <div className="flex items-center gap-4 mb-4">
+              <Select value={kanbanFacility} onValueChange={setKanbanFacility}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Escolha a facility" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  {facilitiesDisponiveis.map((fac) => (
+                    <SelectItem key={fac} value={fac}>{fac}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <KanbanBoard
+              dataInicio={dataInicio}
+              dataFim={dataFim}
+              facility={kanbanFacility === "todas" ? "" : kanbanFacility} />
           </TabsContent>
 
           <TabsContent value="distribution" className="space-y-6">
@@ -690,29 +746,74 @@ export default function AnalyserPage() {
 
           <TabsContent value="history">
             <Card>
-              <CardHeader><CardTitle>Últimos Carregamentos</CardTitle><CardDescription>{carregamentos.length} registros no período</CardDescription></CardHeader>
+              <CardHeader>
+                <CardTitle>Últimos Carregamentos</CardTitle>
+                <CardDescription>
+                  {carregamentos.length} registros no período
+                </CardDescription>
+              </CardHeader>
               <CardContent className="overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Travel ID</TableHead><TableHead>Destino</TableHead><TableHead>Motorista</TableHead><TableHead>Status</TableHead><TableHead>Saída</TableHead><TableHead>Previsão</TableHead>
+                      <TableHead>Travel ID</TableHead>
+                      <TableHead>Destino</TableHead>
+                      <TableHead>Motorista</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Posição</TableHead>
+                      <TableHead>Saída</TableHead>
+                      <TableHead>Previsão</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {carregamentos.slice(0, 50).map(c => (
-                      <TableRow key={c.id || c.motoristaId}>
-                        <TableCell className="font-mono text-xs">{c.motorista?.travelId || c.id?.substring(0, 8)}</TableCell>
-                        <TableCell>{getNomeDestino(c.destino)}</TableCell>
-                        <TableCell>{c.motorista?.nome}</TableCell>
-                        <TableCell>
-                          <Badge variant={c.status === "liberado" ? "default" : c.status === "carregando" ? "secondary" : "outline"}>
-                            {c.status === "liberado" ? "Liberado" : c.status === "carregando" ? "Carregando" : "Pendente"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{formatTime(c.horarios?.saidaLiberada || "")}</TableCell>
-                        <TableCell>{formatTime(c.horarios?.previsaoChegada || "")}</TableCell>
-                      </TableRow>
-                    ))}
+                    {/* Ordena pelo destino e posição do veículo */}
+                    {carregamentos
+                      .slice()
+                      .sort((a, b) => {
+                        const destinoA = getNomeDestino(a.destino).toLowerCase();
+                        const destinoB = getNomeDestino(b.destino).toLowerCase();
+                        if (destinoA < destinoB) return -1;
+                        if (destinoA > destinoB) return 1;
+                        const posA = a.posicaoVeiculo ?? Number.MAX_SAFE_INTEGER;
+                        const posB = b.posicaoVeiculo ?? Number.MAX_SAFE_INTEGER;
+                        return posA - posB;
+                      })
+                      .slice(0, 50)
+                      .map((c) => (
+                        <TableRow key={c.id || c.motoristaId}>
+                          <TableCell className="font-mono text-xs">
+                            {c.motorista?.travelId || c.id?.substring(0, 8)}
+                          </TableCell>
+                          <TableCell>{getNomeDestino(c.destino)}</TableCell>
+                          <TableCell>{c.motorista?.nome}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                c.status === "liberado"
+                                  ? "default"
+                                  : c.status === "carregando"
+                                    ? "secondary"
+                                    : "outline"
+                              }
+                            >
+                              {c.status === "liberado"
+                                ? "Liberado"
+                                : c.status === "not_used"
+                                  ? "Not_Used"
+                                  : c.status === "carregando"
+                                    ? "Carregando"
+                                    : "Pendente"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{c.posicaoVeiculo}</TableCell>
+                          <TableCell>
+                            {formatTime(c.horarios?.saidaLiberada || "")}
+                          </TableCell>
+                          <TableCell>
+                            {formatTime(c.horarios?.previsaoChegada || "")}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -776,6 +877,18 @@ function MetricCard({
 
 // ---------- Tabela de detalhes (reutilizável no Drawer) ----------
 function DetailTable({ data }: { data: CarregamentoData[] }) {
+  // Ordena primeiro por destino, depois por posição
+  const sortedData = [...data].sort((a, b) => {
+    const destinoA = getNomeDestino(a.destino).toLowerCase();
+    const destinoB = getNomeDestino(b.destino).toLowerCase();
+    if (destinoA < destinoB) return -1;
+    if (destinoA > destinoB) return 1;
+    // Mesmo destino → ordena pela posição (valores nulos vão para o fim)
+    const posA = a.posicaoVeiculo ?? Number.MAX_SAFE_INTEGER;
+    const posB = b.posicaoVeiculo ?? Number.MAX_SAFE_INTEGER;
+    return posA - posB;
+  });
+
   return (
     <div className="rounded-md border overflow-auto max-h-[60vh]">
       <Table>
@@ -784,6 +897,7 @@ function DetailTable({ data }: { data: CarregamentoData[] }) {
             <TableHead>Motorista</TableHead>
             <TableHead>Destino</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Posição</TableHead>
             <TableHead>Doca</TableHead>
             <TableHead>Saída</TableHead>
             <TableHead>Gaiolas</TableHead>
@@ -792,19 +906,34 @@ function DetailTable({ data }: { data: CarregamentoData[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((c) => (
+          {sortedData.map((c) => (
             <TableRow key={c.id || c.motoristaId}>
               <TableCell className="font-medium">{c.motorista?.nome}</TableCell>
               <TableCell>{getNomeDestino(c.destino)}</TableCell>
               <TableCell>
                 <Badge
-                  variant={c.status === "liberado" ? "default" : c.status === "carregando" ? "secondary" : "outline"}
+                  variant={
+                    c.status === "liberado"
+                      ? "default"
+                      : c.status === "carregando"
+                        ? "secondary"
+                        : "outline"
+                  }
                 >
-                  {c.status === "liberado" ? "Liberado" : c.status === "carregando" ? "Carregando" : "Pendente"}
+                  {c.status === "liberado"
+                    ? "Liberado"
+                    : c.status === "not_used"
+                      ? "Not_Used"
+                      : c.status === "carregando"
+                        ? "Carregando"
+                        : "Pendente"}
                 </Badge>
               </TableCell>
+              <TableCell>{c.posicaoVeiculo}</TableCell>
               <TableCell>{c.doca}</TableCell>
-              <TableCell>{formatTime(c.horarios?.saidaLiberada || "")}</TableCell>
+              <TableCell>
+                {formatTime(c.horarios?.saidaLiberada || "")}
+              </TableCell>
               <TableCell>{c.carga.gaiolas}</TableCell>
               <TableCell>{c.carga.volumosos}</TableCell>
               <TableCell>{c.carga.manga}</TableCell>
