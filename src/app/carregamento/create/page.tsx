@@ -511,6 +511,7 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
 
       if (response.ok) {
         // ✅ 4. Marcar como finalizado no localStorage
+
         const carregamentosStr = localStorage.getItem(chaveBase);
         if (carregamentosStr) {
           const carregamentos = JSON.parse(carregamentosStr);
@@ -522,7 +523,27 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
             localStorage.setItem(chaveBase, JSON.stringify(carregamentos));
           }
         }
+        // ↓ NOVO — avançar para finalizado com dados da carga
+        const carregamentosExistentes = JSON.parse(localStorage.getItem(chaveBase) || '{}');
+        const dbId = carregamentosExistentes[motoristaId]?._dbId;
 
+          if (dbId) {
+    // timestamps.finalizado é gravado em UTC
+    await fetch(`/api/carregamento/${dbId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'finalizado',
+        dadosAdicionais: {
+          carga:          carregamentoData.carga,
+          lacres:         carregamentoData.lacres,
+          horarios:       carregamentoData.horarios,
+          posicaoVeiculo: carregamentoData.posicaoVeiculo,
+        },
+      }),
+    });
+  }
+        
         // 5. Limpeza das chaves temporárias
         localStorage.removeItem("motoristaSelecionadoId");
         localStorage.removeItem("MotoristaSelecionado");
@@ -564,11 +585,11 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
         dataEnvio: new Date().toISOString(),
       };
 
-  const response = await fetch("/api/carregamento", {
-  method: "PUT",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ ...dadosParaBanco, motoristaId }),
-});
+      const response = await fetch("/api/carregamento", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...dadosParaBanco, motoristaId }),
+      });
 
       if (response.ok) {
         // Marcar como finalizado no localStorage
@@ -989,8 +1010,8 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
                   disabled={isComplete}
                   onClick={handleNotUsed}
                   className={`px-4 py-2 rounded-lg transition-colors ${isComplete
-                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                      : "bg-red-500 text-white "
+                    ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                    : "bg-red-500 text-white "
                     }`}
                 >
                   {copiado === "notused" ? "Copiado!" : "Not Used"}
@@ -999,8 +1020,8 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
                   onClick={handleFinalizar}
                   disabled={!isComplete}
                   className={`px-4 py-2 rounded-lg transition-colors ${isComplete
-                      ? "bg-green-600 text-white hover:bg-green-700"
-                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                    ? "bg-green-600 text-white hover:bg-green-700"
+                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
                     }`}
                 >
                   Finalizar Carregamento
