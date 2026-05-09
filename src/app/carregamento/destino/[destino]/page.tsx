@@ -23,7 +23,13 @@ import {
 } from "lucide-react";
 import QRScanner from "@/app/components/QrScanner";
 
-//  Interfaces
+// ─────────────────────────────────────────────────────────────
+// TIMEZONE — Brasil UTC-3
+// Timestamps são armazenados em UTC ISO (agora.toISOString()).
+// Exibição usa formatarHoraBrasil(iso) — converte UTC → Brasília.
+// ─────────────────────────────────────────────────────────────
+
+// ─── Interfaces ───────────────────────────────────────────────
 interface MotoristaInfo {
   nome: string;
   tipoVeiculo: string;
@@ -62,7 +68,64 @@ interface CarregamentoData {
   status: "emFila" | "carregando" | "liberado";
   posicaoVeiculo?: number;
   finalizado?: boolean;
+  // ↓ NOVO — timestamps das etapas do Kanban (UTC ISO)
+  timestamps?: Record<string, string>;
 }
+
+// ─── Helpers de localStorage para _dbId ───────────────────────
+// O _dbId é o _id do documento no MongoDB, necessário para o PATCH de etapas.
+// É salvo junto ao carregamento no localStorage após o primeiro POST/PUT.
+
+function salvarDbId(
+  destino: string,
+  facility: string,
+  motoristaId: string,
+  dbId: string
+): void {
+  try {
+    const chave = `carregamentos_${destino}_${facility}`;
+    const dados = JSON.parse(localStorage.getItem(chave) || "{}");
+    dados[motoristaId] = { ...dados[motoristaId], _dbId: dbId };
+    localStorage.setItem(chave, JSON.stringify(dados));
+  } catch (err) {
+    console.error("[salvarDbId] Erro:", err);
+  }
+}
+
+function lerDbId(
+  destino: string,
+  facility: string,
+  motoristaId: string
+): string | null {
+  try {
+    const chave = `carregamentos_${destino}_${facility}`;
+    const dados = JSON.parse(localStorage.getItem(chave) || "{}");
+    return dados[motoristaId]?._dbId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── PATCH de etapa para o Kanban (fire-and-forget) ───────────
+// Nunca bloqueia o fluxo principal. Falhas são logadas mas ignoradas.
+async function avancarEtapaKanban(
+  dbId: string,
+  status: "aguardando" | "emDoca" | "carregando" | "finalizado",
+  dadosAdicionais?: Record<string, any>
+): Promise<void> {
+  try {
+    await fetch(`/api/carregamento/${dbId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, dadosAdicionais }),
+    });
+  } catch (err) {
+    // Fire-and-forget: erro não afeta o fluxo principal
+    console.warn(`[avancarEtapaKanban] Falha ao avançar para "${status}":`, err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 
 function DestinoContent() {
   const router = useRouter();
@@ -204,6 +267,54 @@ function DestinoContent() {
     router.push("/carregamento/novo");
   };
 
+  // ─── Criação inicial no banco (POST) ──────────────────────────
+  // Chamada quando o operador abre o primeiro modal de um motorista.
+  // Grava status 'aguardando' + timestamps.aguardando no banco para
+  // que o Kanban já mostre o motorista na coluna correta.
+  // Fire-and-forget: falha não afeta o fluxo de trabalho.
+  const criarCarregamentoNoBanco = async (motorista: any): Promise<void> => {
+    const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
+
+    // Só cria se ainda não tiver _dbId salvo
+    const dbIdExistente = lerDbId(destinoCodigo, facility, motoristaId);
+    if (dbIdExistente) return;
+
+    try {
+      const res = await fetch("/api/carregamento", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destino: destinoCodigo,
+          facility,
+          motorista: {
+            nome:           motorista.nome,
+            travelId:       motorista.travelId,
+            tipoVeiculo:    motorista.tipoVeiculo,
+            veiculoTracao:  motorista.veiculoTracao,
+            veiculoCarga:   motorista.veiculoCarga,
+            placa:          motorista.placa,
+            transportadora: motorista.transportadora,
+            dataInicio:     motorista.dataInicio,
+          },
+          // status: 'aguardando' e timestamps.aguardando são definidos
+          // automaticamente pelo POST em /api/carregamento/route.ts
+        }),
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        const dbId: string = result.data._id ?? result.data.id;
+        if (dbId) {
+          salvarDbId(destinoCodigo, facility, motoristaId, dbId);
+          console.log(`[criarCarregamentoNoBanco] Criado — motoristaId: ${motoristaId}, dbId: ${dbId}`);
+        }
+      }
+    } catch (err) {
+      // Fire-and-forget: erro não bloqueia o operador
+      console.warn("[criarCarregamentoNoBanco] Falha (não crítica):", err);
+    }
+  };
+
   const handleOpenModal = (modal: string, motorista: any) => {
     setSelectedMotorista(motorista);
     setActiveModal(modal);
@@ -243,23 +354,46 @@ function DestinoContent() {
         status: "emFila",
         posicaoVeiculo: 0,
       });
+
+      // ↓ NOVO — primeira interação: criar no banco com status 'aguardando'
+      // Fire-and-forget, não bloqueia a abertura do modal
+      criarCarregamentoNoBanco(motorista);
     }
   };
 
-      const enviarIncremental = async (
-      motoristaId: string,
-      payload: Partial<CarregamentoData> & { status?: string; timestamps?: any }
-    ) => {
-      try {
-        await fetch('/api/carregamento', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ motoristaId, ...payload }),
-        });
-      } catch (error) {
-        console.warn('Erro ao enviar parcialmente, dados permanecem no localStorage', error);
+  // ─── Envio incremental existente (PUT upsert) ────────────────
+  // Mantido exatamente como era, com adição de captura do _dbId
+  // retornado pelo banco para uso posterior nos PATCHs de etapa.
+  const enviarIncremental = async (
+    motoristaId: string,
+    payload: Partial<CarregamentoData> & { status?: string; timestamps?: any }
+  ): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/carregamento", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ motoristaId, ...payload }),
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        // Captura o _id retornado pelo PUT (upsert) e salva no localStorage
+        const dbId: string | undefined = result.data?._id ?? result.data?.id;
+        if (dbId) {
+          // Extrai destino e facility do motoristaId (formato: destino_facility_nome_travelId)
+          // É mais seguro usar as variáveis de escopo que já temos
+          salvarDbId(destinoCodigo, facility, motoristaId, dbId);
+          return dbId;
+        }
       }
-    };
+    } catch (error) {
+      console.warn(
+        "Erro ao enviar parcialmente, dados permanecem no localStorage",
+        error
+      );
+    }
+    return null;
+  };
 
   const handleCloseModal = () => {
     setActiveModal(null);
@@ -267,104 +401,122 @@ function DestinoContent() {
     setCarregamentoData(null);
   };
 
- const handleSaveModal = () => {
-  if (!selectedMotorista || !carregamentoData) return;
+  const handleSaveModal = async () => {
+    if (!selectedMotorista || !carregamentoData) return;
 
-  const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
-  const agora = new Date().toISOString();
+    const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
+    const agora = new Date().toISOString();
 
-  let dadosAtualizados = { ...carregamentoData };
-  let timestamps = { ...carregamentoData.timestamps }; // Preserva timestamps existentes
+    let dadosAtualizados = { ...carregamentoData };
+    let timestamps = { ...carregamentoData.timestamps }; // Preserva timestamps existentes
 
-  // ─── Determina novo status e timestamps ──────────────────
+    // ─── Determina novo status e timestamps ──────────────────
 
-  // 1. Modal "doca": transição para "emDoca"
-  if (activeModal === "doca") {
-    if (dadosAtualizados.doca && dadosAtualizados.status !== "carregando" && dadosAtualizados.status !== "liberado") {
-      dadosAtualizados.status = "emDoca";
-      if (!timestamps.aguardando) {
-        timestamps.aguardando = dadosAtualizados.timestamp; // timestamp inicial do carregamento
-      }
-      if (!timestamps.emDoca) {
-        timestamps.emDoca = agora;
+    // 1. Modal "doca": transição para "emDoca"
+    if (activeModal === "doca") {
+      if (dadosAtualizados.doca && dadosAtualizados.status !== "carregando" && dadosAtualizados.status !== "liberado") {
+        dadosAtualizados.status = "emDoca" as any;
+        if (!timestamps.aguardando) {
+          timestamps.aguardando = dadosAtualizados.timestamp;
+        }
+        if (!timestamps.emDoca) {
+          timestamps.emDoca = agora;
+        }
       }
     }
-  }
-  // 2. Outros modais (horarios, carga, lacres): transição para "carregando" ou "liberado"
-  else if (activeModal === "horarios" || activeModal === "carga" || activeModal === "lacres") {
-    if (dadosAtualizados.horarios?.encostadoDoca?.trim() !== "") {
-      const saidaLiberada =
-        dadosAtualizados.horarios?.saidaLiberada?.trim() &&
-        dadosAtualizados.lacres?.traseiro?.trim();
+    // 2. Outros modais (horarios, carga, lacres)
+    else if (activeModal === "horarios" || activeModal === "carga" || activeModal === "lacres") {
+      if (dadosAtualizados.horarios?.encostadoDoca?.trim() !== "") {
+        const saidaLiberada =
+          dadosAtualizados.horarios?.saidaLiberada?.trim() &&
+          dadosAtualizados.lacres?.traseiro?.trim();
 
-      if (saidaLiberada) {
-        // Liberado
-        dadosAtualizados.status = "liberado";
+        if (saidaLiberada) {
+          // Liberado
+          dadosAtualizados.status = "liberado";
 
-        // Posição do veículo
-        const chaveCarregamentos = `carregamentos_${destinoCodigo}_${facility}`;
-        const carregamentosSalvos = localStorage.getItem(chaveCarregamentos);
-        let liberadosCount = 0;
-        if (carregamentosSalvos) {
-          try {
-            const parsed = JSON.parse(carregamentosSalvos);
-            liberadosCount = Object.entries(parsed).filter(
-              ([id, c]: [string, any]) =>
-                c.status === "liberado" && id !== motoristaId,
-            ).length;
-          } catch (e) {
-            console.error("Erro ao ler carregamentos salvos:", e);
+          const chaveCarregamentos = `carregamentos_${destinoCodigo}_${facility}`;
+          const carregamentosSalvos = localStorage.getItem(chaveCarregamentos);
+          let liberadosCount = 0;
+          if (carregamentosSalvos) {
+            try {
+              const parsed = JSON.parse(carregamentosSalvos);
+              liberadosCount = Object.entries(parsed).filter(
+                ([id, c]: [string, any]) =>
+                  c.status === "liberado" && id !== motoristaId,
+              ).length;
+            } catch (e) {
+              console.error("Erro ao ler carregamentos salvos:", e);
+            }
+          }
+          dadosAtualizados.posicaoVeiculo = liberadosCount + 1;
+
+          timestamps.aguardando = timestamps.aguardando || dadosAtualizados.timestamp;
+          timestamps.emDoca = timestamps.emDoca || agora;
+          timestamps.carregando = timestamps.carregando || agora;
+          timestamps.finalizado = agora;
+        } else {
+          // Carregando
+          dadosAtualizados.status = "carregando";
+          dadosAtualizados.posicaoVeiculo = undefined;
+
+          timestamps.aguardando = timestamps.aguardando || dadosAtualizados.timestamp;
+          timestamps.emDoca = timestamps.emDoca || agora;
+          if (!timestamps.carregando) {
+            timestamps.carregando = agora;
           }
         }
-        dadosAtualizados.posicaoVeiculo = liberadosCount + 1;
-
-        // Timestamps: garante que todos os anteriores estejam preenchidos
-        timestamps.aguardando = timestamps.aguardando || dadosAtualizados.timestamp;
-        timestamps.emDoca = timestamps.emDoca || agora;
-        timestamps.carregando = timestamps.carregando || agora;
-        timestamps.finalizado = agora;
       } else {
-        // Carregando
-        dadosAtualizados.status = "carregando";
-        dadosAtualizados.posicaoVeiculo = undefined;
-
-        timestamps.aguardando = timestamps.aguardando || dadosAtualizados.timestamp;
-        timestamps.emDoca = timestamps.emDoca || agora;
-        if (!timestamps.carregando) {
-          timestamps.carregando = agora;
+        if (dadosAtualizados.status !== "liberado") {
+          dadosAtualizados.posicaoVeiculo = undefined;
         }
       }
-    } else {
-      // Se não tem encostadoDoca, remove posicaoVeiculo se não for liberado
-      if (dadosAtualizados.status !== "liberado") {
-        dadosAtualizados.posicaoVeiculo = undefined;
+    }
+
+    // Atualiza os timestamps no objeto
+    dadosAtualizados.timestamps = timestamps;
+
+    // ─── Envio incremental para o banco (PUT upsert — fluxo original) ───
+    const dbId = await enviarIncremental(motoristaId, {
+      ...dadosAtualizados,
+      status: dadosAtualizados.status,
+    });
+
+    // ─── PATCH de etapa para o Kanban (fire-and-forget) ─────────────────
+    // Usa o _dbId capturado acima ou o que já estava salvo no localStorage.
+    // Nunca bloqueia o salvamento, mesmo se o PATCH falhar.
+    const dbIdParaPatch = dbId ?? lerDbId(destinoCodigo, facility, motoristaId);
+
+    if (dbIdParaPatch) {
+      // Modal "doca": avança Kanban → emDoca
+      if (activeModal === "doca" && dadosAtualizados.doca) {
+        avancarEtapaKanban(dbIdParaPatch, "emDoca", { doca: dadosAtualizados.doca });
+      }
+
+      // Modal "horarios": avança Kanban → carregando
+      // Condição: inicioCarregamento foi preenchido nesta sessão
+      else if (
+        activeModal === "horarios" &&
+        dadosAtualizados.horarios?.inicioCarregamento?.trim()
+      ) {
+        avancarEtapaKanban(dbIdParaPatch, "carregando");
       }
     }
-  }
 
-  // Atualiza os timestamps no objeto
-  dadosAtualizados.timestamp = timestamps;
+    // ─── Atualização do localStorage (fluxo original) ────────────────────
+    const updatedCarregamentos = {
+      ...carregamentos,
+      [motoristaId]: dadosAtualizados,
+    };
 
-  // ─── Envio incrementtal para o banco ───────────────────
-  enviarIncremental(motoristaId, {
-    ...dadosAtualizados,
-    status: dadosAtualizados.status,
-  });
+    setCarregamentos(updatedCarregamentos);
+    localStorage.setItem(
+      `carregamentos_${destinoCodigo}_${facility}`,
+      JSON.stringify(updatedCarregamentos),
+    );
 
-  // ─── Atualização do localStorage ───────────────────────
-  const updatedCarregamentos = {
-    ...carregamentos,
-    [motoristaId]: dadosAtualizados,
+    handleCloseModal();
   };
-
-  setCarregamentos(updatedCarregamentos);
-  localStorage.setItem(
-    `carregamentos_${destinoCodigo}_${facility}`,
-    JSON.stringify(updatedCarregamentos),
-  );
-
-  handleCloseModal();
-};
 
   const handleDocaChange = (value: string) => {
     if (carregamentoData) {
@@ -440,13 +592,8 @@ function DestinoContent() {
 
   const handleQRScan = (result: string) => {
     if (activeQRField && carregamentoData) {
-      // Extrair apenas números do QR Code e limitar a 7 dígitos
       const numericResult = result.replace(/\D/g, "").slice(0, 7);
-
-      // Atualizar o campo específico
       handleLacreChange(activeQRField, numericResult);
-
-      // Fechar o scanner
       setShowQRScanner(false);
       setActiveQRField(null);
     }
@@ -486,7 +633,6 @@ function DestinoContent() {
       default:
         horasAdicionais = 0;
     }
-
 
     const saida = new Date();
     saida.setHours(hours + horasAdicionais, minutes);
@@ -531,10 +677,8 @@ function DestinoContent() {
     const dados = carregamentos[motoristaId];
 
     if (filter === "active") {
-      // Em andamento: não finalizados OU sem registro (nunca foram finalizados)
       return !dados?.finalizado;
     } else {
-      // Finalizados: possuem a flag finalizado = true
       return dados?.finalizado === true;
     }
   });
@@ -648,7 +792,6 @@ function DestinoContent() {
                     <div
                       className="cursor-pointer"
                       onClick={() => {
-                        // Só permite clique se NÃO estiver na aba finalizados
                         if (
                           filter !== "finalized" &&
                           dadosCarregamento?.finalizado !== true
