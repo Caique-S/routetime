@@ -147,3 +147,58 @@ export async function PATCH(
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
+
+/*export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  try {
+    const db = await getDatabase();
+    const collection = db.collection("carregamentos");
+    const body = await request.json();
+    const { status, dadosAdicionais = {} } = body;
+
+    // Validação dos status permitidos
+    const statusValidos = ["aguardando", "emDoca", "carregando", "finalizado"];
+    if (!statusValidos.includes(status)) {
+      return NextResponse.json(
+        { error: "Status inválido" },
+        { status: 400 }
+      );
+    }
+
+    // Atualiza o campo status e registra timestamp da etapa
+    const agora = new Date();
+    const updateFields: any = {
+      status,
+      dataAtualizacao: agora,
+      [`timestamps.${status}`]: agora.toISOString(),
+    };
+
+    // Mescla dados adicionais (ex.: doca)
+    Object.assign(updateFields, dadosAdicionais);
+
+    const result = await collection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateFields }
+    );
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json(
+        { error: "Documento não encontrado" },
+        { status: 404 }
+      );
+    }
+
+    // Retorna o documento atualizado (opcional)
+    const updated = await collection.findOne({ _id: new ObjectId(id) });
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error) {
+    console.error("Erro no PATCH /carregamento/[id]/status:", error);
+    return NextResponse.json(
+      { error: "Erro interno" },
+      { status: 500 }
+    );
+  }
+} */
