@@ -1,0 +1,24 @@
+(Opcional) 
+
+Inicializar o seletor do Kanban com a facility do upload
+ao carregar a página, o Kanban já vem pré-selecionado com 
+a facility do último upload, (substituir o loadInitialFacility removido):
+
+useEffect(() => {
+  async function preSelectFacility() {
+    try {
+      const today = getTodayStr();
+      const res = await fetch(`/api/upload?date=${today}&limit=1`);
+      const json = await res.json();
+      if (json.success && json.data && json.data.length > 0) {
+        const upload = json.data[0];
+        if (upload.filterValue) {
+          setKanbanFacility(upload.filterValue);  // define o valor padrão do seletor do Kanban
+        }
+      }
+    } catch (e) {
+      console.warn("Não foi possível pré-selecionar a facility do upload", e);
+    }
+  }
+  preSelectFacility();
+}, []);
