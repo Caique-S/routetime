@@ -5,15 +5,10 @@ import {
   ArrowLeft,
   Users,
   Truck,
-  Calendar,
   MapPin,
   ChevronRight,
-  Download,
-  FileText,
   Loader2,
-  Package,
   Hash,
-  Building,
   Clock,
   Tag,
   Box,
@@ -25,11 +20,10 @@ import QRScanner from "@/app/components/QrScanner";
 
 // ─────────────────────────────────────────────────────────────
 // TIMEZONE — Brasil UTC-3
-// Timestamps são armazenados em UTC ISO (agora.toISOString()).
-// Exibição usa formatarHoraBrasil(iso) — converte UTC → Brasília.
+// Armazenamento: agora.toISOString() → UTC
+// Exibição: toLocaleTimeString com timeZone: 'America/Sao_Paulo'
 // ─────────────────────────────────────────────────────────────
 
-// ─── Interfaces ───────────────────────────────────────────────
 interface MotoristaInfo {
   nome: string;
   tipoVeiculo: string;
@@ -44,11 +38,7 @@ interface MotoristaInfo {
 interface CarregamentoData {
   id: string;
   doca: string;
-  carga: {
-    gaiolas: string;
-    volumosos: string;
-    manga: string;
-  };
+  carga: { gaiolas: string; volumosos: string; manga: string };
   horarios: {
     encostadoDoca: string;
     inicioCarregamento: string;
@@ -56,11 +46,7 @@ interface CarregamentoData {
     saidaLiberada: string;
     previsaoChegada: string;
   };
-  lacres: {
-    traseiro: string;
-    lateral1: string;
-    lateral2: string;
-  };
+  lacres: { traseiro: string; lateral1: string; lateral2: string };
   motorista: MotoristaInfo;
   destino: string;
   facility: string;
@@ -68,60 +54,40 @@ interface CarregamentoData {
   status: "emFila" | "carregando" | "liberado";
   posicaoVeiculo?: number;
   finalizado?: boolean;
-  // ↓ NOVO — timestamps das etapas do Kanban (UTC ISO)
   timestamps?: Record<string, string>;
 }
 
-// ─── Helpers de localStorage para _dbId ───────────────────────
-// O _dbId é o _id do documento no MongoDB, necessário para o PATCH de etapas.
-// É salvo junto ao carregamento no localStorage após o primeiro POST/PUT.
-
-function salvarDbId(
-  destino: string,
-  facility: string,
-  motoristaId: string,
-  dbId: string
-): void {
-  try {
-    const chave = `carregamentos_${destino}_${facility}`;
-    const dados = JSON.parse(localStorage.getItem(chave) || "{}");
-    dados[motoristaId] = { ...dados[motoristaId], _dbId: dbId };
-    localStorage.setItem(chave, JSON.stringify(dados));
-  } catch (err) {
-    console.error("[salvarDbId] Erro:", err);
-  }
-}
-
-function lerDbId(
-  destino: string,
-  facility: string,
-  motoristaId: string
-): string | null {
-  try {
-    const chave = `carregamentos_${destino}_${facility}`;
-    const dados = JSON.parse(localStorage.getItem(chave) || "{}");
-    return dados[motoristaId]?._dbId ?? null;
-  } catch {
-    return null;
-  }
-}
-
-// ─── PATCH de etapa para o Kanban (fire-and-forget) ───────────
-// Nunca bloqueia o fluxo principal. Falhas são logadas mas ignoradas.
+// ─────────────────────────────────────────────────────────────
+// avancarEtapaKanban
+//
+// Chama PATCH /api/carregamento/etapa com motoristaId.
+// motoristaId é sempre calculável no frontend — nunca depende
+// de resposta async ou localStorage. Isso elimina a race condition.
+//
+// Regras:
+//   emDoca     → operador salvou doca
+//   carregando → operador salvou inicioCarregamento
+//   finalizado → saidaLiberada + lacre traseiro preenchidos
+//
+// Fire-and-forget: nunca bloqueia o operador.
+// ─────────────────────────────────────────────────────────────
 async function avancarEtapaKanban(
-  dbId: string,
+  motoristaId: string,
   status: "aguardando" | "emDoca" | "carregando" | "finalizado",
   dadosAdicionais?: Record<string, any>
 ): Promise<void> {
   try {
-    await fetch(`/api/carregamento/${dbId}/status`, {
+    const res = await fetch("/api/carregamento/etapa", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, dadosAdicionais }),
+      body: JSON.stringify({ motoristaId, status, dadosAdicionais }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.warn(`[avancarEtapaKanban] ${status} falhou para ${motoristaId}:`, err);
+    }
   } catch (err) {
-    // Fire-and-forget: erro não afeta o fluxo principal
-    console.warn(`[avancarEtapaKanban] Falha ao avançar para "${status}":`, err);
+    console.warn(`[avancarEtapaKanban] Erro de rede (${status}):`, err);
   }
 }
 
@@ -139,122 +105,76 @@ function DestinoContent() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [selectedMotorista, setSelectedMotorista] = useState<any>(null);
   const [filter, setFilter] = useState<"active" | "finalized">("active");
-  const [carregamentoData, setCarregamentoData] =
-    useState<CarregamentoData | null>(null);
-  const [carregamentos, setCarregamentos] = useState<
-    Record<string, CarregamentoData>
-  >({});
+  const [carregamentoData, setCarregamentoData] = useState<CarregamentoData | null>(null);
+  const [carregamentos, setCarregamentos] = useState<Record<string, CarregamentoData>>({});
   const [showQRScanner, setShowQRScanner] = useState(false);
-  const [activeQRField, setActiveQRField] = useState<
-    keyof CarregamentoData["lacres"] | null
-  >(null);
+  const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData["lacres"] | null>(null);
 
   const facility = searchParams?.get("facility") || "N/A";
 
   // Carregar dados do localStorage ao iniciar
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(
-        "carregamentos_" + destinoCodigo + "_" + facility,
-      );
-      if (saved) {
-        setCarregamentos(JSON.parse(saved));
-      }
+      const saved = localStorage.getItem(`carregamentos_${destinoCodigo}_${facility}`);
+      if (saved) setCarregamentos(JSON.parse(saved));
     }
   }, [destinoCodigo, facility]);
 
   useEffect(() => {
-    if (destinoCodigo && facility) {
-      fetchDestinoData();
-    }
+    if (destinoCodigo && facility) fetchDestinoData();
   }, [destinoCodigo, facility]);
 
   const fetchDestinoData = async () => {
     try {
       setLoading(true);
-
       const expedicaoEditavel = localStorage.getItem("ExpedicaoEditavel");
       if (!expedicaoEditavel) {
-        console.error("❌ Dados não encontrados no localStorage");
         router.push("/carregamento/novo");
         return;
       }
 
       const csvData = JSON.parse(expedicaoEditavel);
-      console.log("📊 Dados recuperados do localStorage:", csvData);
-
       const getNomeDestino = (codigo: string): string => {
-        const mapeamento: Record<string, string> = {
-          EBA14: "Serrinha",
-          EBA4: "Santo Antônio de Jesus",
-          EBA19: "Itaberaba",
-          EBA3: "Jacobina",
-          EBA2: "Pombal",
-          EBA16: "Senhor do Bonfim",
-          EBA21: "Seabra",
-          EBA6: "Juazeiro",
-          EBA29: "Valença",
+        const mapa: Record<string, string> = {
+          EBA14: "Serrinha", EBA4: "Santo Antônio de Jesus",
+          EBA19: "Itaberaba", EBA3: "Jacobina", EBA2: "Pombal",
+          EBA16: "Senhor do Bonfim", EBA21: "Seabra",
+          EBA6: "Juazeiro", EBA29: "Valença",
         };
-        return mapeamento[codigo] || codigo;
+        return mapa[codigo] || codigo;
       };
 
       const filteredData = csvData.data.filter((item: any) => {
         const itemDestino = item.destino || item.Destino || item.DESTINO;
-        const itemFacility =
-          item.Facility || item.facility || csvData.filterValue;
+        const itemFacility = item.Facility || item.facility || csvData.filterValue;
         return itemDestino === destinoCodigo && itemFacility === facility;
       });
 
-      console.log(
-        `✅ ${filteredData.length} registros encontrados para ${destinoCodigo}`,
-      );
-
       const motoristasMap = new Map();
       filteredData.forEach((item: any) => {
-        const motoristaNome =
-          item["Nome do motorista 1"] ||
-          item["Motorista"] ||
-          item["motorista"] ||
-          "Motorista Não Identificado";
-        if (!motoristasMap.has(motoristaNome)) {
-          motoristasMap.set(motoristaNome, {
-            nome: motoristaNome,
-            tipoVeiculo:
-              item["Tipo de veículo"] ||
-              item["Tipo Veículo"] ||
-              "Não especificado",
-            veiculoTracao:
-              item["Veículo de tração"] ||
-              item["Veiculo Tração"] ||
-              "Não especificado",
-            veiculoCarga:
-              item["Veículo de carga"] ||
-              item["Veiculo Carga"] ||
-              "Não especificado",
-            travelId:
-              item["Travel ID"] || item["TravelID"] || "Não especificado",
-            placa:
-              item["Placa"] || item["Placa do Cavalo"] || "Não especificado",
+        const nome = item["Nome do motorista 1"] || item["Motorista"] || item["motorista"] || "Motorista Não Identificado";
+        if (!motoristasMap.has(nome)) {
+          motoristasMap.set(nome, {
+            nome,
+            tipoVeiculo: item["Tipo de veículo"] || item["Tipo Veículo"] || "Não especificado",
+            veiculoTracao: item["Veículo de tração"] || item["Veiculo Tração"] || "Não especificado",
+            veiculoCarga: item["Veículo de carga"] || item["Veiculo Carga"] || "Não especificado",
+            travelId: item["Travel ID"] || item["TravelID"] || "Não especificado",
+            placa: item["Placa"] || item["Placa do Cavalo"] || "Não especificado",
             transportadora: item["Transportadora"] || "Não especificada",
-            dataInicio:
-              item["Data de início"] ||
-              item["Data Inicio"] ||
-              new Date().toISOString(),
+            dataInicio: item["Data de início"] || item["Data Inicio"] || new Date().toISOString(),
           });
         }
       });
 
       const motoristasArray = Array.from(motoristasMap.values());
       setMotoristas(motoristasArray);
-
       setDestinoInfo({
         nome: getNomeDestino(destinoCodigo),
         codigo: destinoCodigo,
-        facility: facility,
+        facility,
         totalMotoristas: motoristasArray.length,
-        totalVeiculos: motoristasArray.length,
-        ultimoCarregamento:
-          filteredData[0]?.["Data de início"] || new Date().toISOString(),
+        ultimoCarregamento: filteredData[0]?.["Data de início"] || new Date().toISOString(),
       });
     } catch (error) {
       console.error("❌ Erro ao processar dados:", error);
@@ -263,136 +183,80 @@ function DestinoContent() {
     }
   };
 
-  const handleVoltar = () => {
-    router.push("/carregamento/novo");
-  };
-
-  // ─── Criação inicial no banco (POST) ──────────────────────────
-  // Chamada quando o operador abre o primeiro modal de um motorista.
-  // Grava status 'aguardando' + timestamps.aguardando no banco para
-  // que o Kanban já mostre o motorista na coluna correta.
-  // Fire-and-forget: falha não afeta o fluxo de trabalho.
-  const criarCarregamentoNoBanco = async (motorista: any): Promise<void> => {
+  // ─── Registro inicial no banco (fire-and-forget) ─────────────
+  // POST com upsert por motoristaId. Cria o documento com
+  // status 'aguardando' se não existir. Se já existir, retorna
+  // o documento sem alterar status — nunca duplica.
+  const registrarNoBanco = (motorista: any): void => {
     const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
-
-    // Só cria se ainda não tiver _dbId salvo
-    const dbIdExistente = lerDbId(destinoCodigo, facility, motoristaId);
-    if (dbIdExistente) return;
-
-    try {
-      const res = await fetch("/api/carregamento", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          destino: destinoCodigo,
-          facility,
-          motorista: {
-            nome:           motorista.nome,
-            travelId:       motorista.travelId,
-            tipoVeiculo:    motorista.tipoVeiculo,
-            veiculoTracao:  motorista.veiculoTracao,
-            veiculoCarga:   motorista.veiculoCarga,
-            placa:          motorista.placa,
-            transportadora: motorista.transportadora,
-            dataInicio:     motorista.dataInicio,
-          },
-          // status: 'aguardando' e timestamps.aguardando são definidos
-          // automaticamente pelo POST em /api/carregamento/route.ts
-        }),
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        const dbId: string = result.data._id ?? result.data.id;
-        if (dbId) {
-          salvarDbId(destinoCodigo, facility, motoristaId, dbId);
-          console.log(`[criarCarregamentoNoBanco] Criado — motoristaId: ${motoristaId}, dbId: ${dbId}`);
-        }
-      }
-    } catch (err) {
-      // Fire-and-forget: erro não bloqueia o operador
-      console.warn("[criarCarregamentoNoBanco] Falha (não crítica):", err);
-    }
+    fetch("/api/carregamento", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        destino: destinoCodigo,
+        facility,
+        motorista: {
+          nome: motorista.nome,
+          travelId: motorista.travelId,
+          tipoVeiculo: motorista.tipoVeiculo,
+          veiculoTracao: motorista.veiculoTracao,
+          veiculoCarga: motorista.veiculoCarga,
+          placa: motorista.placa,
+          transportadora: motorista.transportadora,
+          dataInicio: motorista.dataInicio,
+        },
+      }),
+    }).catch((err) => console.warn("[registrarNoBanco] Erro (não crítico):", err));
   };
 
   const handleOpenModal = (modal: string, motorista: any) => {
     setSelectedMotorista(motorista);
     setActiveModal(modal);
 
-    // Carregar dados existentes para este motorista
     const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
-    const existingData = carregamentos[motoristaId];
+    const existing = carregamentos[motoristaId];
 
-    if (existingData) {
+    if (existing) {
       const statusCorrigido =
-        existingData.horarios?.encostadoDoca &&
-          existingData.horarios.encostadoDoca.trim() !== ""
+        existing.horarios?.encostadoDoca?.trim()
           ? "carregando"
-          : existingData.status || "emFila";
-      setCarregamentoData({
-        ...existingData,
-        status: statusCorrigido as any,
-      });
+          : existing.status || "emFila";
+      setCarregamentoData({ ...existing, status: statusCorrigido as any });
     } else {
-      // Criar novo objeto de carregamento
       setCarregamentoData({
         id: generateId(),
         doca: "",
         carga: { gaiolas: "", volumosos: "", manga: "" },
         horarios: {
-          encostadoDoca: "",
-          inicioCarregamento: "",
-          terminoCarregamento: "",
-          saidaLiberada: "",
-          previsaoChegada: "",
+          encostadoDoca: "", inicioCarregamento: "",
+          terminoCarregamento: "", saidaLiberada: "", previsaoChegada: "",
         },
         lacres: { traseiro: "", lateral1: "", lateral2: "" },
-        motorista: motorista,
+        motorista,
         destino: destinoCodigo,
-        facility: facility,
+        facility,
         timestamp: new Date().toISOString(),
         status: "emFila",
         posicaoVeiculo: 0,
       });
-
-      // ↓ NOVO — primeira interação: criar no banco com status 'aguardando'
-      // Fire-and-forget, não bloqueia a abertura do modal
-      criarCarregamentoNoBanco(motorista);
+      // Registra no banco com status 'aguardando' para aparecer no Kanban.
+      // POST é upsert — seguro chamar mesmo que o documento já exista.
+      registrarNoBanco(motorista);
     }
   };
 
-  // ─── Envio incremental existente (PUT upsert) ────────────────
-  // Mantido exatamente como era, com adição de captura do _dbId
-  // retornado pelo banco para uso posterior nos PATCHs de etapa.
-  const enviarIncremental = async (
+  // ─── Envio de dados ao banco (PUT upsert) ─────────────────────
+  const enviarIncremental = (
     motoristaId: string,
-    payload: Partial<CarregamentoData> & { status?: string; timestamps?: any }
-  ): Promise<string | null> => {
-    try {
-      const res = await fetch("/api/carregamento", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ motoristaId, ...payload }),
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        // Captura o _id retornado pelo PUT (upsert) e salva no localStorage
-        const dbId: string | undefined = result.data?._id ?? result.data?.id;
-        if (dbId) {
-          // Extrai destino e facility do motoristaId (formato: destino_facility_nome_travelId)
-          // É mais seguro usar as variáveis de escopo que já temos
-          salvarDbId(destinoCodigo, facility, motoristaId, dbId);
-          return dbId;
-        }
-      }
-    } catch (error) {
-      console.warn(
-        "Erro ao enviar parcialmente, dados permanecem no localStorage",
-        error
-      );
-    }
-    return null;
+    payload: Partial<CarregamentoData> & { status?: string }
+  ): void => {
+    fetch("/api/carregamento", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motoristaId, ...payload }),
+    }).catch((err) =>
+      console.warn("[enviarIncremental] Erro (dados no localStorage):", err)
+    );
   };
 
   const handleCloseModal = () => {
@@ -401,316 +265,210 @@ function DestinoContent() {
     setCarregamentoData(null);
   };
 
+  // ─── handleSaveModal ──────────────────────────────────────────
+  // Fluxo de etapas do Kanban:
+  //
+  //   Modal "doca" + doca selecionada
+  //     → Kanban: aguardando → emDoca
+  //
+  //   Modal "horarios" + inicioCarregamento preenchido
+  //     → Kanban: emDoca → carregando
+  //
+  //   Qualquer modal + saidaLiberada preenchida + lacre traseiro preenchido
+  //     → Kanban: carregando → finalizado
+  //
+  // O motoristaId é sempre calculado localmente — sem await, sem
+  // dependência de localStorage ou de retorno de POST.
   const handleSaveModal = async () => {
     if (!selectedMotorista || !carregamentoData) return;
 
     const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
     const agora = new Date().toISOString();
 
-    let dadosAtualizados = { ...carregamentoData };
-    let timestamps = { ...carregamentoData.timestamps }; // Preserva timestamps existentes
+    let dados = { ...carregamentoData };
+    let ts = { ...(carregamentoData.timestamps || {}) };
 
-    // ─── Determina novo status e timestamps ──────────────────
-
-    // 1. Modal "doca": transição para "emDoca"
+    // ── Determinar status interno e timestamps de exibição ──────
     if (activeModal === "doca") {
-      if (dadosAtualizados.doca && dadosAtualizados.status !== "carregando" && dadosAtualizados.status !== "liberado") {
-        dadosAtualizados.status = "emDoca" as any;
-        if (!timestamps.aguardando) {
-          timestamps.aguardando = dadosAtualizados.timestamp;
-        }
-        if (!timestamps.emDoca) {
-          timestamps.emDoca = agora;
-        }
+      if (dados.doca && dados.status !== "carregando" && dados.status !== "liberado") {
+        dados.status = "emDoca" as any;
+        ts.aguardando = ts.aguardando || dados.timestamp;
+        ts.emDoca = ts.emDoca || agora;
       }
-    }
-    // 2. Outros modais (horarios, carga, lacres)
-    else if (activeModal === "horarios" || activeModal === "carga" || activeModal === "lacres") {
-      if (dadosAtualizados.horarios?.encostadoDoca?.trim() !== "") {
-        const saidaLiberada =
-          dadosAtualizados.horarios?.saidaLiberada?.trim() &&
-          dadosAtualizados.lacres?.traseiro?.trim();
+    } else if (activeModal === "horarios" || activeModal === "carga" || activeModal === "lacres") {
+      const temEncostado = dados.horarios?.encostadoDoca?.trim();
+      const temSaida = dados.horarios?.saidaLiberada?.trim();
+      const temLacre = dados.lacres?.traseiro?.trim();
 
-        if (saidaLiberada) {
-          // Liberado
-          dadosAtualizados.status = "liberado";
-
-          const chaveCarregamentos = `carregamentos_${destinoCodigo}_${facility}`;
-          const carregamentosSalvos = localStorage.getItem(chaveCarregamentos);
-          let liberadosCount = 0;
-          if (carregamentosSalvos) {
-            try {
-              const parsed = JSON.parse(carregamentosSalvos);
-              liberadosCount = Object.entries(parsed).filter(
-                ([id, c]: [string, any]) =>
-                  c.status === "liberado" && id !== motoristaId,
-              ).length;
-            } catch (e) {
-              console.error("Erro ao ler carregamentos salvos:", e);
-            }
-          }
-          dadosAtualizados.posicaoVeiculo = liberadosCount + 1;
-
-          timestamps.aguardando = timestamps.aguardando || dadosAtualizados.timestamp;
-          timestamps.emDoca = timestamps.emDoca || agora;
-          timestamps.carregando = timestamps.carregando || agora;
-          timestamps.finalizado = agora;
+      if (temEncostado) {
+        if (temSaida && temLacre) {
+          // Liberado / finalizado
+          dados.status = "liberado";
+          const chave = `carregamentos_${destinoCodigo}_${facility}`;
+          const salvos = JSON.parse(localStorage.getItem(chave) || "{}");
+          const liberadosCount = Object.entries(salvos).filter(
+            ([id, c]: [string, any]) => c.status === "liberado" && id !== motoristaId
+          ).length;
+          dados.posicaoVeiculo = liberadosCount + 1;
+          ts.aguardando = ts.aguardando || dados.timestamp;
+          ts.emDoca = ts.emDoca || agora;
+          ts.carregando = ts.carregando || agora;
+          ts.finalizado = agora;
         } else {
           // Carregando
-          dadosAtualizados.status = "carregando";
-          dadosAtualizados.posicaoVeiculo = undefined;
-
-          timestamps.aguardando = timestamps.aguardando || dadosAtualizados.timestamp;
-          timestamps.emDoca = timestamps.emDoca || agora;
-          if (!timestamps.carregando) {
-            timestamps.carregando = agora;
-          }
+          dados.status = "carregando";
+          dados.posicaoVeiculo = undefined;
+          ts.aguardando = ts.aguardando || dados.timestamp;
+          ts.emDoca = ts.emDoca || agora;
+          ts.carregando = ts.carregando || agora;
         }
       } else {
-        if (dadosAtualizados.status !== "liberado") {
-          dadosAtualizados.posicaoVeiculo = undefined;
-        }
+        if (dados.status !== "liberado") dados.posicaoVeiculo = undefined;
       }
     }
 
-    // Atualiza os timestamps no objeto
-    dadosAtualizados.timestamps = timestamps;
+    dados.timestamps = ts;
 
-    // ─── Envio incremental para o banco (PUT upsert — fluxo original) ───
-    const dbId = await enviarIncremental(motoristaId, {
-      ...dadosAtualizados,
-      status: dadosAtualizados.status,
-    });
+    // ── 1. Enviar dados ao banco (fire-and-forget) ───────────────
+    enviarIncremental(motoristaId, { ...dados, status: dados.status });
 
-    // ─── PATCH de etapa para o Kanban (fire-and-forget) ─────────────────
-    // Usa o _dbId capturado acima ou o que já estava salvo no localStorage.
-    // Nunca bloqueia o salvamento, mesmo se o PATCH falhar.
-    const dbIdParaPatch = dbId ?? lerDbId(destinoCodigo, facility, motoristaId);
+    // ── 2. Avançar etapa no Kanban ───────────────────────────────
+    // Usa motoristaId — sempre disponível, sem dependência async.
+    // PATCH /api/carregamento/etapa → updateOne por motoristaId.
+    if (activeModal === "doca" && dados.doca) {
+      // Doca salva → emDoca
+      avancarEtapaKanban(motoristaId, "emDoca", { doca: dados.doca });
 
-    if (dbIdParaPatch) {
-      // Modal "doca": avança Kanban → emDoca
-      if (activeModal === "doca" && dadosAtualizados.doca) {
-        avancarEtapaKanban(dbIdParaPatch, "emDoca", { doca: dadosAtualizados.doca });
-      }
+    } else if (
+      activeModal === "horarios" &&
+      dados.horarios?.inicioCarregamento?.trim()
+    ) {
+      // Início de carregamento salvo → carregando
+      avancarEtapaKanban(motoristaId, "carregando");
 
-      // Modal "horarios": avança Kanban → carregando
-      // Condição: inicioCarregamento foi preenchido nesta sessão
-      else if (
-        activeModal === "horarios" &&
-        dadosAtualizados.horarios?.inicioCarregamento?.trim()
-      ) {
-        avancarEtapaKanban(dbIdParaPatch, "carregando");
-      }
+    } else if (
+      dados.horarios?.saidaLiberada?.trim() &&
+      dados.lacres?.traseiro?.trim()
+    ) {
+      // Saída liberada + lacre traseiro → finalizado
+      avancarEtapaKanban(motoristaId, "finalizado");
     }
 
-    // ─── Atualização do localStorage (fluxo original) ────────────────────
-    const updatedCarregamentos = {
-      ...carregamentos,
-      [motoristaId]: dadosAtualizados,
-    };
-
-    setCarregamentos(updatedCarregamentos);
+    // ── 3. Atualizar localStorage ────────────────────────────────
+    const updated = { ...carregamentos, [motoristaId]: dados };
+    setCarregamentos(updated);
     localStorage.setItem(
       `carregamentos_${destinoCodigo}_${facility}`,
-      JSON.stringify(updatedCarregamentos),
+      JSON.stringify(updated)
     );
 
     handleCloseModal();
   };
 
   const handleDocaChange = (value: string) => {
-    if (carregamentoData) {
-      setCarregamentoData({
-        ...carregamentoData,
-        doca: value,
-      });
-    }
+    if (carregamentoData) setCarregamentoData({ ...carregamentoData, doca: value });
   };
 
-  const handleCargaChange = (
-    tipo: "gaiolas" | "volumosos" | "manga",
-    value: string,
-  ) => {
-    if (carregamentoData) {
-      const numericValue = value.replace(/\D/g, "").slice(0, 2);
-      setCarregamentoData({
-        ...carregamentoData,
-        carga: {
-          ...carregamentoData.carga,
-          [tipo]: numericValue === "" ? "" : numericValue,
-        },
-      });
-    }
-  };
-
-  const handleHorarioChange = (
-    tipo: keyof CarregamentoData["horarios"],
-    value: string,
-  ) => {
+  const handleCargaChange = (tipo: "gaiolas" | "volumosos" | "manga", value: string) => {
     if (!carregamentoData) return;
-
-    const updatedHorarios = {
-      ...carregamentoData.horarios,
-      [tipo]: value,
-    };
-
-    if (tipo === "saidaLiberada") {
-      updatedHorarios.previsaoChegada = calcularPrevisaoChegada(
-        value,
-        destinoCodigo,
-      );
-
-      setCarregamentoData({
-        ...carregamentoData,
-        horarios: updatedHorarios,
-      });
-
-      return;
-    }
-
+    const num = value.replace(/\D/g, "").slice(0, 2);
     setCarregamentoData({
       ...carregamentoData,
-      horarios: updatedHorarios,
+      carga: { ...carregamentoData.carga, [tipo]: num },
     });
   };
 
-  const handleLacreChange = (
-    tipo: keyof CarregamentoData["lacres"],
-    value: string,
-  ) => {
-    if (carregamentoData) {
-      const numericValue = value.replace(/\D/g, "").slice(0, 7);
-      setCarregamentoData({
-        ...carregamentoData,
-        lacres: {
-          ...carregamentoData.lacres,
-          [tipo]: numericValue === "" ? "" : numericValue,
-        },
-      });
+  const handleHorarioChange = (tipo: keyof CarregamentoData["horarios"], value: string) => {
+    if (!carregamentoData) return;
+    const horarios = { ...carregamentoData.horarios, [tipo]: value };
+    if (tipo === "saidaLiberada") {
+      horarios.previsaoChegada = calcularPrevisaoChegada(value, destinoCodigo);
     }
+    setCarregamentoData({ ...carregamentoData, horarios });
+  };
+
+  const handleLacreChange = (tipo: keyof CarregamentoData["lacres"], value: string) => {
+    if (!carregamentoData) return;
+    const num = value.replace(/\D/g, "").slice(0, 7);
+    setCarregamentoData({
+      ...carregamentoData,
+      lacres: { ...carregamentoData.lacres, [tipo]: num },
+    });
   };
 
   const handleQRScan = (result: string) => {
     if (activeQRField && carregamentoData) {
-      const numericResult = result.replace(/\D/g, "").slice(0, 7);
-      handleLacreChange(activeQRField, numericResult);
+      handleLacreChange(activeQRField, result.replace(/\D/g, "").slice(0, 7));
       setShowQRScanner(false);
       setActiveQRField(null);
     }
   };
 
-  const calcularPrevisaoChegada = (
-    saidaLiberada: string,
-    destinoCodigo: string,
-  ): string => {
+  const calcularPrevisaoChegada = (saidaLiberada: string, dest: string): string => {
     if (!saidaLiberada) return "";
-
-    const [hours, minutes] = saidaLiberada.split(":").map(Number);
-    let horasAdicionais = 0;
-
-    switch (destinoCodigo) {
-      case "EBA14":
-      case "EBA4":
-        horasAdicionais = 2;
-        break;
-      case "EBA19":
-      case "EBA29":
-        horasAdicionais = 3;
-        break;
-      case "EBA2":
-        horasAdicionais = 4;
-        break;
-      case "EBA3":
-      case "EBA16":
-        horasAdicionais = 5;
-        break;
-      case "EBA21":
-        horasAdicionais = 6;
-        break;
-      case "EBA6":
-        horasAdicionais = 7;
-        break;
-      default:
-        horasAdicionais = 0;
-    }
-
+    const [h, m] = saidaLiberada.split(":").map(Number);
+    const horas: Record<string, number> = {
+      EBA14: 2, EBA4: 2, EBA19: 3, EBA29: 3,
+      EBA2: 4, EBA3: 5, EBA16: 5, EBA21: 6, EBA6: 7,
+    };
     const saida = new Date();
-    saida.setHours(hours + horasAdicionais, minutes);
-
-    return (
-      saida.getHours().toString().padStart(2, "0") +
-      ":" +
-      saida.getMinutes().toString().padStart(2, "0")
-    );
+    saida.setHours(h + (horas[dest] || 0), m);
+    return `${saida.getHours().toString().padStart(2, "0")}:${saida.getMinutes().toString().padStart(2, "0")}`;
   };
 
-  const generateId = (): string => {
-    return Math.floor(10000000 + Math.random() * 90000000).toString();
-  };
+  const generateId = (): string =>
+    Math.floor(10000000 + Math.random() * 90000000).toString();
 
   const handleSelecionarMotorista = (motorista: any) => {
     const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
-
     localStorage.setItem("motoristaSelecionadoId", motoristaId);
     localStorage.setItem("MotoristaSelecionado", JSON.stringify(motorista));
     localStorage.setItem("DestinoAtual", JSON.stringify(destinoInfo));
-
-    router.push(`/carregamento/create`);
+    router.push("/carregamento/create");
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex items-center justify-center safe-area">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <div className="absolute inset-0 border-4 border-blue-200 border-b-transparent rounded-full animate-ping"></div>
-          </div>
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-gray-600 font-medium">Carregando informações...</p>
         </div>
       </div>
     );
   }
 
-  const motoristasFiltrados = motoristas.filter((motorista) => {
-    const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
-    const dados = carregamentos[motoristaId];
-
-    if (filter === "active") {
-      return !dados?.finalizado;
-    } else {
-      return dados?.finalizado === true;
-    }
+  const motoristasFiltrados = motoristas.filter((m) => {
+    const id = `${destinoCodigo}_${facility}_${m.nome}_${m.travelId}`;
+    const d = carregamentos[id];
+    return filter === "active" ? !d?.finalizado : d?.finalizado === true;
   });
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 safe-area">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10 pt-safe-top">
+      <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
             <div className="flex items-center space-x-4">
               <button
-                onClick={handleVoltar}
+                onClick={() => router.push("/carregamento/novo")}
                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />
                 <span className="hidden sm:inline">Voltar</span>
               </button>
               <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-blue-500 rounded-lg transform rotate-3 opacity-20"></div>
-                  <div className="relative bg-linear-to-br from-blue-600 to-blue-700 p-2 rounded-lg shadow">
-                    <MapPin className="w-6 h-6 text-white" />
-                  </div>
+                <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-2 rounded-lg shadow">
+                  <MapPin className="w-6 h-6 text-white" />
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-gray-900">
-                    {destinoInfo ? destinoInfo.nome : destinoCodigo}
+                    {destinoInfo?.nome || destinoCodigo}
                   </h1>
                   <p className="text-sm text-gray-500">
                     <Hash className="w-4 h-4 inline mr-1" />
-                    Código: {destinoCodigo}
+                    {destinoCodigo}
                   </p>
                 </div>
               </div>
@@ -723,49 +481,30 @@ function DestinoContent() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        {/* Filtros: Em andamento / Finalizados */}
-        <div className="mb-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex gap-3">
+        {/* Filtros */}
+        <div className="mb-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 p-4 flex gap-3">
+            {(["active", "finalized"] as const).map((f) => {
+              const count = motoristas.filter((m) => {
+                const id = `${destinoCodigo}_${facility}_${m.nome}_${m.travelId}`;
+                const d = carregamentos[id];
+                return f === "active" ? !d?.finalizado : d?.finalizado === true;
+              }).length;
+              return (
                 <button
-                  onClick={() => setFilter("active")}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${filter === "active"
-                      ? "bg-blue-600 text-white shadow-md"
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    filter === f
+                      ? f === "active" ? "bg-blue-600 text-white shadow-md" : "bg-gray-700 text-white shadow-md"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
+                  }`}
                 >
-                  🚛 Pendentes
-                  <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                    {
-                      motoristas.filter((m) => {
-                        const id = `${destinoCodigo}_${facility}_${m.nome}_${m.travelId}`;
-                        const dados = carregamentos[id];
-                        return !dados?.finalizado;
-                      }).length
-                    }
-                  </span>
+                  {f === "active" ? "🚛 Pendentes" : "✅ Finalizados"}
+                  <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">{count}</span>
                 </button>
-                <button
-                  onClick={() => setFilter("finalized")}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${filter === "finalized"
-                      ? "bg-gray-700 text-white shadow-md"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                >
-                  ✅ Finalizados
-                  <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                    {
-                      motoristas.filter((m) => {
-                        const id = `${destinoCodigo}_${facility}_${m.nome}_${m.travelId}`;
-                        const dados = carregamentos[id];
-                        return dados?.finalizado === true;
-                      }).length
-                    }
-                  </span>
-                </button>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
 
@@ -775,168 +514,123 @@ function DestinoContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {motoristasFiltrados.map((motorista, index) => {
                 const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
-                const dadosCarregamento = carregamentos[motoristaId];
+                const d = carregamentos[motoristaId];
+                const borderColor =
+                  d?.status === "carregando" ? "border-orange-400" :
+                  d?.status === "liberado" ? "border-green-500" : "border-gray-200";
+                const iconColor =
+                  d?.status === "carregando" ? "text-orange-500" :
+                  d?.status === "liberado" ? "text-green-500" : "text-blue-600";
 
                 return (
                   <div
                     key={index}
-                    className={`bg-white rounded-xl shadow-sm border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 p-6 text-left group
-                    ${dadosCarregamento?.status === "carregando"
-                        ? "border-orange-400"
-                        : dadosCarregamento?.status === "liberado"
-                          ? "border-green-500"
-                          : "border-gray-200"
-                      }
-                    `}
+                    className={`bg-white rounded-xl shadow-sm border ${borderColor} hover:shadow-md transition-all duration-200 p-6 group`}
                   >
                     <div
                       className="cursor-pointer"
                       onClick={() => {
-                        if (
-                          filter !== "finalized" &&
-                          dadosCarregamento?.finalizado !== true
-                        ) {
+                        if (filter !== "finalized" && !d?.finalizado) {
                           handleSelecionarMotorista(motorista);
                         }
                       }}
                     >
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 bg-linear-to-br from-blue-100 to-blue-50 rounded-lg flex items-center justify-center">
-                            <Users
-                              className={`w-6 h-6 ${dadosCarregamento?.status === "carregando"
-                                  ? "text-orange-500"
-                                  : dadosCarregamento?.status === "liberado"
-                                    ? "text-green-500"
-                                    : "text-blue-600"
-                                }`}
-                            />
+                          <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                            <Users className={`w-6 h-6 ${iconColor}`} />
                           </div>
                           <div>
-                            <h3 className="font-bold text-gray-900">
-                              {motorista.nome}
-                            </h3>
+                            <h3 className="font-bold text-gray-900">{motorista.nome}</h3>
                             <p className="text-sm text-gray-600">Motorista</p>
                           </div>
                         </div>
                         <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
                       </div>
-
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {motorista.tipoVeiculo && (
                           <div className="flex items-center text-sm text-gray-600">
                             <Truck className="w-4 h-4 mr-2 text-gray-400" />
                             <span className="font-medium">Tipo:</span>
-                            <span className="ml-1 text-gray-800">
-                              {motorista.tipoVeiculo}
-                            </span>
+                            <span className="ml-1">{motorista.tipoVeiculo}</span>
                           </div>
                         )}
                         {motorista.tipoVeiculo === "Carreta" ? (
                           <>
                             <div className="flex items-center text-sm text-gray-600">
                               <Truck className="w-4 h-4 mr-2 text-gray-400" />
-                              <span className="font-medium">Placa Tração:</span>
-                              <span className="ml-1 text-gray-800">
-                                {motorista.veiculoTracao}
-                              </span>
+                              <span className="font-medium">Tração:</span>
+                              <span className="ml-1">{motorista.veiculoTracao}</span>
                             </div>
                             <div className="flex items-center text-sm text-gray-600">
                               <Truck className="w-4 h-4 mr-2 text-gray-400" />
-                              <span className="font-medium">Placa Carga:</span>
-                              <span className="ml-1 text-gray-800">
-                                {motorista.veiculoCarga}
-                              </span>
+                              <span className="font-medium">Carga:</span>
+                              <span className="ml-1">{motorista.veiculoCarga}</span>
                             </div>
                           </>
-                        ) : (
-                          motorista.veiculoTracao && (
-                            <div className="flex items-center text-sm text-gray-600">
-                              <Truck className="w-4 h-4 mr-2 text-gray-400" />
-                              <span className="font-medium">Placa Tração:</span>
-                              <span className="ml-1 text-gray-800">
-                                {motorista.veiculoTracao}
-                              </span>
-                            </div>
-                          )
-                        )}
-
+                        ) : motorista.veiculoTracao ? (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Truck className="w-4 h-4 mr-2 text-gray-400" />
+                            <span className="font-medium">Placa:</span>
+                            <span className="ml-1">{motorista.veiculoTracao}</span>
+                          </div>
+                        ) : null}
                         {motorista.travelId && (
                           <div className="flex items-center text-sm text-gray-600">
                             <Hash className="w-4 h-4 mr-2 text-gray-400" />
                             <span className="font-medium">Travel ID:</span>
-                            <span className="ml-1 text-blue-600 font-mono">
-                              {motorista.travelId}
-                            </span>
+                            <span className="ml-1 text-blue-600 font-mono">{motorista.travelId}</span>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Botões de Ação */}
-                    <div className="mt-6 pt-6 border-t border-gray-100">
-                      {/* Badge da Doca */}
-                      <div className="mb-4">
+                    {/* Ações */}
+                    <div className="mt-6 pt-4 border-t border-gray-100">
+                      {/* Badge Doca */}
+                      <div className="mb-3">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenModal("doca", motorista);
-                          }}
-                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${dadosCarregamento?.doca
+                          onClick={(e) => { e.stopPropagation(); handleOpenModal("doca", motorista); }}
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                            d?.doca
                               ? "bg-blue-100 text-blue-700 border border-blue-300"
                               : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
-                            }`}
+                          }`}
                         >
                           <DoorClosed className="w-4 h-4" />
-                          {dadosCarregamento?.doca
-                            ? `Doca: ${dadosCarregamento.doca}`
-                            : "Escolha a doca"}
+                          {d?.doca ? `Doca: ${d.doca}` : "Escolha a doca"}
                         </button>
                       </div>
-
                       <div className="flex flex-wrap gap-2">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenModal("carga", motorista);
-                          }}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${dadosCarregamento?.carga?.gaiolas &&
-                              dadosCarregamento?.carga?.volumosos &&
-                              dadosCarregamento?.carga?.manga
+                          onClick={(e) => { e.stopPropagation(); handleOpenModal("carga", motorista); }}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                            d?.carga?.gaiolas && d?.carga?.volumosos && d?.carga?.manga
                               ? "bg-green-100 text-green-700 border border-green-300"
                               : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
-                            }`}
+                          }`}
                         >
-                          <Box className="w-4 h-4" />
-                          Carga
+                          <Box className="w-4 h-4" /> Carga
                         </button>
-
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenModal("horarios", motorista);
-                          }}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${dadosCarregamento?.horarios?.encostadoDoca
+                          onClick={(e) => { e.stopPropagation(); handleOpenModal("horarios", motorista); }}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                            d?.horarios?.encostadoDoca
                               ? "bg-orange-100 text-orange-700 border border-orange-300"
                               : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
-                            }`}
+                          }`}
                         >
-                          <Clock className="w-4 h-4" />
-                          Horários
+                          <Clock className="w-4 h-4" /> Horários
                         </button>
-
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenModal("lacres", motorista);
-                          }}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${dadosCarregamento?.lacres?.traseiro
+                          onClick={(e) => { e.stopPropagation(); handleOpenModal("lacres", motorista); }}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                            d?.lacres?.traseiro
                               ? "bg-purple-100 text-purple-700 border border-purple-300"
                               : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200"
-                            }`}
+                          }`}
                         >
-                          <Tag className="w-4 h-4" />
-                          Lacres
+                          <Tag className="w-4 h-4" /> Lacres
                         </button>
                       </div>
                     </div>
@@ -947,55 +641,47 @@ function DestinoContent() {
           ) : (
             <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-200">
               <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600 font-medium">
-                Nenhum motorista encontrado
-              </p>
+              <p className="text-gray-600 font-medium">Nenhum motorista encontrado</p>
               <p className="text-sm text-gray-500 mt-1">
-                Não há motoristas cadastrados para o destino{" "}
-                {destinoInfo ? destinoInfo.nome : destinoCodigo} na operação{" "}
-                {facility}
+                Destino: {destinoInfo?.nome || destinoCodigo} • Operação: {facility}
               </p>
               <button
-                onClick={handleVoltar}
-                className="mt-4 inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                onClick={() => router.push("/carregamento/novo")}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>Voltar para destinos</span>
+                Voltar
               </button>
             </div>
           )}
         </div>
       </main>
 
-      {/* Modal Doca */}
+      {/* ── Modal Doca ── */}
       {activeModal === "doca" && selectedMotorista && carregamentoData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
             <div className="flex items-center justify-between p-6 border-b">
               <div className="flex items-center gap-3">
                 <DoorClosed className="w-5 h-5 text-blue-600" />
                 <h3 className="text-lg font-bold">Selecionar Doca</h3>
               </div>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6">
               <p className="text-sm text-gray-600 mb-4">
-                Selecione a doca para: <strong>{selectedMotorista.nome}</strong>
+                Doca para: <strong>{selectedMotorista.nome}</strong>
               </p>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-5 gap-2">
                 {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
                   <button
                     key={num}
                     onClick={() => handleDocaChange(num.toString())}
-                    className={`p-3 text-center rounded-lg border-2 transition-all ${carregamentoData.doca === num.toString()
+                    className={`p-3 text-center rounded-lg border-2 font-semibold transition-all ${
+                      carregamentoData.doca === num.toString()
                         ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-gray-100 border-gray-300 hover:bg-gray-200"
-                      }`}
+                        : "bg-gray-50 border-gray-200 hover:border-blue-300 hover:bg-blue-50"
+                    }`}
                   >
                     {num}
                   </button>
@@ -1003,15 +689,11 @@ function DestinoContent() {
               </div>
             </div>
             <div className="p-6 border-t flex justify-end gap-3">
-              <button
-                onClick={handleCloseModal}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Cancelar
-              </button>
+              <button onClick={handleCloseModal} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
               <button
                 onClick={handleSaveModal}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                disabled={!carregamentoData.doca}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Salvar Doca
               </button>
@@ -1020,383 +702,166 @@ function DestinoContent() {
         </div>
       )}
 
-      {/* Modal Carga */}
+      {/* ── Modal Carga ── */}
       {activeModal === "carga" && selectedMotorista && carregamentoData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
             <div className="flex items-center justify-between p-6 border-b">
               <div className="flex items-center gap-3">
                 <Box className="w-5 h-5 text-green-600" />
                 <h3 className="text-lg font-bold">Informar Carga</h3>
               </div>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Total de Gaiolas
-                </label>
-                <input
-                  type="number"
-                  value={carregamentoData.carga.gaiolas || ""}
-                  onChange={(e) =>
-                    handleCargaChange("gaiolas", e.target.value || "")
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Total de Volumosos
-                </label>
-                <input
-                  type="number"
-                  value={carregamentoData.carga.volumosos || ""}
-                  onChange={(e) =>
-                    handleCargaChange("volumosos", e.target.value || "")
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Total de Manga Palete
-                </label>
-                <input
-                  type="number"
-                  value={carregamentoData.carga.manga || ""}
-                  onChange={(e) =>
-                    handleCargaChange("manga", e.target.value || "")
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
+              {(["gaiolas", "volumosos", "manga"] as const).map((tipo) => (
+                <div key={tipo}>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
+                    {tipo === "manga" ? "Manga Palete" : tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+                  </label>
+                  <input
+                    type="number"
+                    value={carregamentoData.carga[tipo] || ""}
+                    onChange={(e) => handleCargaChange(tipo, e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              ))}
             </div>
             <div className="p-6 border-t flex justify-end gap-3">
-              <button
-                onClick={handleCloseModal}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveModal}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                Salvar Carga
-              </button>
+              <button onClick={handleCloseModal} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
+              <button onClick={handleSaveModal} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Salvar Carga</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Horários */}
+      {/* ── Modal Horários ── */}
       {activeModal === "horarios" && selectedMotorista && carregamentoData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
             <div className="flex items-center justify-between p-6 border-b">
               <div className="flex items-center gap-3">
                 <Clock className="w-5 h-5 text-orange-600" />
                 <h3 className="text-lg font-bold">Registrar Horários</h3>
               </div>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
+              {([
+                { key: "encostadoDoca", label: "Encostado na Doca" },
+                { key: "inicioCarregamento", label: "Início de Carregamento" },
+                { key: "terminoCarregamento", label: "Término de Carregamento" },
+                { key: "saidaLiberada", label: "Saída Liberada" },
+              ] as const).map(({ key, label }) => (
+                <div key={key}>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+                  <input
+                    type="time"
+                    value={carregamentoData.horarios[key] || ""}
+                    onChange={(e) => handleHorarioChange(key, e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              ))}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Encostado na Doca
-                </label>
-                <input
-                  type="time"
-                  value={carregamentoData.horarios.encostadoDoca || ""}
-                  onChange={(e) =>
-                    handleHorarioChange("encostadoDoca", e.target.value)
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Início de Carregamento
-                </label>
-                <input
-                  type="time"
-                  value={carregamentoData.horarios.inicioCarregamento || ""}
-                  onChange={(e) =>
-                    handleHorarioChange("inicioCarregamento", e.target.value)
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Término de Carregamento
-                </label>
-                <input
-                  type="time"
-                  value={carregamentoData.horarios.terminoCarregamento || ""}
-                  onChange={(e) =>
-                    handleHorarioChange("terminoCarregamento", e.target.value)
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Saída Liberada
-                </label>
-                <input
-                  type="time"
-                  value={carregamentoData.horarios.saidaLiberada || ""}
-                  onChange={(e) =>
-                    handleHorarioChange("saidaLiberada", e.target.value)
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Previsão de Chegada
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Previsão de Chegada</label>
                 <input
                   type="time"
                   value={carregamentoData.horarios.previsaoChegada || ""}
                   disabled
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Calculado automaticamente com base na saída liberada
-                </p>
+                <p className="text-xs text-gray-400 mt-1">Calculado automaticamente</p>
               </div>
             </div>
             <div className="p-6 border-t flex justify-end gap-3">
-              <button
-                onClick={handleCloseModal}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveModal}
-                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
-              >
-                Salvar Horários
-              </button>
+              <button onClick={handleCloseModal} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
+              <button onClick={handleSaveModal} className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">Salvar Horários</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Lacres */}
+      {/* ── Modal Lacres ── */}
       {activeModal === "lacres" && selectedMotorista && carregamentoData && (
         <>
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
               <div className="flex items-center justify-between p-6 border-b">
                 <div className="flex items-center gap-3">
                   <Tag className="w-5 h-5 text-purple-600" />
                   <h3 className="text-lg font-bold">Registrar Lacres</h3>
                 </div>
-                <button
-                  onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5" /></button>
               </div>
               <div className="p-6 space-y-4">
-                {/* Lacre Traseiro - COM SCANNER */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Lacre Traseiro
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={carregamentoData.lacres.traseiro || ""}
-                      onChange={(e) =>
-                        handleLacreChange("traseiro", e.target.value)
-                      }
-                      placeholder="Ex: 4476646"
-                      className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${carregamentoData.lacres.traseiro.length === 7
-                          ? "border-green-500 bg-green-50"
-                          : "border-gray-300"
+                {([
+                  { key: "traseiro", label: "Lacre Traseiro" },
+                  { key: "lateral1", label: "Lacre Lateral 1" },
+                  { key: "lateral2", label: "Lacre Lateral 2" },
+                ] as const).map(({ key, label }) => (
+                  <div key={key}>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={carregamentoData.lacres[key] || ""}
+                        onChange={(e) => handleLacreChange(key, e.target.value)}
+                        placeholder="Ex: 4476646"
+                        maxLength={7}
+                        inputMode="numeric"
+                        className={`flex-1 px-4 py-2 border rounded-lg font-mono focus:ring-2 focus:ring-blue-500 ${
+                          carregamentoData.lacres[key]?.length === 7
+                            ? "border-green-500 bg-green-50"
+                            : "border-gray-300"
                         }`}
-                      maxLength={7}
-                      inputMode="numeric"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveQRField("traseiro");
-                        setShowQRScanner(true);
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                    >
-                      <Scan className="w-5 h-5" />
-                      <span className="hidden sm:inline">QR</span>
-                    </button>
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setActiveQRField(key); setShowQRScanner(true); }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                      >
+                        <Scan className="w-5 h-5" />
+                        <span className="hidden sm:inline">QR</span>
+                      </button>
+                    </div>
+                    {carregamentoData.lacres[key]?.length === 7 && (
+                      <p className="text-xs text-green-600 mt-1">✓ Lacre válido (7 dígitos)</p>
+                    )}
                   </div>
-                  {carregamentoData.lacres.traseiro.length === 7 && (
-                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                      ✓ Lacre válido (7 dígitos)
-                    </p>
-                  )}
-                </div>
-
-                {/* Lacre Lateral 1 - COM SCANNER */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Lacre Lateral 1
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={carregamentoData.lacres.lateral1 || ""}
-                      onChange={(e) =>
-                        handleLacreChange("lateral1", e.target.value)
-                      }
-                      placeholder="Ex: 4476647"
-                      className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${carregamentoData.lacres.lateral1.length === 7
-                          ? "border-green-500 bg-green-50"
-                          : "border-gray-300"
-                        }`}
-                      maxLength={7}
-                      inputMode="numeric"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveQRField("lateral1");
-                        setShowQRScanner(true);
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                    >
-                      <Scan className="w-5 h-5" />
-                      <span className="hidden sm:inline">QR</span>
-                    </button>
-                  </div>
-                  {carregamentoData.lacres.lateral1.length === 7 && (
-                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                      ✓ Lacre válido (7 dígitos)
-                    </p>
-                  )}
-                </div>
-
-                {/* Lacre Lateral 2 - COM SCANNER */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Lacre Lateral 2
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={carregamentoData.lacres.lateral2 || ""}
-                      onChange={(e) =>
-                        handleLacreChange("lateral2", e.target.value)
-                      }
-                      placeholder="Ex: 4476649"
-                      className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono ${carregamentoData.lacres.lateral2.length === 7
-                          ? "border-green-500 bg-green-50"
-                          : "border-gray-300"
-                        }`}
-                      maxLength={7}
-                      inputMode="numeric"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveQRField("lateral2");
-                        setShowQRScanner(true);
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                    >
-                      <Scan className="w-5 h-5" />
-                      <span className="hidden sm:inline">QR</span>
-                    </button>
-                  </div>
-                  {carregamentoData.lacres.lateral2.length === 7 && (
-                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                      ✓ Lacre válido (7 dígitos)
-                    </p>
-                  )}
-                </div>
-
-                {/* Instruções */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
-                  <p className="text-xs text-blue-700">
-                    <strong>Dica:</strong> Use o botão QR para escanear
-                    automaticamente.
-                  </p>
+                ))}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-blue-700"><strong>Dica:</strong> Use o botão QR para escanear automaticamente.</p>
                 </div>
               </div>
               <div className="p-6 border-t flex justify-end gap-3">
-                <button
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSaveModal}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                >
-                  Salvar Lacres
-                </button>
+                <button onClick={handleCloseModal} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
+                <button onClick={handleSaveModal} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Salvar Lacres</button>
               </div>
             </div>
           </div>
-
-          {/* Scanner QR Code */}
           {showQRScanner && (
             <QRScanner
               onScan={handleQRScan}
-              onClose={() => {
-                setShowQRScanner(false);
-                setActiveQRField(null);
-              }}
+              onClose={() => { setShowQRScanner(false); setActiveQRField(null); }}
             />
           )}
         </>
       )}
 
       {/* Footer */}
-      <footer className="mb-4 py-2 border-t border-gray-200 pb-safe-bottom">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between">
-            <div className="text-gray-500 text-sm">
-              <p>
-                Sistema de Carregamento • Destino:{" "}
-                {destinoInfo ? destinoInfo.nome : destinoCodigo}
-              </p>
-              <p className="mt-1">
-                Operação: {facility} • © {new Date().getFullYear()}
-              </p>
-            </div>
-            <div className="mt-2 md:mt-0">
-              <span className="text-xs text-gray-500">
-                Motoristas: {motoristas.length} • Dados preenchidos:{" "}
-                {
-                  Object.keys(carregamentos).filter(
-                    (key) =>
-                      carregamentos[key]?.doca ||
-                      carregamentos[key]?.carga?.gaiolas != "" ||
-                      carregamentos[key]?.horarios?.encostadoDoca,
-                  ).length
-                }
-              </span>
-            </div>
+      <footer className="py-4 border-t border-gray-200 mt-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <div className="text-gray-500 text-sm">
+            <p>Sistema de Carregamento • {destinoInfo?.nome || destinoCodigo} • {facility}</p>
           </div>
+          <span className="text-xs text-gray-500">
+            Motoristas: {motoristas.length} • Preenchidos:{" "}
+            {Object.keys(carregamentos).filter((k) =>
+              carregamentos[k]?.doca || carregamentos[k]?.horarios?.encostadoDoca
+            ).length}
+          </span>
         </div>
       </footer>
     </div>
@@ -1405,14 +870,13 @@ function DestinoContent() {
 
 export default function DestinoPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-        </div>
-      }
-    >
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    }>
       <DestinoContent />
     </Suspense>
   );
 }
+

@@ -187,7 +187,7 @@ export default function AnalyserPage() {
   const [facilitySelecionada, setFacilitySelecionada] = useState("");
   const [kanbanFacility, setKanbanFacility] = useState<string>("todas");
 
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("kanban");
 
   // Drawer único (controlado)
   const [drawerOpen, setDrawerOpen] = useState(false);

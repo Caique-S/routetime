@@ -7,22 +7,11 @@ export type StatusCarregamento =
   | 'finalizado';
 
 interface AvancarEtapaParams {
-  /** _id do documento no MongoDB (salvo como _dbId no localStorage) */
   carregamentoDbId: string;
-  /** Próxima etapa */
   status: StatusCarregamento;
-  /** Campos extras para gravar junto (ex: doca, carga, lacres, horarios) */
   dadosAdicionais?: Record<string, any>;
 }
 
-/**
- * Avança uma etapa do carregamento via PATCH e registra o timestamp no banco.
- *
- * Uso:
- *   const ok = await avancarEtapa({ carregamentoDbId: dbId, status: 'emDoca', dadosAdicionais: { doca: '12' } });
- *
- * Retorna true se bem-sucedido, false em caso de erro.
- */
 export async function avancarEtapa({
   carregamentoDbId,
   status,
@@ -48,12 +37,6 @@ export async function avancarEtapa({
   }
 }
 
-/**
- * Lê o _dbId de um carregamento no localStorage.
- *
- * Uso:
- *   const dbId = getDbId({ destino: 'EBA14', facility: 'XPT', motoristaId: '...' });
- */
 export function getDbIdFromLocalStorage({
   destino,
   facility,
@@ -72,9 +55,6 @@ export function getDbIdFromLocalStorage({
   }
 }
 
-/**
- * Salva o _dbId retornado pelo banco no localStorage junto aos dados do carregamento.
- */
 export function salvarDbIdNoLocalStorage({
   destino,
   facility,

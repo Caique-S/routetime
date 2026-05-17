@@ -30,66 +30,6 @@ function serializeDocument(doc: any): any {
   return result;
 }
 
-export async function POST(request: NextRequest) {
-  console.log('=== API CARREGAMENTO: Criando novo carregamento ===');
-
-  try {
-    const db = await getDatabase();
-    const data = await request.json();
-
-    console.log('Dados recebidos:', data);
-
-    if (!data.destino) {
-      return NextResponse.json({ error: 'Destino é obrigatório' }, { status: 400 });
-    }
-    if (!data.facility) {
-      return NextResponse.json({ error: 'Facility é obrigatória' }, { status: 400 });
-    }
-    if (!data.motorista || !data.motorista.nome) {
-      return NextResponse.json({ error: 'Dados do motorista incompletos' }, { status: 400 });
-    }
-
-    const motoristaId = `${data.destino}_${data.facility}_${data.motorista.nome}_${data.motorista.travelId}`;
-
-    const agora = new Date();
-
-    const carregamento = {
-      ...data,
-      motoristaId,
-      status: 'aguardando',
-      timestamps: {
-        aguardando: agora.toISOString(), 
-      },
-      dataCriacao: data.dataCriacao ? new Date(data.dataCriacao) : agora,
-      dataAtualizacao: agora,
-      numero: `CAR-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`
-    };
-
-    console.log('Inserindo carregamento:', carregamento);
-
-    const result = await db.collection('carregamentos').insertOne(carregamento);
-
-    console.log('✅ Carregamento criado com ID:', result.insertedId);
-
-    // Retorna o documento serializado
-    const insertedDoc = await db.collection('carregamentos').findOne({ _id: result.insertedId });
-    const serialized = serializeDocument(insertedDoc);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Carregamento criado com sucesso',
-      data: serialized
-    });
-
-  } catch (error: any) {
-    console.error('❌ Erro ao criar carregamento:', error);
-    return NextResponse.json(
-      { error: 'Erro ao criar carregamento' },
-      { status: 500 }
-    );
-  }
-}
-
 export async function GET(request: NextRequest) {
   try {
     const db = await getDatabase();
@@ -176,5 +116,69 @@ export async function PUT(request: NextRequest) {
   } catch (error: any) {
     console.error('Erro no PUT /api/carregamento:', error);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  console.log('=== API CARREGAMENTO: Upsert por motoristaId ===');
+
+  try {
+    const db = await getDatabase();
+    const data = await request.json();
+
+    if (!data.destino) {
+      return NextResponse.json({ error: 'Destino é obrigatório' }, { status: 400 });
+    }
+    if (!data.facility) {
+      return NextResponse.json({ error: 'Facility é obrigatória' }, { status: 400 });
+    }
+    if (!data.motorista || !data.motorista.nome) {
+      return NextResponse.json({ error: 'Dados do motorista incompletos' }, { status: 400 });
+    }
+
+    const motoristaId = `${data.destino}_${data.facility}_${data.motorista.nome}_${data.motorista.travelId}`;
+    const agora = new Date();
+    const agoraISO = agora.toISOString();
+
+    const doc = await db.collection('carregamentos').findOneAndUpdate(
+      { motoristaId },
+      {
+        $setOnInsert: {
+          motoristaId,
+          destino:   data.destino,
+          facility:  data.facility,
+          motorista: data.motorista,
+          status:    'aguardando',
+          timestamps: { aguardando: agoraISO }, // UTC — frontend exibe em Brasília
+          dataCriacao: agora,
+          numero: `CAR-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
+        },
+        $set: {
+          dataAtualizacao: agora,
+        },
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+
+    const serialized = serializeDocument(doc);
+
+    const isNewDoc = doc?.status === 'aguardando' && !doc?.timestamps?.emDoca;
+    console.log(
+      isNewDoc
+        ? `[API POST] Novo carregamento criado — motoristaId: ${motoristaId}`
+        : `[API POST] Documento existente retornado — motoristaId: ${motoristaId}, status: ${doc?.status}`
+    );
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: isNewDoc ? 'Carregamento criado com sucesso' : 'Carregamento já existia, retornado sem alteração de status',
+        data: serialized,
+      },
+      { status: isNewDoc ? 201 : 200 }
+    );
+  } catch (error: any) {
+    console.error('❌ Erro ao criar/buscar carregamento:', error);
+    return NextResponse.json({ error: 'Erro ao criar carregamento' }, { status: 500 });
   }
 }
