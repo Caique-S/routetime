@@ -53,7 +53,6 @@ export async function PATCH(request: NextRequest) {
     const agora = new Date();
     const agoraISO = agora.toISOString(); // UTC — correto para armazenamento
 
-    // Log com horário de Brasília para facilitar leitura no servidor
     console.log(
       `[PATCH /etapa] ${motoristaId} → ${status}`,
       `| UTC: ${agoraISO}`,
