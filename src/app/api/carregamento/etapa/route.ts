@@ -1,27 +1,3 @@
-// app/api/carregamento/etapa/route.ts
-//
-// PATCH /api/carregamento/etapa
-//
-// Avança a etapa de um carregamento no Kanban usando motoristaId como chave.
-//
-// Por que motoristaId e não _id?
-//   • motoristaId = `${destino}_${facility}_${nome}_${travelId}`
-//     É calculável no frontend sem nenhuma chamada async prévia.
-//   • _id só está disponível depois do POST terminar E o resultado ser
-//     salvo no localStorage — isso criava race condition.
-//   • Com motoristaId não há dependência de localStorage, não há race.
-//   • Idempotente: chamar N vezes com o mesmo status apenas atualiza
-//     o timestamp — nunca cria duplicata.
-//
-// Regras de negócio do Kanban:
-//   aguardando  → motorista foi adicionado (POST inicial)
-//   emDoca      → operador salvou o número da doca
-//   carregando  → operador preencheu horario.inicioCarregamento
-//   finalizado  → saída liberada + lacre traseiro preenchidos
-//
-// IMPORTANTE: este arquivo deve exportar APENAS a função PATCH.
-// Next.js route files não aceitam outros exports nomeados.
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 
@@ -51,7 +27,7 @@ export async function PATCH(request: NextRequest) {
 
     const db = await getDatabase();
     const agora = new Date();
-    const agoraISO = agora.toISOString(); // UTC — correto para armazenamento
+    const agoraISO = agora.toISOString(); 
 
     console.log(
       `[PATCH /etapa] ${motoristaId} → ${status}`,
@@ -65,7 +41,6 @@ export async function PATCH(request: NextRequest) {
       dataAtualizacao: agora,
     };
 
-    // Mesclar dados extras (ex: doca) sem sobrescrever campos de controle
     if (dadosAdicionais && typeof dadosAdicionais === 'object') {
       for (const [key, value] of Object.entries(dadosAdicionais)) {
         if (!['status', 'timestamps', 'dataAtualizacao', '_id', 'motoristaId'].includes(key)) {
