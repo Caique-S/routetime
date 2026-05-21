@@ -6,24 +6,24 @@
  * Funções utilitárias para persistência de estado de carregamentos
  * no localStorage do navegador.
  *
- * RENOMEADO de useEtapaCarregamento.ts:
- *   - O arquivo original tinha nome de hook React mas não usava nenhum hook.
- *   - Mantido como módulo utilitário puro ('use client' para Next.js).
- *
- * IMPORTANTE:
- *   - O localStorage é a fonte de verdade para o estado visual do Kanban.
- *   - "Finalizar Carregamento" opera APENAS aqui, sem escrita no banco.
- *   - Somente avancarEtapa() se comunica com a API.
+ * RESPONSABILIDADES:
+ *   - Leitura e escrita do estado local dos cards do Kanban
+ *   - Comunicação com a API via avancarEtapa()
+ *   - "Finalizar Carregamento" opera APENAS aqui, sem escrita no banco
+ *   - "Not Used" persiste localmente E chama a API
  */
 
-import type { StatusCarregamento } from '../utils/status';
+import type { StatusCarregamento } from '@/app/lib/utils/status';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-interface DadosCarregamentoLocal {
-  _dbId: string;
-  status?: StatusCarregamento;
-  [key: string]: unknown;
+export interface DadosCarregamentoLocal {
+  _dbId:           string;
+  status?:         StatusCarregamento;
+  finalizadoEm?:   string;
+  canceladoEm?:    string;
+  statusAnterior?: StatusCarregamento;
+  [key: string]:   unknown;
 }
 
 // ─── Chave do localStorage ────────────────────────────────────────────────────
@@ -32,120 +32,132 @@ function montarChave(destino: string, facility: string): string {
   return `carregamentos_${destino}_${facility}`;
 }
 
-// ─── Leitura ──────────────────────────────────────────────────────────────────
-
-/**
- * Retorna o _id do MongoDB de um motorista salvo no localStorage.
- * Retorna null se não encontrado ou em caso de erro de parse.
- */
-export function getDbId({
-  destino,
-  facility,
-  motoristaId,
-}: {
-  destino: string;
-  facility: string;
-  motoristaId: string;
-}): string | null {
+function lerArmazenamento(destino: string, facility: string): Record<string, DadosCarregamentoLocal> {
   try {
-    const chave = montarChave(destino, facility);
-    const dados: Record<string, DadosCarregamentoLocal> = JSON.parse(
-      localStorage.getItem(chave) || '{}'
-    );
-    return dados[motoristaId]?._dbId ?? null;
+    return JSON.parse(localStorage.getItem(montarChave(destino, facility)) || '{}');
   } catch {
-    return null;
+    return {};
   }
 }
 
-/**
- * Retorna todos os dados de um motorista salvos no localStorage.
- * Retorna null se não encontrado.
- */
-export function getDadosMotorista({
-  destino,
-  facility,
-  motoristaId,
-}: {
-  destino: string;
-  facility: string;
-  motoristaId: string;
-}): DadosCarregamentoLocal | null {
+function escreverArmazenamento(
+  destino: string,
+  facility: string,
+  dados: Record<string, DadosCarregamentoLocal>
+): void {
   try {
-    const chave = montarChave(destino, facility);
-    const dados: Record<string, DadosCarregamentoLocal> = JSON.parse(
-      localStorage.getItem(chave) || '{}'
-    );
-    return dados[motoristaId] ?? null;
-  } catch {
-    return null;
+    localStorage.setItem(montarChave(destino, facility), JSON.stringify(dados));
+  } catch (err) {
+    console.error('[carregamentoStorage] Erro ao escrever no localStorage:', err);
   }
+}
+
+// ─── Leitura ──────────────────────────────────────────────────────────────────
+
+export function getDbId({
+  destino, facility, motoristaId,
+}: { destino: string; facility: string; motoristaId: string }): string | null {
+  return lerArmazenamento(destino, facility)[motoristaId]?._dbId ?? null;
+}
+
+export function getDadosMotorista({
+  destino, facility, motoristaId,
+}: { destino: string; facility: string; motoristaId: string }): DadosCarregamentoLocal | null {
+  return lerArmazenamento(destino, facility)[motoristaId] ?? null;
 }
 
 // ─── Escrita ──────────────────────────────────────────────────────────────────
 
 /**
- * Salva ou atualiza campos de um motorista no localStorage.
- * Faz merge com os dados existentes (não sobrescreve o objeto inteiro).
+ * Salva ou atualiza campos de um motorista no localStorage com merge.
  */
 export function salvarDadosMotorista({
-  destino,
-  facility,
-  motoristaId,
-  dados,
+  destino, facility, motoristaId, dados,
 }: {
   destino: string;
   facility: string;
   motoristaId: string;
   dados: Partial<DadosCarregamentoLocal>;
 }): void {
-  try {
-    const chave = montarChave(destino, facility);
-    const armazenado: Record<string, DadosCarregamentoLocal> = JSON.parse(
-      localStorage.getItem(chave) || '{}'
-    );
-    armazenado[motoristaId] = { ...armazenado[motoristaId], ...dados };
-    localStorage.setItem(chave, JSON.stringify(armazenado));
-  } catch (err) {
-    console.error('[carregamentoStorage] Erro ao salvar dados do motorista:', err);
-  }
+  const armazenado = lerArmazenamento(destino, facility);
+  armazenado[motoristaId] = { ...armazenado[motoristaId], ...dados };
+  escreverArmazenamento(destino, facility, armazenado);
 }
 
-/**
- * Atalho: salva apenas o _dbId de um motorista.
- */
 export function salvarDbId({
-  destino,
-  facility,
-  motoristaId,
-  dbId,
-}: {
-  destino: string;
-  facility: string;
-  motoristaId: string;
-  dbId: string;
-}): void {
+  destino, facility, motoristaId, dbId,
+}: { destino: string; facility: string; motoristaId: string; dbId: string }): void {
   salvarDadosMotorista({ destino, facility, motoristaId, dados: { _dbId: dbId } });
 }
 
+// ─── Ações do Kanban ──────────────────────────────────────────────────────────
+
 /**
- * Marca um motorista como finalizado APENAS no localStorage.
- * Não faz nenhuma chamada à API — comportamento do botão "Finalizar Carregamento".
+ * "Finalizar Carregamento"
+ *
+ * Marca o motorista como liberado APENAS no localStorage.
+ * Não faz nenhuma chamada à API.
+ * Pré-condição: saidaLiberada e lacreTraseiro já foram preenchidos.
  */
 export function finalizarCarregamentoLocal({
-  destino,
-  facility,
-  motoristaId,
-}: {
-  destino: string;
-  facility: string;
-  motoristaId: string;
-}): void {
+  destino, facility, motoristaId,
+}: { destino: string; facility: string; motoristaId: string }): void {
   salvarDadosMotorista({
     destino,
     facility,
     motoristaId,
-    dados: { status: 'liberado', finalizadoEm: new Date().toISOString() },
+    dados: {
+      status:       'liberado',
+      finalizadoEm: new Date().toISOString(),
+    },
+  });
+}
+
+/**
+ * "Not Used"
+ *
+ * 1. Persiste status not_used no localStorage com o statusAnterior
+ * 2. Chama a API para persistir no banco
+ *
+ * Retorna true se a API respondeu com sucesso, false caso contrário.
+ * O estado local é atualizado independentemente do resultado da API
+ * para garantir resposta imediata na UI.
+ */
+export async function marcarNotUsed({
+  destino,
+  facility,
+  motoristaId,
+  carregamentoDbId,
+  statusAtual,
+  motivoCancelamento,
+}: {
+  destino: string;
+  facility: string;
+  motoristaId: string;
+  carregamentoDbId: string;
+  statusAtual: StatusCarregamento;
+  motivoCancelamento?: string;
+}): Promise<boolean> {
+  // Atualiza o localStorage imediatamente para feedback visual instantâneo
+  salvarDadosMotorista({
+    destino,
+    facility,
+    motoristaId,
+    dados: {
+      status:          'not_used',
+      statusAnterior:  statusAtual,
+      canceladoEm:     new Date().toISOString(),
+    },
+  });
+
+  // Persiste no banco em segundo plano
+  return avancarEtapa({
+    carregamentoDbId,
+    status: 'not_used',
+    dadosAdicionais: {
+      statusAnterior: statusAtual,
+      ...(motivoCancelamento ? { motivoCancelamento } : {}),
+    },
   });
 }
 
@@ -160,9 +172,6 @@ interface AvancarEtapaParams {
 /**
  * Avança a etapa de um carregamento na API.
  * Retorna true em caso de sucesso, false em caso de falha.
- *
- * NOTA: Após chamar esta função, salvar o novo status no localStorage
- * via salvarDadosMotorista() para manter o estado local sincronizado.
  */
 export async function avancarEtapa({
   carregamentoDbId,
@@ -171,9 +180,9 @@ export async function avancarEtapa({
 }: AvancarEtapaParams): Promise<boolean> {
   try {
     const res = await fetch(`/api/carregamento/${carregamentoDbId}/status`, {
-      method: 'PATCH',
+      method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, dadosAdicionais }),
+      body:    JSON.stringify({ status, dadosAdicionais }),
     });
 
     if (!res.ok) {
