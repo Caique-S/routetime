@@ -18,14 +18,6 @@ import {
 } from "lucide-react";
 import QRScanner from "@/app/components/QrScanner";
 
-<<<<<<< HEAD
-=======
-// ─────────────────────────────────────────────────────────────
-// TIMEZONE — Brasil UTC-3
-// Armazenamento: agora.toISOString() → UTC
-// Exibição: toLocaleTimeString com timeZone: 'America/Sao_Paulo'
-// ─────────────────────────────────────────────────────────────
->>>>>>> origin/updates
 
 interface MotoristaInfo {
   nome: string;
@@ -60,23 +52,6 @@ interface CarregamentoData {
   timestamps?: Record<string, string>;
 }
 
-<<<<<<< HEAD
-=======
-// ─────────────────────────────────────────────────────────────
-// avancarEtapaKanban
-//
-// Chama PATCH /api/carregamento/etapa com motoristaId.
-// motoristaId é sempre calculável no frontend — nunca depende
-// de resposta async ou localStorage. Isso elimina a race condition.
-//
-// Regras:
-//   emDoca     → operador salvou doca
-//   carregando → operador salvou inicioCarregamento
-//   finalizado → saidaLiberada + lacre traseiro preenchidos
-//
-// Fire-and-forget: nunca bloqueia o operador.
-// ─────────────────────────────────────────────────────────────
->>>>>>> origin/updates
 async function avancarEtapaKanban(
   motoristaId: string,
   status: "aguardando" | "emDoca" | "carregando" | "finalizado",
@@ -97,10 +72,6 @@ async function avancarEtapaKanban(
   }
 }
 
-<<<<<<< HEAD
-=======
-// ─────────────────────────────────────────────────────────────
->>>>>>> origin/updates
 
 function DestinoContent() {
   const router = useRouter();
@@ -192,13 +163,6 @@ function DestinoContent() {
     }
   };
 
-<<<<<<< HEAD
-=======
-  // ─── Registro inicial no banco (fire-and-forget) ─────────────
-  // POST com upsert por motoristaId. Cria o documento com
-  // status 'aguardando' se não existir. Se já existir, retorna
-  // o documento sem alterar status — nunca duplica.
->>>>>>> origin/updates
   const registrarNoBanco = (motorista: any): void => {
     const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
     fetch("/api/carregamento", {
@@ -251,11 +215,6 @@ function DestinoContent() {
         status: "emFila",
         posicaoVeiculo: 0,
       });
-<<<<<<< HEAD
-=======
-      // Registra no banco com status 'aguardando' para aparecer no Kanban.
-      // POST é upsert — seguro chamar mesmo que o documento já exista.
->>>>>>> origin/updates
       registrarNoBanco(motorista);
     }
   };
@@ -280,23 +239,6 @@ function DestinoContent() {
     setCarregamentoData(null);
   };
 
-<<<<<<< HEAD
-=======
-  // ─── handleSaveModal ──────────────────────────────────────────
-  // Fluxo de etapas do Kanban:
-  //
-  //   Modal "doca" + doca selecionada
-  //     → Kanban: aguardando → emDoca
-  //
-  //   Modal "horarios" + inicioCarregamento preenchido
-  //     → Kanban: emDoca → carregando
-  //
-  //   Qualquer modal + saidaLiberada preenchida + lacre traseiro preenchido
-  //     → Kanban: carregando → finalizado
-  //
-  // O motoristaId é sempre calculado localmente — sem await, sem
-  // dependência de localStorage ou de retorno de POST.
->>>>>>> origin/updates
   const handleSaveModal = async () => {
     if (!selectedMotorista || !carregamentoData) return;
 
@@ -351,11 +293,6 @@ function DestinoContent() {
     enviarIncremental(motoristaId, { ...dados, status: dados.status });
 
     // ── 2. Avançar etapa no Kanban ───────────────────────────────
-<<<<<<< HEAD
-=======
-    // Usa motoristaId — sempre disponível, sem dependência async.
-    // PATCH /api/carregamento/etapa → updateOne por motoristaId.
->>>>>>> origin/updates
     if (activeModal === "doca" && dados.doca) {
       // Doca salva → emDoca
       avancarEtapaKanban(motoristaId, "emDoca", { doca: dados.doca });
@@ -678,10 +615,6 @@ function DestinoContent() {
         </div>
       </main>
 
-<<<<<<< HEAD
-=======
-      {/* ── Modal Doca ── */}
->>>>>>> origin/updates
       {activeModal === "doca" && selectedMotorista && carregamentoData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
@@ -726,10 +659,6 @@ function DestinoContent() {
         </div>
       )}
 
-<<<<<<< HEAD
-=======
-      {/* ── Modal Carga ── */}
->>>>>>> origin/updates
       {activeModal === "carga" && selectedMotorista && carregamentoData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
@@ -763,10 +692,6 @@ function DestinoContent() {
         </div>
       )}
 
-<<<<<<< HEAD
-=======
-      {/* ── Modal Horários ── */}
->>>>>>> origin/updates
       {activeModal === "horarios" && selectedMotorista && carregamentoData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
@@ -813,10 +738,6 @@ function DestinoContent() {
         </div>
       )}
 
-<<<<<<< HEAD
-=======
-      {/* ── Modal Lacres ── */}
->>>>>>> origin/updates
       {activeModal === "lacres" && selectedMotorista && carregamentoData && (
         <>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -911,9 +832,4 @@ export default function DestinoPage() {
       <DestinoContent />
     </Suspense>
   );
-<<<<<<< HEAD
 }
-=======
-}
-
->>>>>>> origin/updates
