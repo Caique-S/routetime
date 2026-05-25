@@ -204,7 +204,11 @@ function NovoCarregamento() {
                 <ClipboardCheck className="w-7 h-7 text-blue-600" />
               </div>
               <div>
-                <h2 className="font-bold text-gray-900 mb-1">Finalizar Operação {facilityAtual}</h2>
+                <div onClick = {() => router.push('/analyzer')}>
+                  <h2 className="font-bold text-gray-900 mb-1">Acompanhamento da Operação {facilityAtual}
+                  
+                  </h2>
+                </div>
                 {destinos.length === 0 && (
                   <p className="text-sm text-gray-600">
                     Nenhum destino encontrado para hoje. Faça upload do arquivo do dia.
