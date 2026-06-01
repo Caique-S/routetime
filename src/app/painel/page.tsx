@@ -227,7 +227,7 @@ export default function PainelPage() {
   // Auto-refresh a cada 10s
   useEffect(() => {
     if (!autoRefresh) return;
-    const id = setInterval(() => fetchMotoristas(true), 10000);
+    const id = setInterval(() => fetchMotoristas(true), 25000);
     return () => clearInterval(id);
   }, [autoRefresh, fetchMotoristas]);
 
