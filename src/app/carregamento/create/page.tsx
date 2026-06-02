@@ -223,10 +223,8 @@ export default function CreatePage() {
   };
 
   const handleDespachar = async () => {
-    // Tenta usar o carregamento já carregado no estado
     let data = carregamento;
 
-    // Se não existir ou não tiver posição, busca do banco
     if (!data || !data.posicaoVeiculo) {
       const motoristaId = localStorage.getItem("motoristaSelecionadoId");
       if (motoristaId) {
@@ -278,26 +276,26 @@ export default function CreatePage() {
     }
 
     const posicao = data.posicaoVeiculo?.toString().padStart(2, "0") || "";
-    const content = ` *ID:* ${data.motorista.travelId}
-                      *Doca:* (${data.doca || "Não definida"})
-                      *${data.motorista.tipoVeiculo}:* ${getNomeDestino(data.destino)} (${posicao})
-                      *Condutor:* ${data.motorista.nome}
-                      *Placa Tração:* ${data.motorista.veiculoTracao}
-                      ${data.motorista.veiculoCarga && data.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${data.motorista.veiculoCarga}` : ""}
+    const content = `*ID:* ${data.motorista.travelId}
+*Doca:* (${data.doca || "Não definida"})    
+*${data.motorista.tipoVeiculo}:* ${getNomeDestino(data.destino)} (${posicao})
+*Condutor:* ${data.motorista.nome}
+*Placa Tração:* ${data.motorista.veiculoTracao}
+${data.motorista.veiculoCarga && data.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${data.motorista.veiculoCarga}` : ""}
 
-                      *Encostado na doca:* ${data.horarios.encostadoDoca || "Não registrado"}
-                      *Início carregamento:* ${data.horarios.inicioCarregamento || "Não registrado"}
-                      *Término carregamento:* ${data.horarios.terminoCarregamento || "Não registrado"}
-                      *Saída liberada:* ${data.horarios.saidaLiberada || "Não registrado"}
-                      *Previsão de chegada:* ${data.horarios.previsaoChegada || "Não calculado"}
+*Encostado na doca:* ${data.horarios.encostadoDoca || "Não registrado"}
+*Início carregamento:* ${data.horarios.inicioCarregamento || "Não registrado"}
+*Término carregamento:* ${data.horarios.terminoCarregamento || "Não registrado"}
+*Saída liberada:* ${data.horarios.saidaLiberada || "Não registrado"}
+*Previsão de chegada:* ${data.horarios.previsaoChegada || "Não calculado"}
 
-                      *Lacre Traseiro:* ${data.lacres.traseiro || ""}
-                      *Lacre Lateral 1:* ${data.lacres.lateral1 || ""}
-                      *Lacre Lateral 2:* ${data.lacres.lateral2 || ""}
+*Lacre Traseiro:* ${data.lacres.traseiro || ""}
+*Lacre Lateral 1:* ${data.lacres.lateral1 || ""}
+*Lacre Lateral 2:* ${data.lacres.lateral2 || ""}
 
-                      *Total de gaiolas:* ${data.carga.gaiolas}
-                      *Total de volumosos:* ${data.carga.volumosos}
-                      *Total de manga palete:* ${data.carga.manga}`;
+*Total de gaiolas:* ${data.carga.gaiolas}
+*Total de volumosos:* ${data.carga.volumosos}
+*Total de manga palete:* ${data.carga.manga}`;
 
     const copiadoComSucesso = await copyToClipboard(content);
 
@@ -324,10 +322,10 @@ export default function CreatePage() {
     if (!carregamento) return;
 
     const mensagem = `Not Used
-                      ID: ${carregamento.motorista.travelId}
-                      ${carregamento.motorista.tipoVeiculo} : ${getNomeDestino(carregamento.destino)}
-                      Placa Tração: ${carregamento.motorista.veiculoTracao}
-                      Condutor: ${carregamento.motorista.nome}`;
+ID: ${carregamento.motorista.travelId}
+${carregamento.motorista.tipoVeiculo} : ${getNomeDestino(carregamento.destino)}
+Placa Tração: ${carregamento.motorista.veiculoTracao}
+Condutor: ${carregamento.motorista.nome}`;
 
     const copiadoComSucesso = await copyToClipboard(mensagem);
 
@@ -356,7 +354,6 @@ export default function CreatePage() {
       const motoristaId = `${carregamentoData.destino}_${carregamentoData.facility}_${carregamentoData.motorista.nome}_${carregamentoData.motorista.travelId}`;
       const chaveBase = `carregamentos_${carregamentoData.destino}_${carregamentoData.facility}`;
 
-      // 1. Envia a ordem para a API (Isso já estava funcionando perfeitamente)
       const response = await fetch("/api/carregamento", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -373,12 +370,8 @@ export default function CreatePage() {
 
       if (!response.ok) throw new Error("Erro ao atualizar banco");
 
-      // 2. A MÁGICA SIMPLES DO LOCALSTORAGE
       const carregamentosExistentes = JSON.parse(localStorage.getItem(chaveBase) || '{}');
       
-      // Removemos o "if". Nós simplesmente forçamos a gravação.
-      // Se ele já existir lá dentro, ele pega o que tem. 
-      // Se NÃO existir, ele usa o 'carregamentoData' que veio via prop da tela!
       carregamentosExistentes[motoristaId] = {
         ...(carregamentosExistentes[motoristaId] || carregamentoData),
         finalizado: true,
@@ -389,10 +382,8 @@ export default function CreatePage() {
         lacres: { traseiro: "", lateral1: "", lateral2: "" }
       };
 
-      // Grava a chave base de volta (se ela não existia, passa a existir agora)
       localStorage.setItem(chaveBase, JSON.stringify(carregamentosExistentes));
 
-      // 3. Limpeza de sessão
       localStorage.removeItem("motoristaSelecionadoId");
       localStorage.removeItem("MotoristaSelecionado");
       localStorage.removeItem("DestinoAtual");

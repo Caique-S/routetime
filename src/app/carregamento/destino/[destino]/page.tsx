@@ -31,7 +31,7 @@ interface MotoristaInfo {
 }
 
 interface CarregamentoData {
-  id: string;
+  motoristaId: string;
   doca: string;
   carga: { gaiolas: string; volumosos: string; manga: string };
   horarios: {
@@ -72,7 +72,6 @@ function DestinoContent() {
 
   const facility = searchParams?.get("facility") || "N/A";
 
-  // Carregar dados do localStorage ao iniciar
   useEffect(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(`carregamentos_${destinoCodigo}_${facility}`);
@@ -143,61 +142,34 @@ function DestinoContent() {
     }
   };
 
-  const registrarNoBanco = (motorista: any): void => {
-    const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
-    fetch("/api/carregamento", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        destino: destinoCodigo,
-        facility,
-        motorista: {
-          nome: motorista.nome,
-          travelId: motorista.travelId,
-          tipoVeiculo: motorista.tipoVeiculo,
-          veiculoTracao: motorista.veiculoTracao,
-          veiculoCarga: motorista.veiculoCarga,
-          placa: motorista.placa,
-          transportadora: motorista.transportadora,
-          dataInicio: motorista.dataInicio,
-        },
-      }),
-    }).catch((err) => console.warn("[registrarNoBanco] Erro (não crítico):", err));
-  };
+const handleOpenModal = (modal: string, motorista: any) => {
+  setSelectedMotorista(motorista);
+  setActiveModal(modal);
 
-  const handleOpenModal = (modal: string, motorista: any) => {
-    setSelectedMotorista(motorista);
-    setActiveModal(modal);
+  const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
+  const existing = carregamentos[motoristaId];
 
-    const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
-    const existing = carregamentos[motoristaId];
-
-    if (existing) {
-      const statusCorrigido =
-        existing.horarios?.inicioCarregamento?.trim()
-          ? "carregando"
-          : existing.status || "aguardando";
-      setCarregamentoData({ ...existing, status: statusCorrigido as any });
-    } else {
-      setCarregamentoData({
-        id: generateId(),
-        doca: "",
-        carga: { gaiolas: "", volumosos: "", manga: "" },
-        horarios: {
-          encostadoDoca: "", inicioCarregamento: "",
-          terminoCarregamento: "", saidaLiberada: "", previsaoChegada: "",
-        },
-        lacres: { traseiro: "", lateral1: "", lateral2: "" },
-        motorista,
-        destino: destinoCodigo,
-        facility,
-        timestamp: new Date().toISOString(),
-        status: "aguardando",
-        posicaoVeiculo: 0,
-      });
-      registrarNoBanco(motorista);
-    }
-  };
+  if (existing) {
+    setCarregamentoData({ ...existing });
+  } else {
+    setCarregamentoData({
+      motoristaId,
+      doca: "",
+      carga: { gaiolas: "", volumosos: "", manga: "" },
+      horarios: {
+        encostadoDoca: "", inicioCarregamento: "",
+        terminoCarregamento: "", saidaLiberada: "", previsaoChegada: "",
+      },
+      lacres: { traseiro: "", lateral1: "", lateral2: "" },
+      motorista,
+      destino: destinoCodigo,
+      facility,
+      timestamp: new Date().toISOString(),
+      status: "aguardando",
+      posicaoVeiculo: 0,
+    });
+  }
+};
 
 const enviarIncremental = (
   motoristaId: string,
@@ -222,14 +194,12 @@ const handleSaveModal = async () => {
     let ts = { ...(carregamentoData.timestamps || {}) };
     let payloadParaOBanco: Record<string, any> = {};
 
-    // ─── 1. Processamento de Regras de Negócio e Status ───
     if (activeModal === "doca") {
       if (dados.doca && dados.status !== "carregando" && dados.status !== "liberado") {
         dados.status = "emDoca";
         ts.aguardando = ts.aguardando || dados.timestamp;
         ts.emDoca = ts.emDoca || agora;
       }
-      // Prepara o bloco isolado para o banco
       payloadParaOBanco = { 
         doca: dados.doca, 
         status: dados.status 
@@ -250,7 +220,6 @@ const handleSaveModal = async () => {
       payloadParaOBanco = { lacres: dados.lacres };
     }
 
-    // ─── 2. Checagem Automática de Finalização (Gatilho de Saída) ───
     const temDoca = dados.doca?.trim();
     const temSaida = dados.horarios?.saidaLiberada?.trim();
     const temLacreTraseiro = dados.lacres?.traseiro?.trim();
@@ -258,7 +227,7 @@ const handleSaveModal = async () => {
 
     if (temDoca && temSaida && temLacreTraseiro && temCargaCompleta && dados.status !== "liberado") {
       dados.status = "liberado";
-      dados.finalizado = true; // Carimba como finalizado para sumir dos pendentes
+      dados.finalizado = true; 
       ts.finalizado = agora;
       
       const chave = `carregamentos_${destinoCodigo}_${facility}`;
@@ -274,14 +243,11 @@ const handleSaveModal = async () => {
       payloadParaOBanco.posicaoVeiculo = dados.posicaoVeiculo;
     }
 
-    // Injeta os timestamps atualizados no payload que vai viajar para a API
     dados.timestamps = ts;
     payloadParaOBanco.timestamps = ts;
 
-    // ─── 3. Disparo Único para o Servidor (Sem endpoints fantasmas!) ───
     enviarIncremental(motoristaId, payloadParaOBanco);
-
-    // ─── 4. Atualização da Memória Local (Interface Fluida) ───
+    
     const updated = { ...carregamentos, [motoristaId]: dados };
     setCarregamentos(updated);
     localStorage.setItem(
@@ -348,8 +314,6 @@ const handleSaveModal = async () => {
     return `${saida.getHours().toString().padStart(2, "0")}:${saida.getMinutes().toString().padStart(2, "0")}`;
   };
 
-  const generateId = (): string =>
-    Math.floor(10000000 + Math.random() * 90000000).toString();
 
   const handleSelecionarMotorista = (motorista: any) => {
     const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
@@ -450,9 +414,11 @@ const handleSaveModal = async () => {
                 const borderColor =
                   d?.status === "carregando" ? "border-orange-400" :
                   d?.status === "liberado" ? "border-green-500" : "border-gray-200";
-                const iconColor =
+                  d?.status === "not_used" ? "border-red-600" : "border-gray-200";
+                  const iconColor =
                   d?.status === "carregando" ? "text-orange-500" :
                   d?.status === "liberado" ? "text-green-500" : "text-blue-600";
+                  d?.status === "not_used" ? "text-red-500" : "border-gray-200";
 
                 return (
                   <div
