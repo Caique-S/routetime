@@ -1,0 +1,204 @@
+// tests/api/carregamento.test.ts
+
+
+import { NextRequest } from 'next/server';
+import { ObjectId } from 'mongodb';
+import { describe, test, expect, afterAll } from '@jest/globals'; // ← Importação corrigida
+
+import { GET, POST, PUT } from '@/app/api/carregamento/route';
+import { PUT as PUT_ID, DELETE } from '@/app/api/carregamento/[id]/route';
+import { PATCH } from '@/app/api/carregamento/[id]/status/route';
+
+// =============================================
+// CONFIGURAÇÃO DE TESTE
+// =============================================
+
+const TEST_FACILITY = 'FAC-TESTE-AUTOMATIZADO';
+const TEST_PREFIX = 'TESTE-AUTO-';
+
+describe('API Carregamentos - Testes Reais (Cronológico)', () => {
+  let createdId: string;
+  let motoristaId: string;
+
+  console.log('🚀 Iniciando testes de integração com MongoDB...');
+
+  // =============================================
+  // 1. CRIAÇÃO
+  // =============================================
+  test('1. Deve criar um novo carregamento com sucesso', async () => {
+    const payload = {
+      destino: 'São Paulo',
+      facility: TEST_FACILITY,
+      motorista: {
+        nome: `${TEST_PREFIX}João Silva`,
+        travelId: 'TRV-TEST-001',
+      },
+    };
+
+    const request = new NextRequest('http://localhost/api/carregamento', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(201);                    // ← Agora deve funcionar
+    expect(data.success).toBe(true);
+    expect(data.data).toHaveProperty('_id');
+    expect(data.data).toHaveProperty('motoristaId');
+    expect(data.data.status).toBe('aguardando');
+    expect(data.data.facility).toBe(TEST_FACILITY);
+
+    createdId = data.data._id;
+    motoristaId = data.data.motoristaId;
+
+    console.log(`✅ Carregamento criado - ID: ${createdId}`);
+  });
+
+  // =============================================
+  // 2. LISTAGEM
+  // =============================================
+  test('2. Deve listar carregamentos com paginação', async () => {
+    const request = new NextRequest(
+      `http://localhost/api/carregamento?limit=10&page=1&facility=${TEST_FACILITY}`
+    );
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(Array.isArray(data.data)).toBe(true);
+    expect(data.pagination).toBeDefined();
+  });
+
+  // =============================================
+  // 3. ATUALIZAÇÃO GERAL
+  // =============================================
+  test('3. Deve atualizar dados gerais do carregamento', async () => {
+    const updatePayload = {
+      motoristaId,
+      destino: 'Rio de Janeiro - Teste Automatizado',
+      'motorista.nome': `${TEST_PREFIX}João Silva Atualizado`,
+    };
+
+    const request = new NextRequest('http://localhost/api/carregamento', {
+      method: 'PUT',
+      body: JSON.stringify(updatePayload),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await PUT(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.data.destino).toBe('Rio de Janeiro - Teste Automatizado');
+  });
+
+  // =============================================
+  // 4. ATUALIZAÇÃO POR ID
+  // =============================================
+  test('4. Deve atualizar campos específicos pelo _id', async () => {
+    const updateData = {
+      observacoes: 'Teste automatizado - Prioridade Alta',
+      placaCaminhao: 'TEST-9999',
+    };
+
+    const request = new NextRequest(`http://localhost/api/carregamento/${createdId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await PUT_ID(request, { params: Promise.resolve({ id: createdId }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.data.observacoes).toBe('Teste automatizado - Prioridade Alta');
+  });
+
+  // =============================================
+  // 5~7. TRANSIÇÕES DE STATUS
+  // =============================================
+  test('5. Deve avançar status: aguardando → emDoca', async () => {
+    const request = new NextRequest(`http://localhost/api/carregamento/${createdId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'emDoca', dadosAdicionais: { doca: 'D15' } }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await PATCH(request, { params: Promise.resolve({ id: createdId }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.data.status).toBe('emDoca');
+  });
+
+  test('6. Deve avançar status: emDoca → carregando', async () => {
+    const request = new NextRequest(`http://localhost/api/carregamento/${createdId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'carregando', dadosAdicionais: { horaInicio: '09:15' } }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await PATCH(request, { params: Promise.resolve({ id: createdId }) });
+    const data = await response.json();
+
+    expect(data.data.status).toBe('carregando');
+  });
+
+  test('7. Deve cancelar carregamento (not_used)', async () => {
+    const request = new NextRequest(`http://localhost/api/carregamento/${createdId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'not_used',
+        dadosAdicionais: { motivoCancelamento: 'Teste automatizado' }
+      }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await PATCH(request, { params: Promise.resolve({ id: createdId }) });
+    const data = await response.json();
+
+    expect(data.data.status).toBe('not_used');
+  });
+
+  // =============================================
+  // 8. EXCLUSÃO
+  // =============================================
+  test('8. Deve deletar o carregamento', async () => {
+    const request = new NextRequest(`http://localhost/api/carregamento/${createdId}`, {
+      method: 'DELETE',
+    });
+
+    const response = await DELETE(request, { params: Promise.resolve({ id: createdId }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+  });
+
+  // =============================================
+  // TESTE DE ERRO
+  // =============================================
+  test('9. Deve rejeitar ID inválido', async () => {
+    const request = new NextRequest('http://localhost/api/carregamento/invalid-id', {
+      method: 'PUT',
+      body: JSON.stringify({}),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const response = await PUT_ID(request, { params: Promise.resolve({ id: 'invalid-id' }) });
+    expect(response.status).toBe(400);
+  });
+
+  afterAll(() => {
+    console.log('🏁 Testes finalizados.');
+    console.log(`💡 Dica: Limpe os testes com: db.carregamentos.deleteMany({ facility: "${TEST_FACILITY}" })`);
+  });
+});

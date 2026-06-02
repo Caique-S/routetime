@@ -3,12 +3,6 @@ import { ObjectId } from 'mongodb';
 import { getDatabase } from '@/app/lib/mongodb';
 import { serializeDocument } from '@/app/lib/utils/serialize';
 
-/**
- * PUT /api/carregamento/[id]
- *
- * Atualiza campos livres de um carregamento pelo _id do MongoDB.
- * O campo _id é removido automaticamente para evitar conflitos.
- */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -43,11 +37,6 @@ export async function PUT(
   }
 }
 
-/**
- * DELETE /api/carregamento/[id]
- *
- * Remove um carregamento pelo _id do MongoDB.
- */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

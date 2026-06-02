@@ -4,28 +4,6 @@ import { getDatabase } from '@/app/lib/mongodb';
 import { STATUS_VALIDOS, validarTransicao, type StatusCarregamento,} from '@/app/lib/utils/status';
 import { TZ_BRASIL } from '@/app/lib/utils/dateUtils';
 
-/**
- * PATCH /api/carregamento/[id]/status
- *
- * Avança ou cancela a etapa de um carregamento.
- *
- * Transições válidas (definidas em lib/utils/status.ts):
- *   aguardando → emDoca | not_used
- *   emDoca     → carregando | not_used
- *   carregando → liberado | not_used
- *   liberado   → (terminal)
- *   not_used   → (terminal)
- *
- * Body: {
- *   status: StatusCarregamento,
- *   dadosAdicionais?: Record<string, unknown>
- *     Exemplos por status:
- *       emDoca:    { doca: 'D1' }
- *       carregando: { horaInicio: '14:00' }
- *       liberado:  { saidaLiberada: '15:30', lacreTraseiro: 'LAC-001' }
- *       not_used:  { motivoCancelamento?: string }
- * }
- */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

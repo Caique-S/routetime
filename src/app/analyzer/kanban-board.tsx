@@ -6,20 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Clock, MapPin, User } from "lucide-react";
 
-// ─────────────────────────────────────────────────────────────
-// TIMEZONE — Brasil UTC-3
-//
-// Os timestamps no banco estão em UTC ISO ("2025-05-08T17:00:00.000Z").
-// calcularTempo() usa getTime() para calcular DURAÇÃO → timezone-agnóstico ✅
-// formatarHoraBrasil() converte para EXIBIÇÃO em UTC-3 ✅
-// ─────────────────────────────────────────────────────────────
 
 const TZ_BRASIL = "America/Sao_Paulo";
 
-/**
- * Formata um ISO UTC para horário de Brasília (HH:MM).
- * Exemplo: "2025-05-08T17:00:00.000Z" → "14:00"
- */
 function formatarHoraBrasil(iso: string | undefined): string {
   if (!iso) return "—";
   try {
@@ -35,7 +24,7 @@ function formatarHoraBrasil(iso: string | undefined): string {
 
 const INTERVALO = 10000;
 
-type StatusCarregamento = "aguardando" | "emDoca" | "carregando" | "finalizado";
+type StatusCarregamento = "aguardando" | "emDoca" | "carregando" | "liberado";
 
 interface MotoristaKanban {
   motoristaId: string;
@@ -50,31 +39,19 @@ const colunas: { status: StatusCarregamento; titulo: string; cor: string }[] = [
   { status: "aguardando",  titulo: "🕒 Aguardando", cor: "border-amber-400"  },
   { status: "emDoca",      titulo: "📥 Em Doca",    cor: "border-blue-500"   },
   { status: "carregando",  titulo: "🚛 Carregando", cor: "border-orange-500" },
-  { status: "finalizado",  titulo: "✅ Finalizado",  cor: "border-green-500"  },
+  { status: "liberado",  titulo: "✅ Liberado",  cor: "border-green-500"  },
 ];
 
-/**
- * Calcula a duração na etapa atual em HH:MM:SS.
- *
- * Como funciona:
- *   timestamps.aguardando = "2025-05-08T17:00:00.000Z" (UTC)
- *   new Date(iso).getTime() → ms em UTC desde epoch
- *   new Date().getTime()    → ms em UTC desde epoch (agora)
- *   diferença em ms → segundos → formato HH:MM:SS
- *
- * O cálculo é timezone-agnóstico: ms desde epoch independe de fuso.
- * O resultado (duração) é o mesmo seja em Brasília, Lisboa ou UTC.
- */
 function calcularTempo(
   status: StatusCarregamento,
   timestamps?: Record<string, string>
 ): string {
   if (!timestamps) return "00:00:00";
 
-  // Para "finalizado", mostra o tempo total (aguardando → finalizado)
-  if (status === "finalizado") {
+  // Para "liberado", mostra o tempo total (aguardando → liberado)
+  if (status === "liberado") {
     const inicio = timestamps.aguardando;
-    const fim = timestamps.finalizado;
+    const fim = timestamps.liberado;
     if (!inicio || !fim) return "—";
     const diffSeg = Math.max(
       0,
@@ -203,8 +180,8 @@ export default function KanbanBoard({ dataInicio, dataFim, facility }: KanbanBoa
                           {m.timestamps.carregando && (
                             <p>🚛 Início: {formatarHoraBrasil(m.timestamps.carregando)}</p>
                           )}
-                          {m.timestamps.finalizado && (
-                            <p>✅ Fim: {formatarHoraBrasil(m.timestamps.finalizado)}</p>
+                          {m.timestamps.liberado && (
+                            <p>✅ Fim: {formatarHoraBrasil(m.timestamps.liberado)}</p>
                           )}
                         </div>
                       )}

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parse } from 'papaparse';
 import { getDatabase } from '@/app/lib/mongodb';
-import { criarIntervaloDia, getTodayBrasilia } from '@/app/lib/utils/dateUtils';
+import { criarIntervaloDia } from '@/app/lib/utils/dateUtils';
+import { criarCarregamentosFromCSV } from '@/app/lib/models/carregamento'; 
 
 interface CSVUpload {
   fileName:         string;
@@ -14,24 +15,16 @@ interface CSVUpload {
   filterColumn?:    string;
   filterValue?:     string;
   metadata?: {
-    headers:    string[];
-    delimiter:  string;
-    encoding:   string;
+    headers:   string[];
+    delimiter: string;
+    encoding:  string;
   };
-}
-
-function montarMotoristaId(destino: string, facility: string, nome: string, travelId: string): string {
-  return `${destino}_${facility}_${nome}_${travelId}`;
-}
-
-function gerarNumeroCarregamento(): string {
-  return `CAR-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const formData    = await request.formData();
-    const file        = formData.get('file') as File | null;
+    const formData     = await request.formData();
+    const file         = formData.get('file') as File | null;
     const filterColumn = formData.get('filterColumn') as string | null;
     const filterValue  = formData.get('filterValue')  as string | null;
 
@@ -86,38 +79,22 @@ export async function POST(request: NextRequest) {
     const db = await getDatabase();
     const insertResult = await db.collection('uploads_atribuicao').insertOne(uploadDocument);
 
-    const agora    = new Date();
-    const agoraISO = agora.toISOString();
-    const facility = filterValue ?? '';
+    const facilityFallback = filterValue ?? '';
 
     const bulkOps = filteredData
       .filter((row) => row['Nome do motorista 1'] && row['Destino'])
       .map((row) => {
-        const nome      = String(row['Nome do motorista 1']).trim();
-        const destino   = String(row['Destino']).trim();
-        const travelId  = String(row['ID do motorista 1'] ?? '').trim();
-        const rowFacility = String(row['Facility'] ?? row['facility'] ?? facility).trim();
-        const motoristaId = montarMotoristaId(destino, rowFacility, nome, travelId);
+        
+        const carregamento = criarCarregamentosFromCSV(row, facilityFallback);
+
+        const { dataAtualizacao, ...dadosParaInserir } = carregamento;
 
         return {
           updateOne: {
-            filter: { motoristaId },
+            filter: { motoristaId: carregamento.motoristaId },
             update: {
-              $setOnInsert: {
-                motoristaId,
-                destino,
-                facility:    rowFacility,
-                motorista: {
-                  nome,
-                  travelId,
-                  tipoVeiculo: String(row['Tipo de veículo'] ?? '').trim(),
-                },
-                status:     'aguardando',
-                timestamps: { aguardando: agoraISO },
-                dataCriacao: agora,
-                numero:      gerarNumeroCarregamento(),
-              },
-              $set: { dataAtualizacao: agora },
+              $setOnInsert: dadosParaInserir,
+              $set: { dataAtualizacao: new Date() },
             },
             upsert: true,
           },
@@ -128,7 +105,7 @@ export async function POST(request: NextRequest) {
     if (bulkOps.length > 0) {
       const bulk = await db.collection('carregamentos').bulkWrite(bulkOps, { ordered: false });
       carregamentosResult = {
-        criados:    bulk.upsertedCount,
+        criados:     bulk.upsertedCount,
         existentes: bulk.matchedCount,
       };
     }
@@ -151,7 +128,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
 
 export async function GET(request: NextRequest) {
   try {

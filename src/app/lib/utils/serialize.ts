@@ -1,22 +1,5 @@
 import { ObjectId } from 'mongodb';
 
-/**
- * serialize.ts
- *
- * Converte documentos MongoDB para objetos JSON seguros,
- * transformando tipos não serializáveis (Date, ObjectId) em strings.
- *
- * Anteriormente definido inline em app/api/carregamento/route.ts.
- */
-
-/**
- * Serializa recursivamente um documento MongoDB.
- *  - Date       → ISO string (UTC)
- *  - ObjectId   → string hexadecimal
- *  - Arrays     → mapeados recursivamente
- *  - Objetos    → percorridos recursivamente
- *  - null/undefined → mantidos como estão
- */
 export function serializeDocument<T = Record<string, unknown>>(doc: any): T {
   if (doc === null || doc === undefined) return doc;
 

@@ -46,7 +46,7 @@ interface CarregamentoData {
   destino: string;
   facility: string;
   timestamp: string;
-  status: "emFila" | "carregando" | "liberado";
+  status: "aguardando" | "emDoca" | "carregando" | "liberado" | "not_used";
   posicaoVeiculo?: number;
   finalizado?: boolean;
   timestamps?: Record<string, string>;
@@ -54,7 +54,7 @@ interface CarregamentoData {
 
 async function avancarEtapaKanban(
   motoristaId: string,
-  status: "aguardando" | "emDoca" | "carregando" | "finalizado",
+  status: "aguardando" | "emDoca" | "carregando" | "liberado",
   dadosAdicionais?: Record<string, any>
 ): Promise<void> {
   try {
@@ -194,9 +194,9 @@ function DestinoContent() {
 
     if (existing) {
       const statusCorrigido =
-        existing.horarios?.encostadoDoca?.trim()
+        existing.horarios?.inicioCarregamento?.trim()
           ? "carregando"
-          : existing.status || "emFila";
+          : existing.status || "aguardando";
       setCarregamentoData({ ...existing, status: statusCorrigido as any });
     } else {
       setCarregamentoData({
@@ -212,7 +212,7 @@ function DestinoContent() {
         destino: destinoCodigo,
         facility,
         timestamp: new Date().toISOString(),
-        status: "emFila",
+        status: "aguardando",
         posicaoVeiculo: 0,
       });
       registrarNoBanco(motorista);
@@ -256,13 +256,13 @@ function DestinoContent() {
         ts.emDoca = ts.emDoca || agora;
       }
     } else if (activeModal === "horarios" || activeModal === "carga" || activeModal === "lacres") {
-      const temEncostado = dados.horarios?.encostadoDoca?.trim();
+      const temEncostado = dados.doca?.trim();
       const temSaida = dados.horarios?.saidaLiberada?.trim();
       const temLacre = dados.lacres?.traseiro?.trim();
 
       if (temEncostado) {
         if (temSaida && temLacre) {
-          // Liberado / finalizado
+          // Liberado 
           dados.status = "liberado";
           const chave = `carregamentos_${destinoCodigo}_${facility}`;
           const salvos = JSON.parse(localStorage.getItem(chave) || "{}");
@@ -305,11 +305,14 @@ function DestinoContent() {
       avancarEtapaKanban(motoristaId, "carregando");
 
     } else if (
+      dados.carga?.gaiolas?.trim() &&
+      dados.carga?.volumosos?.trim() &&
+      dados.carga?.manga?.trim() &&
       dados.horarios?.saidaLiberada?.trim() &&
       dados.lacres?.traseiro?.trim()
     ) {
       // Saída liberada + lacre traseiro → finalizado
-      avancarEtapaKanban(motoristaId, "finalizado");
+      avancarEtapaKanban(motoristaId, "liberado");
     }
 
     // ── 3. Atualizar localStorage ────────────────────────────────

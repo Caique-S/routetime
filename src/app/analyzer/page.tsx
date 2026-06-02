@@ -102,7 +102,7 @@ interface CarregamentoData {
     transportadora: string;
     dataInicio: string;
   };
-  status?: "emFila" | "carregando" | "liberado" | "not_used" | "";
+  status?: "emDoca" | "aguardando" | "carregando" | "liberado" | "not_used" | "";
   posicaoVeiculo?: number;
   destino: string;
   facility: string;
@@ -310,7 +310,8 @@ export default function AnalyserPage() {
 
   // Métricas
   const stats = useMemo(() => {
-    const emFila = carregamentos.filter(c => c.status === "emFila").length;
+    const emDoca = carregamentos.filter(c => c.status === "emDoca").length;
+    const aguardando = carregamentos.filter(c => c.status === "aguardando").length;
     const carregando = carregamentos.filter(c => c.status === "carregando").length;
     const liberados = carregamentos.filter(c => c.status === "liberado").length;
     const finalizados = carregamentos.filter(c => c.finalizado).length;
@@ -342,7 +343,8 @@ export default function AnalyserPage() {
 
     return {
       total: carregamentos.length,
-      emFila,
+      emDoca,
+      aguardando,
       carregando,
       liberados,
       finalizados,
@@ -366,7 +368,7 @@ export default function AnalyserPage() {
 
   // Dados para gráficos
   const statusData = [
-    { name: "Em Fila", value: stats.emFila, color: "#f59e0b" },
+    { name: "Em Doca", value: stats.emDoca, color: "#f59e0b" },
     { name: "Carregando", value: stats.carregando, color: "#3b82f6" },
     { name: "Liberados", value: stats.liberados, color: "#10b981" },
   ];
@@ -535,7 +537,7 @@ export default function AnalyserPage() {
         {/* Cards de métricas */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard title="Total" value={stats.total} subtitle="viagens" icon={<Activity className="h-5 w-5" />} onClick={() => abrirDetalhes("Todas as viagens", carregamentos)} />
-          <MetricCard title="Em Andamento" value={stats.emFila + stats.carregando} subtitle={`${stats.emFila} fila, ${stats.carregando} carregando`} icon={<Truck className="h-5 w-5" />} onClick={() => abrirDetalhes("Em andamento", carregamentos.filter(c => !c.finalizado))} />
+          <MetricCard title="Em Andamento" value={stats.emDoca + stats.carregando} subtitle={`${stats.emDoca} Doca, ${stats.carregando} carregando`} icon={<Truck className="h-5 w-5" />} onClick={() => abrirDetalhes("Em andamento", carregamentos.filter(c => !c.finalizado))} />
           <MetricCard title="Concluídos" value={stats.finalizados} subtitle={`${stats.liberados} liberados`} icon={<CheckCircle className="h-5 w-5" />} onClick={() => abrirDetalhes("Concluídos", carregamentos.filter(c => c.finalizado))} />
           <MetricCard title="Gaiolas" value={stats.gaiolas} subtitle={`${stats.volumosos} vol. / ${stats.manga} manga`} icon={<Box className="h-5 w-5" />} onClick={() => abrirDetalhes("Com carga", carregamentos.filter(c => parseInt(c.carga?.gaiolas) > 0))} />
         </div>

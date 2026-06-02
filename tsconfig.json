@@ -31,6 +31,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "server.js", "src/app/api/melicage/motoristas/oldroute.00"  ],
+, "server.js", "src/app/api/melicage/motoristas/oldroute.00", "src/app/tests/api/mongoStatus.test.js", "src/app/tests/api/carregamento.old"  ],
   "exclude": ["node_modules"]
 }
