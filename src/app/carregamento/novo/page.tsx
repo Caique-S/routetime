@@ -276,7 +276,7 @@ function NovoCarregamento() {
                 {destino.atribuicao && (
                   <div className="flex items-center gap-3 text-xs text-gray-600">
                     <Calendar className="w-3.5 h-3.5" />
-                    <span>Atribuído: {formatarDataBrasil(destino.atribuicao)}</span>
+                    <span>Atribuído: {destino.atribuicao}</span>
                     <Truck className="w-4 h-4 text-blue-600" />
                     <span>{destino.veiculosCount} Veículos</span>
                   </div>

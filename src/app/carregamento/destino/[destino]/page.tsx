@@ -52,26 +52,6 @@ interface CarregamentoData {
   timestamps?: Record<string, string>;
 }
 
-async function avancarEtapaKanban(
-  motoristaId: string,
-  status: "aguardando" | "emDoca" | "carregando" | "liberado",
-  dadosAdicionais?: Record<string, any>
-): Promise<void> {
-  try {
-    const res = await fetch("/api/carregamento/etapa", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ motoristaId, status, dadosAdicionais }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.warn(`[avancarEtapaKanban] ${status} falhou para ${motoristaId}:`, err);
-    }
-  } catch (err) {
-    console.warn(`[avancarEtapaKanban] Erro de rede (${status}):`, err);
-  }
-}
-
 
 function DestinoContent() {
   const router = useRouter();
@@ -219,27 +199,20 @@ function DestinoContent() {
     }
   };
 
-  // ─── Envio de dados ao banco (PUT upsert) ─────────────────────
-  const enviarIncremental = (
-    motoristaId: string,
-    payload: Partial<CarregamentoData> & { status?: string }
-  ): void => {
-    fetch("/api/carregamento", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ motoristaId, ...payload }),
-    }).catch((err) =>
-      console.warn("[enviarIncremental] Erro (dados no localStorage):", err)
-    );
-  };
+const enviarIncremental = (
+  motoristaId: string,
+  payload: Record<string, any>
+): void => {
+  fetch("/api/carregamento", {
+    method: "PATCH", 
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ motoristaId, ...payload }),
+  }).catch((err) =>
+    console.warn("[enviarIncremental] Erro ao sincronizar com o banco:", err)
+  );
+};
 
-  const handleCloseModal = () => {
-    setActiveModal(null);
-    setSelectedMotorista(null);
-    setCarregamentoData(null);
-  };
-
-  const handleSaveModal = async () => {
+const handleSaveModal = async () => {
     if (!selectedMotorista || !carregamentoData) return;
 
     const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
@@ -247,75 +220,68 @@ function DestinoContent() {
 
     let dados = { ...carregamentoData };
     let ts = { ...(carregamentoData.timestamps || {}) };
+    let payloadParaOBanco: Record<string, any> = {};
 
-    // ── Determinar status interno e timestamps de exibição ──────
+    // ─── 1. Processamento de Regras de Negócio e Status ───
     if (activeModal === "doca") {
       if (dados.doca && dados.status !== "carregando" && dados.status !== "liberado") {
-        dados.status = "emDoca" as any;
+        dados.status = "emDoca";
         ts.aguardando = ts.aguardando || dados.timestamp;
         ts.emDoca = ts.emDoca || agora;
       }
-    } else if (activeModal === "horarios" || activeModal === "carga" || activeModal === "lacres") {
-      const temEncostado = dados.doca?.trim();
-      const temSaida = dados.horarios?.saidaLiberada?.trim();
-      const temLacre = dados.lacres?.traseiro?.trim();
+      // Prepara o bloco isolado para o banco
+      payloadParaOBanco = { 
+        doca: dados.doca, 
+        status: dados.status 
+      };
 
-      if (temEncostado) {
-        if (temSaida && temLacre) {
-          // Liberado 
-          dados.status = "liberado";
-          const chave = `carregamentos_${destinoCodigo}_${facility}`;
-          const salvos = JSON.parse(localStorage.getItem(chave) || "{}");
-          const liberadosCount = Object.entries(salvos).filter(
-            ([id, c]: [string, any]) => c.status === "liberado" && id !== motoristaId
-          ).length;
-          dados.posicaoVeiculo = liberadosCount + 1;
-          ts.aguardando = ts.aguardando || dados.timestamp;
-          ts.emDoca = ts.emDoca || agora;
-          ts.carregando = ts.carregando || agora;
-          ts.finalizado = agora;
-        } else {
-          // Carregando
-          dados.status = "carregando";
-          dados.posicaoVeiculo = undefined;
-          ts.aguardando = ts.aguardando || dados.timestamp;
-          ts.emDoca = ts.emDoca || agora;
-          ts.carregando = ts.carregando || agora;
-        }
-      } else {
-        if (dados.status !== "liberado") dados.posicaoVeiculo = undefined;
+    } else if (activeModal === "carga") {
+      payloadParaOBanco = { carga: dados.carga };
+
+    } else if (activeModal === "horarios") {
+      payloadParaOBanco = { horarios: dados.horarios };
+      if (dados.horarios?.inicioCarregamento?.trim() && dados.status === "emDoca") {
+        dados.status = "carregando";
+        ts.carregando = ts.carregando || agora;
+        payloadParaOBanco.status = "carregando";
       }
+
+    } else if (activeModal === "lacres") {
+      payloadParaOBanco = { lacres: dados.lacres };
     }
 
+    // ─── 2. Checagem Automática de Finalização (Gatilho de Saída) ───
+    const temDoca = dados.doca?.trim();
+    const temSaida = dados.horarios?.saidaLiberada?.trim();
+    const temLacreTraseiro = dados.lacres?.traseiro?.trim();
+    const temCargaCompleta = dados.carga?.gaiolas && dados.carga?.volumosos && dados.carga?.manga;
+
+    if (temDoca && temSaida && temLacreTraseiro && temCargaCompleta && dados.status !== "liberado") {
+      dados.status = "liberado";
+      dados.finalizado = true; // Carimba como finalizado para sumir dos pendentes
+      ts.finalizado = agora;
+      
+      const chave = `carregamentos_${destinoCodigo}_${facility}`;
+      const salvos = JSON.parse(localStorage.getItem(chave) || "{}");
+      const liberadosCount = Object.entries(salvos).filter(
+        ([id, c]: [string, any]) => c.status === "liberado" && id !== motoristaId
+      ).length;
+      
+      dados.posicaoVeiculo = liberadosCount + 1;
+      
+      payloadParaOBanco.status = "liberado";
+      payloadParaOBanco.finalizado = true;
+      payloadParaOBanco.posicaoVeiculo = dados.posicaoVeiculo;
+    }
+
+    // Injeta os timestamps atualizados no payload que vai viajar para a API
     dados.timestamps = ts;
+    payloadParaOBanco.timestamps = ts;
 
-    // ── 1. Enviar dados ao banco (fire-and-forget) ───────────────
-    enviarIncremental(motoristaId, { ...dados, status: dados.status });
+    // ─── 3. Disparo Único para o Servidor (Sem endpoints fantasmas!) ───
+    enviarIncremental(motoristaId, payloadParaOBanco);
 
-    // ── 2. Avançar etapa no Kanban ───────────────────────────────
-    if (activeModal === "doca" && dados.doca) {
-      // Doca salva → emDoca
-      avancarEtapaKanban(motoristaId, "emDoca", { doca: dados.doca });
-
-    } else if (
-      activeModal === "horarios" &&
-      dados.horarios?.inicioCarregamento?.trim()
-    ) {
-      // Início de carregamento salvo → carregando
-      avancarEtapaKanban(motoristaId, "carregando");
-
-    } else if (
-      dados.carga?.gaiolas?.trim() &&
-      dados.carga?.volumosos?.trim() &&
-      dados.carga?.manga?.trim() &&
-      dados.horarios?.saidaLiberada?.trim() &&
-      dados.lacres?.traseiro?.trim()
-    ) {
-      // Saída liberada + lacre traseiro → finalizado
-      avancarEtapaKanban(motoristaId, "liberado");
-    }
-
-    // ── 3. Atualizar localStorage ────────────────────────────────
+    // ─── 4. Atualização da Memória Local (Interface Fluida) ───
     const updated = { ...carregamentos, [motoristaId]: dados };
     setCarregamentos(updated);
     localStorage.setItem(
@@ -324,6 +290,11 @@ function DestinoContent() {
     );
 
     handleCloseModal();
+  };
+  const handleCloseModal = () => {
+    setActiveModal(null);
+    setSelectedMotorista(null);
+    setCarregamentoData(null);
   };
 
   const handleDocaChange = (value: string) => {

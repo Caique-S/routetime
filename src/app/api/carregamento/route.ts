@@ -128,3 +128,84 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }
+
+function achatarObjeto(obj: Record<string, any>, prefixo = ""): Record<string, any> {
+  const resultado: Record<string, any> = {};
+
+  for (const [chave, valor] of Object.entries(obj)) {
+    // Monta o caminho com ponto caso já exista um prefixo (ex: "lacres" + "." + "traseiro")
+    const chaveComPonto = prefixo ? `${prefixo}.${chave}` : chave;
+
+    // Se o valor for um objeto puro (e não for nulo, array ou uma instância de Date)
+    if (
+      valor && 
+      typeof valor === 'object' && 
+      !Array.isArray(valor) && 
+      !(valor instanceof Date)
+    ) {
+      // Executa a recursão para descer mais um nível no objeto
+      Object.assign(resultado, achatarObjeto(valor, chaveComPonto));
+    } else {
+      // Se chegou no valor primitivo (string, number, boolean), grava a chave achatada
+      resultado[chaveComPonto] = valor;
+    }
+  }
+
+  return resultado;
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    
+    const { motoristaId, ...dadosParaAtualizar } = body;
+
+    if (!motoristaId) {
+      return NextResponse.json(
+        { success: false, error: 'O parâmetro "motoristaId" é obrigatório no payload.' },
+        { status: 400 }
+      );
+    }
+
+    const updateOperacao = achatarObjeto(dadosParaAtualizar);
+
+    if (Object.keys(updateOperacao).length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Nenhum campo válido enviado para atualização.' },
+        { status: 400 }
+      );
+    }
+
+    updateOperacao.dataAtualizacao = new Date();
+
+    const db = await getDatabase();
+
+    const result = await db.collection('carregamentos').updateOne(
+      { motoristaId: motoristaId }, // 1. Onde procurar (Filtro)
+      { $set: updateOperacao }      // 2. O que alterar (Instrução com Dot Notation)
+    );
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Nenhum carregamento correspondente foi encontrado para este ID.' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Registro atualizado incrementalmente com sucesso!',
+      details: {
+        encontrado: result.matchedCount === 1,
+        modificado: result.modifiedCount === 1
+      }
+    });
+
+  } catch (error: any) {
+    console.error('[PATCH /api/carregamento] Falha Crítica:', error);
+    return NextResponse.json(
+      { success: false, error: 'Erro interno no servidor ao processar o PATCH', message: error.message },
+      { status: 500 }
+    );
+  }
+}
