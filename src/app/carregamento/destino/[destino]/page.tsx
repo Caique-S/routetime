@@ -18,40 +18,7 @@ import {
 } from "lucide-react";
 import QRScanner from "@/app/components/QrScanner";
 
-
-interface MotoristaInfo {
-  nome: string;
-  tipoVeiculo: string;
-  veiculoTracao: string;
-  veiculoCarga: string;
-  travelId: string;
-  placa: string;
-  transportadora: string;
-  dataInicio: string;
-}
-
-interface CarregamentoData {
-  motoristaId: string;
-  doca: string;
-  carga: { gaiolas: string; volumosos: string; manga: string };
-  horarios: {
-    encostadoDoca: string;
-    inicioCarregamento: string;
-    terminoCarregamento: string;
-    saidaLiberada: string;
-    previsaoChegada: string;
-  };
-  lacres: { traseiro: string; lateral1: string; lateral2: string };
-  motorista: MotoristaInfo;
-  destino: string;
-  facility: string;
-  timestamp: string;
-  status: "aguardando" | "emDoca" | "carregando" | "liberado" | "not_used";
-  posicaoVeiculo?: number;
-  finalizado?: boolean;
-  timestamps?: Record<string, string>;
-}
-
+import { ICarregamento } from "@/app/lib/models/carregamento";
 
 function DestinoContent() {
   const router = useRouter();
@@ -65,10 +32,11 @@ function DestinoContent() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [selectedMotorista, setSelectedMotorista] = useState<any>(null);
   const [filter, setFilter] = useState<"active" | "finalized">("active");
-  const [carregamentoData, setCarregamentoData] = useState<CarregamentoData | null>(null);
-  const [carregamentos, setCarregamentos] = useState<Record<string, CarregamentoData>>({});
+  const [carregamentoData, setCarregamentoData] = useState<ICarregamento | null>(null);
+  const [carregamentos, setCarregamentos] = useState<Record<string, ICarregamento>>({});
+  
   const [showQRScanner, setShowQRScanner] = useState(false);
-  const [activeQRField, setActiveQRField] = useState<keyof CarregamentoData["lacres"] | null>(null);
+  const [activeQRField, setActiveQRField] = useState<keyof ICarregamento["lacres"] | null>(null);
 
   const facility = searchParams?.get("facility") || "N/A";
 
@@ -142,62 +110,66 @@ function DestinoContent() {
     }
   };
 
-const handleOpenModal = (modal: string, motorista: any) => {
-  setSelectedMotorista(motorista);
-  setActiveModal(modal);
+  const handleOpenModal = (modal: string, motorista: any) => {
+    setSelectedMotorista(motorista);
+    setActiveModal(modal);
 
-  const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
-  const existing = carregamentos[motoristaId];
+    const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
+    const existing = carregamentos[motoristaId];
 
-  if (existing) {
-    setCarregamentoData({ ...existing });
-  } else {
-    setCarregamentoData({
-      motoristaId,
-      doca: "",
-      carga: { gaiolas: "", volumosos: "", manga: "" },
-      horarios: {
-        encostadoDoca: "", inicioCarregamento: "",
-        terminoCarregamento: "", saidaLiberada: "", previsaoChegada: "",
-      },
-      lacres: { traseiro: "", lateral1: "", lateral2: "" },
-      motorista,
-      destino: destinoCodigo,
-      facility,
-      timestamp: new Date().toISOString(),
-      status: "aguardando",
-      posicaoVeiculo: 0,
-    });
-  }
-};
+    if (existing) {
+      setCarregamentoData({ ...existing });
+    } else {
+      setCarregamentoData({
+        motoristaId,
+        doca: "",
+        carga: { gaiolas: "", volumosos: "", manga: "" },
+        horarios: {
+          encostadoDoca: "", inicioCarregamento: "",
+          terminoCarregamento: "", saidaLiberada: "", previsaoChegada: "",
+        },
+        lacres: { traseiro: "", lateral1: "", lateral2: "" },
+        motorista,
+        destino: destinoCodigo,
+        facility,
+        timestamp: new Date().toISOString(),
+        status: "aguardando",
+        posicaoVeiculo: 0,
+      } as unknown as ICarregamento);
+    }
+  };
 
-const enviarIncremental = (
-  motoristaId: string,
-  payload: Record<string, any>
-): void => {
-  fetch("/api/carregamento", {
-    method: "PATCH", 
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ motoristaId, ...payload }),
-  }).catch((err) =>
-    console.warn("[enviarIncremental] Erro ao sincronizar com o banco:", err)
-  );
-};
+  const enviarIncremental = (
+    motoristaId: string,
+    payload: Record<string, any>
+  ): void => {
+    fetch("/api/carregamento", {
+      method: "PATCH", 
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motoristaId, ...payload }),
+    }).catch((err) =>
+      console.warn("[enviarIncremental] Erro ao sincronizar com o banco:", err)
+    );
+  };
 
-const handleSaveModal = async () => {
+  const handleSaveModal = async () => {
     if (!selectedMotorista || !carregamentoData) return;
 
     const motoristaId = `${destinoCodigo}_${facility}_${selectedMotorista.nome}_${selectedMotorista.travelId}`;
     const agora = new Date().toISOString();
 
+    // 👤 Captura o operador logado do localStorage de forma segura
+    const operadorLogado = typeof window !== "undefined" 
+      ? (localStorage.getItem("operador_nome") || localStorage.getItem("operatorName") || "Operador Não Identificado")
+      : "Operador Não Identificado";
+
     let dados = { ...carregamentoData };
-    let ts = { ...(carregamentoData.timestamps || {}) };
+    let ts = { ...(carregamentoData.timestamp || {}) };
     let payloadParaOBanco: Record<string, any> = {};
 
     if (activeModal === "doca") {
-      if (dados.doca && dados.status !== "carregando" && dados.status !== "liberado") {
+      if (dados.doca && dados.status !== "carregando" && dados.status !== "liberado" && dados.status !== "not_used") {
         dados.status = "emDoca";
-        ts.aguardando = ts.aguardando || dados.timestamp;
         ts.emDoca = ts.emDoca || agora;
       }
       payloadParaOBanco = { 
@@ -225,10 +197,11 @@ const handleSaveModal = async () => {
     const temLacreTraseiro = dados.lacres?.traseiro?.trim();
     const temCargaCompleta = dados.carga?.gaiolas && dados.carga?.volumosos && dados.carga?.manga;
 
+    // Gatilho de Liberação Automática (Todas as informações preenchidas)
     if (temDoca && temSaida && temLacreTraseiro && temCargaCompleta && dados.status !== "liberado") {
       dados.status = "liberado";
       dados.finalizado = true; 
-      ts.finalizado = agora;
+     // ts.finalizado = agora;
       
       const chave = `carregamentos_${destinoCodigo}_${facility}`;
       const salvos = JSON.parse(localStorage.getItem(chave) || "{}");
@@ -243,7 +216,13 @@ const handleSaveModal = async () => {
       payloadParaOBanco.posicaoVeiculo = dados.posicaoVeiculo;
     }
 
-    dados.timestamps = ts;
+    // 🛠️ Validação e Injeção do Operador para "liberado" ou "not_used"
+    if (dados.status === "liberado" || dados.status === "not_used") {
+      payloadParaOBanco.operador = operadorLogado;
+      dados.operador = operadorLogado; // Sincroniza localmente na interface
+    }
+
+    dados.timestamp = ts;
     payloadParaOBanco.timestamps = ts;
 
     enviarIncremental(motoristaId, payloadParaOBanco);
@@ -257,6 +236,7 @@ const handleSaveModal = async () => {
 
     handleCloseModal();
   };
+
   const handleCloseModal = () => {
     setActiveModal(null);
     setSelectedMotorista(null);
@@ -276,7 +256,7 @@ const handleSaveModal = async () => {
     });
   };
 
-  const handleHorarioChange = (tipo: keyof CarregamentoData["horarios"], value: string) => {
+  const handleHorarioChange = (tipo: keyof ICarregamento["horarios"], value: string) => {
     if (!carregamentoData) return;
     const horarios = { ...carregamentoData.horarios, [tipo]: value };
     if (tipo === "saidaLiberada") {
@@ -285,7 +265,7 @@ const handleSaveModal = async () => {
     setCarregamentoData({ ...carregamentoData, horarios });
   };
 
-  const handleLacreChange = (tipo: keyof CarregamentoData["lacres"], value: string) => {
+  const handleLacreChange = (tipo: keyof ICarregamento["lacres"], value: string) => {
     if (!carregamentoData) return;
     const num = value.replace(/\D/g, "").slice(0, 7);
     setCarregamentoData({
@@ -313,7 +293,6 @@ const handleSaveModal = async () => {
     saida.setHours(h + (horas[dest] || 0), m);
     return `${saida.getHours().toString().padStart(2, "0")}:${saida.getMinutes().toString().padStart(2, "0")}`;
   };
-
 
   const handleSelecionarMotorista = (motorista: any) => {
     const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
@@ -411,14 +390,16 @@ const handleSaveModal = async () => {
               {motoristasFiltrados.map((motorista, index) => {
                 const motoristaId = `${destinoCodigo}_${facility}_${motorista.nome}_${motorista.travelId}`;
                 const d = carregamentos[motoristaId];
+                
                 const borderColor =
                   d?.status === "carregando" ? "border-orange-400" :
-                  d?.status === "liberado" ? "border-green-500" : "border-gray-200";
+                  d?.status === "liberado" ? "border-green-500" : 
                   d?.status === "not_used" ? "border-red-600" : "border-gray-200";
-                  const iconColor =
+
+                const iconColor =
                   d?.status === "carregando" ? "text-orange-500" :
-                  d?.status === "liberado" ? "text-green-500" : "text-blue-600";
-                  d?.status === "not_used" ? "text-red-500" : "border-gray-200";
+                  d?.status === "liberado" ? "text-green-500" : 
+                  d?.status === "not_used" ? "text-red-500" : "text-blue-600";
 
                 return (
                   <div
@@ -440,7 +421,9 @@ const handleSaveModal = async () => {
                           </div>
                           <div>
                             <h3 className="font-bold text-gray-900">{motorista.nome}</h3>
-                            <p className="text-sm text-gray-600">Motorista</p>
+                            <p className="text-sm text-gray-600">
+                              Motorista
+                            </p>
                           </div>
                         </div>
                         <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
@@ -485,7 +468,6 @@ const handleSaveModal = async () => {
 
                     {/* Ações */}
                     <div className="mt-6 pt-4 border-t border-gray-100">
-                      {/* Badge Doca */}
                       <div className="mb-3">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleOpenModal("doca", motorista); }}
@@ -555,6 +537,7 @@ const handleSaveModal = async () => {
         </div>
       </main>
 
+      {/* Modais mantidos com as novas referências de dados puras */}
       {activeModal === "doca" && selectedMotorista && carregamentoData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
@@ -617,7 +600,7 @@ const handleSaveModal = async () => {
                   </label>
                   <input
                     type="number"
-                    value={carregamentoData.carga[tipo] || ""}
+                    value={(carregamentoData.carga as any)?.[tipo] || ""}
                     onChange={(e) => handleCargaChange(tipo, e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
@@ -653,7 +636,7 @@ const handleSaveModal = async () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
                   <input
                     type="time"
-                    value={carregamentoData.horarios[key] || ""}
+                    value={(carregamentoData.horarios as any)?.[key] || ""}
                     onChange={(e) => handleHorarioChange(key, e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
@@ -663,7 +646,7 @@ const handleSaveModal = async () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Previsão de Chegada</label>
                 <input
                   type="time"
-                  value={carregamentoData.horarios.previsaoChegada || ""}
+                  value={carregamentoData.horarios?.previsaoChegada || ""}
                   disabled
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500"
                 />
@@ -700,13 +683,13 @@ const handleSaveModal = async () => {
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        value={carregamentoData.lacres[key] || ""}
+                        value={(carregamentoData.lacres as any)?.[key] || ""}
                         onChange={(e) => handleLacreChange(key, e.target.value)}
                         placeholder="Ex: 4476646"
                         maxLength={7}
                         inputMode="numeric"
                         className={`flex-1 px-4 py-2 border rounded-lg font-mono focus:ring-2 focus:ring-blue-500 ${
-                          carregamentoData.lacres[key]?.length === 7
+                          (carregamentoData.lacres as any)?.[key]?.length === 7
                             ? "border-green-500 bg-green-50"
                             : "border-gray-300"
                         }`}
@@ -720,7 +703,7 @@ const handleSaveModal = async () => {
                         <span className="hidden sm:inline">QR</span>
                       </button>
                     </div>
-                    {carregamentoData.lacres[key]?.length === 7 && (
+                    {(carregamentoData.lacres as any)?.[key]?.length === 7 && (
                       <p className="text-xs text-green-600 mt-1">✓ Lacre válido (7 dígitos)</p>
                     )}
                   </div>

@@ -353,6 +353,9 @@ Condutor: ${carregamento.motorista.nome}`;
     try {
       const motoristaId = `${carregamentoData.destino}_${carregamentoData.facility}_${carregamentoData.motorista.nome}_${carregamentoData.motorista.travelId}`;
       const chaveBase = `carregamentos_${carregamentoData.destino}_${carregamentoData.facility}`;
+      const operadorLogado = typeof window !== "undefined"
+        ? (localStorage.getItem("operador_nome") || "Operador Não Identificado")
+        : "Operador Não Identificado";
 
       const response = await fetch("/api/carregamento", {
         method: "PATCH",
@@ -361,6 +364,7 @@ Condutor: ${carregamento.motorista.nome}`;
           motoristaId, 
           status: "not_used", 
           finalizado: true,
+          operador: operadorLogado,
           doca: "",
           carga: { gaiolas: "", volumosos: "", manga: "" },
           horarios: { encostadoDoca: "", inicioCarregamento: "", terminoCarregamento: "", saidaLiberada: "", previsaoChegada: "" },

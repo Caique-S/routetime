@@ -1,7 +1,5 @@
 import { StatusCarregamento } from "@/app/lib/utils/status"
 
-// Função que gera o 'numero' aleatório do Objeto EX: "CAR-1774948989570-R46B".
-// Serve como um indicador único.
 export function gerarNumeroCarregamento(): string {
     return `CAR-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
 }
@@ -11,53 +9,52 @@ export interface ICarregamento {
     doca?: string,
     facility: string,
     destino: string,
-    motorista?:{
-        nome?: string,
-        tipoVeiculo?: string,
-        veiculoTracao?: string,
-        veiculoCarga?: string,
+    motorista: {
+        nome: string,
+        tipoVeiculo: string,
+        veiculoTracao: string,
+        veiculoCarga: string,
         travelId: string,
         transportadora: string,
         dataInicio: string,
-        },
-        horarios?:{
-            encostadoDoca?: string | null,
-            inicioCarregamento?: string | null,
-            terminoCarregamento?: string | null,
-            saidaLiberada?: string | null,
-            previsaoChegada?: string | null,
-        },
-        carga?:{
-            gaiolas?: number,
-            volumosos?: number,
-            manga?: number,
-        },
-        lacres?:{
-            traseiro?: string,
-            lateral1?: string,
-            lateral2?: string,
-        },
-        status: StatusCarregamento,
-        posicaoVeiculo?: number,
-        motoristaId?: string,
-        operador?: string,
-        timestamp: {
-            aguardando: Date,
-            emDoca?: Date,
-            carregando?: Date,
-        },
-        dataCriacao: Date,
-        dataEnvio?: Date,
-        dataAtualizacao?: Date,
-        mensagemDespacho?: string,
-        mensagemXPT?: string,
-        numero?: string,
+    },
+    horarios: {
+        encostadoDoca: string | null,
+        inicioCarregamento: string | null,
+        terminoCarregamento: string | null,
+        saidaLiberada: string | null,
+        previsaoChegada: string | null,
+    },
+    carga: {
+        gaiolas: number,
+        volumosos: number,
+        manga: number,
+    },
+    lacres: {
+        traseiro: string,
+        lateral1: string,
+        lateral2: string,
+    },
+    status: StatusCarregamento,
+    posicaoVeiculo: number,
+    motoristaId: string,
+    operador: string,
+    timestamp: {
+        aguardando: Date,
+        emDoca: Date,
+        carregando: Date,
+    },
+    dataCriacao: Date,
+    dataEnvio: Date,
+    dataAtualizacao: Date,
+    mensagemDespacho: string,
+    mensagemXPT: string,
+    finalizado: Boolean,
+    numero: string,
 }
 
-// Função que cria o objeto completo de carregamento com os dados Disponíveis no CSV
+export function criarCarregamentosFromCSV(row: Record<string, unknown>, facilityFallback: string): ICarregamento {
 
-export function criarCarregamentosFromCSV (row: Record<string,unknown>, facilityFallback: string): ICarregamento {
-    
     const codigo = String(row['ID'] ?? ''.trim())
     const transportadora = String(row['Transportadora'] ?? ''.trim())
     const facility = String(row['Facility'] ?? ''.trim()) || facilityFallback;
@@ -70,12 +67,12 @@ export function criarCarregamentosFromCSV (row: Record<string,unknown>, facility
     const travelId = String(row['Travel ID'] ?? ''.trim())
     const motoristaId = `${destino}_${facility}_${nome}_${travelId}`
 
-    return{
+    return {
         codigo,
         doca: '',
         facility,
         destino,
-        motorista:{
+        motorista: {
             nome,
             tipoVeiculo,
             veiculoTracao,
@@ -84,19 +81,19 @@ export function criarCarregamentosFromCSV (row: Record<string,unknown>, facility
             transportadora,
             dataInicio
         },
-        horarios:{
+        horarios: {
             encostadoDoca: null,
             inicioCarregamento: null,
             terminoCarregamento: null,
             saidaLiberada: null,
             previsaoChegada: null,
         },
-        carga:{
+        carga: {
             gaiolas: 0,
             volumosos: 0,
             manga: 0,
         },
-        lacres:{
+        lacres: {
             traseiro: "",
             lateral1: "",
             lateral2: "",
@@ -107,14 +104,15 @@ export function criarCarregamentosFromCSV (row: Record<string,unknown>, facility
         operador: '',
         timestamp: {
             aguardando: new Date(),
-            emDoca: undefined,
-            carregando: undefined,
+            emDoca: new Date(),
+            carregando: new Date(),
         },
         dataCriacao: new Date(),
-        dataEnvio: undefined,
+        dataEnvio: new Date(),
         dataAtualizacao: new Date(),
         mensagemDespacho: '',
         mensagemXPT: '',
+        finalizado: false,
         numero: gerarNumeroCarregamento(),
 
     }

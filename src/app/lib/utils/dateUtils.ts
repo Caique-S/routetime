@@ -9,8 +9,7 @@ export function getTodayBrasilia(): string {
     day: '2-digit',
   })
     .split('/')
-    .reverse()
-    .join('-');
+    .join('/');
 }
 
 export function getHoraAtualBrasilia(): string {
@@ -44,7 +43,7 @@ export function formatarDataBrasil(iso: string | Date | null | undefined): strin
 }
 
 export function criarIntervaloDia(dataStr: string): { start: Date; end: Date } {
-  const [year, month, day] = dataStr.split('-').map(Number);
+  const [day, month, year] = dataStr.split('/').map(Number);
   const start = new Date(Date.UTC(year, month - 1, day, 3, 0, 0, 0));
   const end   = new Date(Date.UTC(year, month - 1, day + 1, 2, 59, 59, 999));
   return { start, end };

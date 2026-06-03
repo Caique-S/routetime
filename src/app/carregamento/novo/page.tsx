@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 import { getNomeDestino, getCodigoDestino } from '@/app/lib/utils/destinos';
-import { getTodayBrasilia, formatarDataBrasil } from '@/app/lib/utils/dateUtils';
+import { getTodayBrasilia, formatarDataBrasil, getHoraAtualBrasilia } from '@/app/lib/utils/dateUtils';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ interface DestinoInfo {
 function NovoCarregamento() {
   const router       = useRouter();
   const searchParams = useSearchParams();
-  const facilityParam = searchParams?.get('facility') ?? 'SBA4';
+  const facilityParam = searchParams?.get('facility') ?? '';
 
   const [loading,       setLoading]       = useState(true);
   const [refreshing,    setRefreshing]    = useState(false);
@@ -234,7 +234,7 @@ function NovoCarregamento() {
             </div>
             <h3 className="font-bold text-gray-900 mb-2">Nenhum destino encontrado para hoje</h3>
             <p className="text-gray-600 mb-6">
-              Não há upload para {formatarDataBrasil(getTodayBrasilia())}.<br />
+              Não há upload para {getTodayBrasilia()} {getHoraAtualBrasilia()}.<br />
               Faça o upload do arquivo do dia.
             </p>
             <button
