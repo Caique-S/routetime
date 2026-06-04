@@ -1,10 +1,10 @@
 import { MongoClient, MongoClientOptions } from 'mongodb';
 
-if (!process.env.MONGODB_URI) {
+if (!process.env.MONGODB_URI_PREVIEW) {
   throw new Error('Variável MONGODB_URI não encontrada. Adicione-a no .env.local');
 }
 
-const uri = process.env.MONGODB_URI;
+const  uri  = process.env.MONGODB_URI_PREVIEW
 
 const options: MongoClientOptions = {
   maxPoolSize:                50,
