@@ -1,6 +1,7 @@
 'use client';
 
 import { Smartphone, Camera, Shield, Download, RefreshCw } from 'lucide-react';
+import { formatarDataBrasil, formatarHoraBrasil, getHoraAtualBrasilia, getTodayBrasilia } from '../lib/utils/dateUtils';
 
 export default function PermissionsGuide() {
   const isWebView = () => {
@@ -106,4 +107,3 @@ export default function PermissionsGuide() {
     </div>
   );
 }
-

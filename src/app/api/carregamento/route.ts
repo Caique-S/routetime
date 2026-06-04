@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 import { serializeDocument } from '@/app/lib/utils/serialize';
-import { criarIntervaloDia } from '@/app/lib/utils/dateUtils';
+import { criarIntervaloDia, formatarDataBrasil } from '@/app/lib/utils/dateUtils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,12 +14,13 @@ export async function GET(request: NextRequest) {
     const status      = searchParams.get('status');
     const motoristaId = searchParams.get('motoristaId');
     const dataInicio  = searchParams.get('dataInicio');
-    const dataFim     = searchParams.get('dataFim');
+    const dataFim     = searchParams.get('dataFim');    
 
     const query: Record<string, unknown> = {};
     if (facility)    query.facility    = facility;
     if (status)      query.status      = status;
     if (motoristaId) query.motoristaId = motoristaId;
+
 
     if (dataInicio && dataFim) {
       const { start } = criarIntervaloDia(dataInicio);

@@ -8,8 +8,6 @@ export function getTodayBrasilia(): string {
     month: '2-digit',
     day: '2-digit',
   })
-    .split('/')
-    .join('/');
 }
 
 export function getHoraAtualBrasilia(): string {
@@ -20,8 +18,8 @@ export function getHoraAtualBrasilia(): string {
   });
 }
 
-export function formatarHoraBrasil(iso: string | null | undefined): string {
-  if (!iso) return '—';
+export function formatarHoraBrasil(iso: string | Date | null | undefined): string {
+  if (!iso) return 'Hora não Informada!';
   try {
     return new Date(iso).toLocaleTimeString('pt-BR', {
       timeZone: TZ_BRASIL,
@@ -29,23 +27,28 @@ export function formatarHoraBrasil(iso: string | null | undefined): string {
       minute: '2-digit',
     });
   } catch {
-    return '—';
+    return '99:99';
   }
 }
 
 export function formatarDataBrasil(iso: string | Date | null | undefined): string {
-  if (!iso) return '—';
+  if (!iso) return 'Data não Informada!';
   try {
-    return new Date(iso).toLocaleDateString('pt-BR', { timeZone: TZ_BRASIL });
+    return new Date(iso).toLocaleDateString('pt-BR', {
+        timeZone: TZ_BRASIL,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
   } catch {
-    return '—';
+    return '00/00/0000';
   }
 }
 
 export function criarIntervaloDia(dataStr: string): { start: Date; end: Date } {
   const [day, month, year] = dataStr.split('/').map(Number);
   const start = new Date(Date.UTC(year, month - 1, day, 3, 0, 0, 0));
-  const end   = new Date(Date.UTC(year, month - 1, day + 1, 2, 59, 59, 999));
+  const end = new Date(Date.UTC(year, month - 1, day + 1, 2, 59, 59, 999));
   return { start, end };
 }
 

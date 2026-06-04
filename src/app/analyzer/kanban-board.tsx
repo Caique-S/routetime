@@ -5,22 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Clock, MapPin, User } from "lucide-react";
-
-
-const TZ_BRASIL = "America/Sao_Paulo";
-
-function formatarHoraBrasil(iso: string | undefined): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleTimeString("pt-BR", {
-      timeZone: TZ_BRASIL,
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "—";
-  }
-}
+import { formatarHoraBrasil , formatarDataBrasil, getTodayBrasilia, TZ_BRASIL } from "../lib/utils/dateUtils";
 
 const INTERVALO = 10000;
 
@@ -93,7 +78,20 @@ export default function KanbanBoard({ dataInicio, dataFim, facility }: KanbanBoa
 
   const buscarDados = async () => {
     try {
-      const params = new URLSearchParams({ limit: "500", dataInicio, dataFim });
+      
+      let dataInicioBR = formatarDataBrasil(dataInicio)
+      let dataFimBR = formatarDataBrasil(dataFim)
+
+      /*if (dataInicio && dataInicio.includes('-')) {
+        const [ano, mes, dia] = dataInicio.split('-');
+        dataInicioBR = `${dia}/${mes}/${ano}`;
+      }
+      if (dataFim && dataFim.includes('-')) {
+        const [ano, mes, dia] = dataFim.split('-');
+        dataFimBR = `${dia}/${mes}/${ano}`;
+      }*/
+
+      const params = new URLSearchParams({ limit: "500", dataInicioBR , dataFimBR });
       if (facility) params.append("facility", facility);
       const res = await fetch(`/api/carregamento?${params}`);
       const json = await res.json();

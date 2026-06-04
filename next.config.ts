@@ -2,7 +2,7 @@ import { NextConfig } from "next"
 
 const nextConfig : NextConfig = {
 
-  allowedDevOrigins: ['10.55.207.19', '10.55.207.19:3000', '10.223.146.17', '10.223.146.17:3000'],
+  allowedDevOrigins: [ '192.168.1.105','192.168.1.105:3000'],
 
   async headers() {
     return [
