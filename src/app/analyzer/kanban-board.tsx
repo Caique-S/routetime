@@ -10,7 +10,7 @@ import {
   formatarDataBrasil,
 } from "../lib/utils/dateUtils";
 import { getNomeDestino } from "../lib/utils/destinos";
-import { StatusCarregamento, COLUNAS_KANBAN, COLUNA_LABELS, STATUS_BADGE } from "../lib/utils/status";
+import { StatusCarregamento, COLUNAS_KANBAN, COLUNA_LABELS, STATUS_BADGE, STATUS_LABELS } from "../lib/utils/status";
 
 const INTERVALO_POLLING = 10000; // 10s
 
@@ -100,7 +100,7 @@ function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; c
             <User className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium text-sm">{motorista.nome}</span>
           </div>
-          <Badge className={badgeCor}>{STATUS_BADGE[columnStatus] || columnStatus}</Badge>
+          <Badge className={badgeCor}>{STATUS_LABELS[columnStatus] || columnStatus}</Badge>
         </div>
 
         {/* Destino */}
