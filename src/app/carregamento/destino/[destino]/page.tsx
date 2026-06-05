@@ -19,6 +19,7 @@ import {
 import QRScanner from "@/app/components/QrScanner";
 
 import { ICarregamento } from "@/app/lib/models/carregamento";
+import { timeStamp } from "console";
 
 function DestinoContent() {
   const router = useRouter();
@@ -132,7 +133,9 @@ function DestinoContent() {
         motorista,
         destino: destinoCodigo,
         facility,
-        timestamp: new Date().toISOString(),
+        timestamp:{
+          aguardando: new Date().toDateString()
+        },
         status: "aguardando",
         posicaoVeiculo: 0,
       } as unknown as ICarregamento);
@@ -174,7 +177,8 @@ function DestinoContent() {
       }
       payloadParaOBanco = { 
         doca: dados.doca, 
-        status: dados.status 
+        status: dados.status,
+        timeStamp: ts
       };
 
     } else if (activeModal === "carga") {
@@ -186,6 +190,7 @@ function DestinoContent() {
         dados.status = "carregando";
         ts.carregando = ts.carregando || agora;
         payloadParaOBanco.status = "carregando";
+        payloadParaOBanco.timestamp = ts;
       }
 
     } else if (activeModal === "lacres") {
@@ -201,7 +206,7 @@ function DestinoContent() {
     if (temDoca && temSaida && temLacreTraseiro && temCargaCompleta && dados.status !== "liberado") {
       dados.status = "liberado";
       dados.finalizado = true; 
-     // ts.finalizado = agora;
+      ts.liberado = ts.liberado || agora;
       
       const chave = `carregamentos_${destinoCodigo}_${facility}`;
       const salvos = JSON.parse(localStorage.getItem(chave) || "{}");
@@ -214,6 +219,7 @@ function DestinoContent() {
       payloadParaOBanco.status = "liberado";
       payloadParaOBanco.finalizado = true;
       payloadParaOBanco.posicaoVeiculo = dados.posicaoVeiculo;
+      payloadParaOBanco.timestamp = ts;
     }
 
     // 🛠️ Validação e Injeção do Operador para "liberado" ou "not_used"

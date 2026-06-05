@@ -87,14 +87,14 @@ export async function POST(request: NextRequest) {
         
         const carregamento = criarCarregamentosFromCSV(row, facilityFallback);
 
-        const { dataAtualizacao, ...dadosParaInserir } = carregamento;
+        const { dataEnvio, ...dadosParaInserir } = carregamento;
 
         return {
           updateOne: {
             filter: { motoristaId: carregamento.motoristaId },
             update: {
               $setOnInsert: dadosParaInserir,
-              $set: { dataAtualizacao: new Date() },
+              $set: { dataEnvio: new Date() },
             },
             upsert: true,
           },

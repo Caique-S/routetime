@@ -21,7 +21,7 @@ interface MotoristaKanban {
   destino: string;
   doca?: string;
   status: StatusCarregamento;
-  timestamps?: Record<string, string>; // ISO
+  timestamp?: Record<string, string>; // ISO
   carga?: {
     gaiolas: number;
     volumosos: number;
@@ -76,7 +76,7 @@ function calcularTempo(
 // Componente de Card individual (estilo similar ao MotoristaCard)
 function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; columnStatus: StatusCarregamento }) {
   const destinoNome = getNomeDestino(motorista.destino);
-  const tempo = calcularTempo(columnStatus, motorista.timestamps);
+  const tempo = calcularTempo(columnStatus, motorista.timestamp);
   const temCarga = motorista.carga &&
     (motorista.carga.gaiolas > 0 || motorista.carga.volumosos > 0 || motorista.carga.manga > 0);
 
@@ -104,14 +104,15 @@ function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; c
         </div>
 
         {/* Destino */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <MapPin className="h-3 w-3" />
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <span className=" font-mono text-xs text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">{motorista.motoristaId.split('_')[0]}</span>
+          <span className="mx-1 text-gray-400">•</span>
           {destinoNome}
         </div>
 
         {/* Doca */}
         {motorista.doca && (
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="outline" className="font-mono text-xs">
             Doca {motorista.doca}
           </Badge>
         )}
@@ -124,38 +125,39 @@ function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; c
 
         {/* Carga (se disponível) */}
         {temCarga && (
-          <div className="grid grid-cols-3 gap-1 text-center bg-muted/30 rounded-md p-2 mt-1">
-            <div className="flex flex-col items-center">
-              <Package className="h-3 w-3 text-muted-foreground" />
-              <span className="text-xs font-semibold">{motorista.carga!.gaiolas}</span>
+          <div className="flex flex-row gap-3 text-center bg-muted/30 rounded-md p-2 mt-1">
+            <div className="flex flex-row gap-1 items-center">
+              <Box className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs font-semibold">{motorista.carga!.gaiolas}{"  |"}</span>
               <span className="text-[10px] text-muted-foreground">Gaiolas</span>
             </div>
-            <div className="flex flex-col items-center">
+            <div className="flex flex-row gap-1 items-center">
               <Box className="h-3 w-3 text-muted-foreground" />
-              <span className="text-xs font-semibold">{motorista.carga!.volumosos}</span>
+              <span className="text-xs font-semibold">{motorista.carga!.volumosos}{"  |"}</span>
               <span className="text-[10px] text-muted-foreground">Volumosos</span>
             </div>
-            <div className="flex flex-col items-center">
-              <span className="text-xs font-semibold">{motorista.carga!.manga}</span>
-              <span className="text-[10px] text-muted-foreground">Manga</span>
+            <div className="flex flex-row gap-1 items-center">
+              <Box className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs font-semibold">{motorista.carga!.manga}{"  |"}</span>
+              <span className="text-[10px] text-muted-foreground">Mangas</span>
             </div>
           </div>
         )}
 
         {/* Linha do tempo (horários) */}
-        {motorista.timestamps && (
-          <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground border-t pt-1.5">
-            {motorista.timestamps.aguardando && (
-              <p>🕒 Chegada: {formatarHoraBrasil(motorista.timestamps.aguardando)}</p>
+        {motorista.timestamp && (
+          <div className=" flex gap-3 mt-2 space-y-0.5 text-[11px] text-muted-foreground border-t pt-1.5">
+            {motorista.timestamp.aguardando && (
+              <p>🕒 Chegada: {formatarHoraBrasil(motorista.timestamp.aguardando)}</p>
             )}
-            {motorista.timestamps.emDoca && (
-              <p>📥 Em doca: {formatarHoraBrasil(motorista.timestamps.emDoca)}</p>
+            {motorista.timestamp.emDoca && (
+              <p>📥 Em doca: {formatarHoraBrasil(motorista.timestamp.emDoca)}</p>
             )}
-            {motorista.timestamps.carregando && (
-              <p>🚛 Início carreg.: {formatarHoraBrasil(motorista.timestamps.carregando)}</p>
+            {motorista.timestamp.carregando && (
+              <p>🚛 Início carreg.: {formatarHoraBrasil(motorista.timestamp.carregando)}</p>
             )}
-            {motorista.timestamps.liberado && (
-              <p>✅ Liberado: {formatarHoraBrasil(motorista.timestamps.liberado)}</p>
+            {motorista.timestamp.liberado && (
+              <p>✅ Liberado: {formatarHoraBrasil(motorista.timestamp.liberado)}</p>
             )}
           </div>
         )}
