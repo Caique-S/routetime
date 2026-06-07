@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
           facility:   data.facility,
           motorista:  data.motorista,
           status:     'aguardando',
-          timestamps: { aguardando: agoraISO },
+          timestamp: { aguardando: agoraISO },
           dataCriacao: agora,
           numero: `CAR-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
         },

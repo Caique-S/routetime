@@ -1,153 +1,22 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription,  CardHeader,  CardTitle,} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Drawer, 
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle,} from "@/components/ui/drawer";
+import {Table, TableBody, TableCell,TableHead, TableHeader, TableRow,} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-} from "recharts";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-} from "@/components/ui/chart";
-import {
-  RefreshCw,
-  Calendar,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  Truck,
-  Box,
-  BarChart3,
-  Activity,
-  X,
-} from "lucide-react";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/components/ui/select";
+import {BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area,} from "recharts";
+import {ChartContainer,ChartTooltip,ChartTooltipContent,ChartLegend,ChartLegendContent,} from "@/components/ui/chart";
+import {RefreshCw,Calendar,AlertCircle,CheckCircle,Clock,Truck,Box,BarChart3,Activity,X,} from "lucide-react";
 import KanbanBoard from "./kanban-board";
-
-// ---------- Interfaces ----------
-interface CarregamentoData {
-  id: string;
-  motoristaId?: string;
-  doca: string;
-  carga: {
-    gaiolas: string;
-    volumosos: string;
-    manga: string;
-  };
-  horarios: {
-    encostadoDoca: string;
-    inicioCarregamento: string;
-    terminoCarregamento: string;
-    saidaLiberada: string;
-    previsaoChegada: string;
-  };
-  lacres: {
-    traseiro: string;
-    lateral1?: string;
-    lateral2?: string;
-  };
-  motorista: {
-    nome: string;
-    tipoVeiculo: string;
-    veiculoTracao: string;
-    veiculoCarga: string;
-    travelId: string;
-    placa: string;
-    transportadora: string;
-    dataInicio: string;
-  };
-  status?: "emDoca" | "aguardando" | "carregando" | "liberado" | "not_used" | "";
-  posicaoVeiculo?: number;
-  destino: string;
-  facility: string;
-  timestamp: string;
-  finalizado?: boolean;
-  dataCriacao?: string;
-  timestamps?: {
-    aguardando?: string;   // ISO
-    emDoca?: string;
-    carregando?: string;
-    finalizado?: string;
-  };
-  tempos?: {
-    aguardando?: number;   // segundos
-    emDoca?: number;
-    carregando?: number;
-    total?: number;
-  };
-}
-
-// ---------- Utilitários ----------
-const getNomeDestino = (codigo: string): string => {
-  const map: Record<string, string> = {
-    EBA14: "Serrinha",
-    EBA4: "Santo Antônio de Jesus",
-    EBA19: "Itaberaba",
-    EBA3: "Jacobina",
-    EBA2: "Pombal",
-    EBA16: "Senhor do Bonfim",
-    EBA21: "Seabra",
-    EBA6: "Juazeiro",
-    EBA29: "Valença",
-  };
-  return map[codigo] || codigo;
-};
-
-const formatTime = (time: string): string => {
-  if (!time) return "--:--";
-  if (time.includes("T"))
-    return new Date(time).toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  return time.substring(0, 5);
-};
+import { getNomeDestino } from "../lib/utils/destinos";
+import { formatarHoraBrasil, formatarDataBrasil, getTodayBrasilia } from "../lib/utils/dateUtils";
+import { StatusCarregamento } from "../lib/utils/status";
+import { ICarregamento } from "@/app/lib/models/carregamento"
 
 const parseTimeToMinutes = (time: string): number | null => {
   if (!time) return null;
@@ -177,7 +46,7 @@ const getYesterdayStr = () => {
 
 // ---------- Componente Principal ----------
 export default function AnalyserPage() {
-  const [carregamentos, setCarregamentos] = useState<CarregamentoData[]>([]);
+  const [carregamentos, setCarregamentos] = useState<ICarregamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -192,32 +61,10 @@ export default function AnalyserPage() {
   // Drawer único (controlado)
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTitle, setDrawerTitle] = useState("");
-  const [drawerData, setDrawerData] = useState<CarregamentoData[]>([]);
+  const [drawerData, setDrawerData] = useState<ICarregamento[]>([]);
 
   // Filtro de facility para o gráfico de liberados
   const [chartFacility, setChartFacility] = useState("todas");
-
-/*  useEffect(() => {
-    async function loadInitialFacility() {
-      try {
-        const today = getTodayStr();
-        const res = await fetch(`/api/upload?date=${today}&limit=1`);
-        const json = await res.json();
-        if (json.success && json.data && json.data.length > 0) {
-          const upload = json.data[0];
-          if (upload.filterValue) {
-            setFacilitySelecionada(upload.filterValue);
-          }
-        }
-      } catch (e) {
-        console.warn("Falha ao obter facility inicial:", e);
-      }
-    }
-    loadInitialFacility();
-  }, []); // executa apenas na montagem
-
-  */
-
 
   // Atualiza datas conforme período
   useEffect(() => {
@@ -256,20 +103,18 @@ export default function AnalyserPage() {
       setError(null);
 
       const params = new URLSearchParams({ limit: "10000" });
-      let carregamentosApi: CarregamentoData[] = [];
+      let carregamentosApi: ICarregamento[] = [];
       try {
         const res = await fetch(`/api/carregamento?${params}`);
         const json = await res.json();
         if (json.success && json.data) {
           const inicio = new Date(`${dataInicio}T00:00:00-03:00`).getTime();
           const fim = new Date(`${dataFim}T23:59:59-03:00`).getTime();
-          carregamentosApi = json.data.filter((c: CarregamentoData) => {
+          carregamentosApi = json.data.filter((c: ICarregamento) => {
             const d = c.dataCriacao || c.timestamp || "";
             if (!d) return false;
 
-            // Se a string da API não termina com Z nem com fuso (+ ou -), injetamos o local
-            const dateStr = (d.includes('Z') || d.includes('-03:00')) ? d : `${d}-03:00`;
-            const ts = new Date(dateStr).getTime();
+            const ts = new Date()
 
             return ts >= inicio && ts <= fim;
           })
@@ -279,7 +124,7 @@ export default function AnalyserPage() {
         console.error("Erro ao buscar da API:", e);
       }
 
-      const carregamentosLocal: CarregamentoData[] = [];
+      const carregamentosLocal: ICarregamento[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith("carregamentos_")) {
@@ -316,9 +161,9 @@ export default function AnalyserPage() {
     const liberados = carregamentos.filter(c => c.status === "liberado").length;
     const finalizados = carregamentos.filter(c => c.finalizado).length;
 
-    const gaiolas = carregamentos.reduce((s, c) => s + (parseInt(c.carga?.gaiolas) || 0), 0);
-    const volumosos = carregamentos.reduce((s, c) => s + (parseInt(c.carga?.volumosos) || 0), 0);
-    const manga = carregamentos.reduce((s, c) => s + (parseInt(c.carga?.manga) || 0), 0);
+    const gaiolas = carregamentos.reduce((s, c) => s + c.carga?.gaiolas || 0, 0);
+    const volumosos = carregamentos.reduce((s, c) => s + c.carga?.volumosos || 0, 0);
+    const manga = carregamentos.reduce((s, c) => s + c.carga?.manga || 0, 0);
 
     let somaCar = 0, ctCar = 0, somaEsp = 0, ctEsp = 0;
     carregamentos.forEach(c => {
@@ -360,7 +205,7 @@ export default function AnalyserPage() {
   }, [carregamentos]);
 
   // Abre Drawer com os registros filtrados
-  const abrirDetalhes = (titulo: string, dados: CarregamentoData[]) => {
+  const abrirDetalhes = (titulo: string, dados: ICarregamento[]) => {
     setDrawerTitle(titulo);
     setDrawerData(dados);
     setDrawerOpen(true);
@@ -415,17 +260,13 @@ export default function AnalyserPage() {
     carregamentos
       .filter(c => c.status && ["liberado", "not_used"].includes(c.status))
       .forEach(c => {
-        const rawDate = c.dataCriacao || c.timestamp;
+        const rawDate = c.dataCriacao;
         if (!rawDate) return;
 
         // Converte a string (independente de ser UTC) para o fuso local do navegador
-        const dateObj = new Date(rawDate);
+        const date = formatarDataBrasil(rawDate);
 
-        // Formata como YYYY-MM-DD respeitando o fuso de Brasília
-        // O local 'en-CA' produz o formato 2026-04-27
-        const date = dateObj.toLocaleDateString("en-CA");
-
-        if (!agrupado[date]) agrupado[date] = {};
+       if (!agrupado[date]) agrupado[date] = {};
         const fac = c.facility || "Desconhecido";
         agrupado[date][fac] = (agrupado[date][fac] || 0) + 1;
       });
@@ -539,7 +380,7 @@ export default function AnalyserPage() {
           <MetricCard title="Total" value={stats.total} subtitle="viagens" icon={<Activity className="h-5 w-5" />} onClick={() => abrirDetalhes("Todas as viagens", carregamentos)} />
           <MetricCard title="Em Andamento" value={stats.emDoca + stats.carregando} subtitle={`${stats.emDoca} Doca, ${stats.carregando} carregando`} icon={<Truck className="h-5 w-5" />} onClick={() => abrirDetalhes("Em andamento", carregamentos.filter(c => !c.finalizado))} />
           <MetricCard title="Concluídos" value={stats.finalizados} subtitle={`${stats.liberados} liberados`} icon={<CheckCircle className="h-5 w-5" />} onClick={() => abrirDetalhes("Concluídos", carregamentos.filter(c => c.finalizado))} />
-          <MetricCard title="Gaiolas" value={stats.gaiolas} subtitle={`${stats.volumosos} vol. / ${stats.manga} manga`} icon={<Box className="h-5 w-5" />} onClick={() => abrirDetalhes("Com carga", carregamentos.filter(c => parseInt(c.carga?.gaiolas) > 0))} />
+          <MetricCard title="Gaiolas" value={stats.gaiolas} subtitle={`${stats.volumosos} vol. / ${stats.manga} manga`} icon={<Box className="h-5 w-5" />} onClick={() => abrirDetalhes("Com carga", carregamentos.filter(c => c.carga?.gaiolas > 0))} />
         </div>
 
         {/* ---- NOVO: Gráfico interativo de liberados por facility ---- */}
@@ -550,7 +391,7 @@ export default function AnalyserPage() {
               <CardDescription>
                 {chartFacility === "todas"
                   ? "Veículos liberados por dia (todas as facilities)"
-                  : `Veículos liberados por dia – ${chartFacility}`}
+                  : `Veículos liberados por dia - ${chartFacility}`}
               </CardDescription>
             </div>
             <Select value={chartFacility} onValueChange={setChartFacility}>
@@ -782,9 +623,9 @@ export default function AnalyserPage() {
                       })
                       .slice(0, 50)
                       .map((c) => (
-                        <TableRow key={c.id || c.motoristaId}>
+                        <TableRow key={c.motoristaId}>
                           <TableCell className="font-mono text-xs">
-                            {c.motorista?.travelId || c.id?.substring(0, 8)}
+                            {c.motorista?.travelId}
                           </TableCell>
                           <TableCell>{getNomeDestino(c.destino)}</TableCell>
                           <TableCell>{c.motorista?.nome}</TableCell>
@@ -809,10 +650,10 @@ export default function AnalyserPage() {
                           </TableCell>
                           <TableCell>{c.posicaoVeiculo}</TableCell>
                           <TableCell>
-                            {formatTime(c.horarios?.saidaLiberada || "")}
+                            {formatarHoraBrasil(c.horarios?.saidaLiberada || "")}
                           </TableCell>
                           <TableCell>
-                            {formatTime(c.horarios?.previsaoChegada || "")}
+                            {formatarHoraBrasil(c.horarios?.previsaoChegada || "")}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -878,7 +719,7 @@ function MetricCard({
 }
 
 // ---------- Tabela de detalhes (reutilizável no Drawer) ----------
-function DetailTable({ data }: { data: CarregamentoData[] }) {
+function DetailTable({ data }: { data: ICarregamento[] }) {
   // Ordena primeiro por destino, depois por posição
   const sortedData = [...data].sort((a, b) => {
     const destinoA = getNomeDestino(a.destino).toLowerCase();
@@ -909,7 +750,7 @@ function DetailTable({ data }: { data: CarregamentoData[] }) {
         </TableHeader>
         <TableBody>
           {sortedData.map((c) => (
-            <TableRow key={c.id || c.motoristaId}>
+            <TableRow key={c.motoristaId}>
               <TableCell className="font-medium">{c.motorista?.nome}</TableCell>
               <TableCell>{getNomeDestino(c.destino)}</TableCell>
               <TableCell>
@@ -934,7 +775,7 @@ function DetailTable({ data }: { data: CarregamentoData[] }) {
               <TableCell>{c.posicaoVeiculo}</TableCell>
               <TableCell>{c.doca}</TableCell>
               <TableCell>
-                {formatTime(c.horarios?.saidaLiberada || "")}
+                {formatarHoraBrasil(c.horarios?.saidaLiberada || "")}
               </TableCell>
               <TableCell>{c.carga.gaiolas}</TableCell>
               <TableCell>{c.carga.volumosos}</TableCell>

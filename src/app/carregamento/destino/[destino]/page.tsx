@@ -17,9 +17,8 @@ import {
   Scan,
 } from "lucide-react";
 import QRScanner from "@/app/components/QrScanner";
-
 import { ICarregamento } from "@/app/lib/models/carregamento";
-import { timeStamp } from "console";
+
 
 function DestinoContent() {
   const router = useRouter();
@@ -134,7 +133,7 @@ function DestinoContent() {
         destino: destinoCodigo,
         facility,
         timestamp:{
-          aguardando: new Date().toDateString()
+          aguardando: new Date().toISOString()
         },
         status: "aguardando",
         posicaoVeiculo: 0,
@@ -142,17 +141,20 @@ function DestinoContent() {
     }
   };
 
-  const enviarIncremental = (
-    motoristaId: string,
-    payload: Record<string, any>
-  ): void => {
-    fetch("/api/carregamento", {
-      method: "PATCH", 
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ motoristaId, ...payload }),
-    }).catch((err) =>
-      console.warn("[enviarIncremental] Erro ao sincronizar com o banco:", err)
-    );
+  const enviarIncremental = async ( motoristaId: string, payload: Record<string, any> ) => {
+    try {
+      const result = await fetch('/api/carregamento',{
+        method: 'PATCH',
+        headers: {'Content-Type' : 'application/json'},
+        body: JSON.stringify({motoristaId, ...payload})
+      }); 
+      if(!result.ok){
+        const errorData = await result.json()
+        console.error('[EnviarIncremental] Falha na API', errorData)
+      }
+    } catch (err) {
+      console.error('[EnviarIncremental] Erro de Rede', err)      
+    }
   };
 
   const handleSaveModal = async () => {
@@ -166,33 +168,45 @@ function DestinoContent() {
       ? (localStorage.getItem("operador_nome") || localStorage.getItem("operatorName") || "Operador Não Identificado")
       : "Operador Não Identificado";
 
-    let dados = { ...carregamentoData };
-    let ts = { ...(carregamentoData.timestamp || {}) };
+    const dados = { ...carregamentoData };
+    dados.timestamp = {...(dados.timestamp || {})}
+    
     let payloadParaOBanco: Record<string, any> = {};
 
     if (activeModal === "doca") {
-      if (dados.doca && dados.status !== "carregando" && dados.status !== "liberado" && dados.status !== "not_used") {
+      if (dados.doca?.trim() && dados.status !== "carregando" && dados.status !== "liberado" && dados.status !== "not_used") {
         dados.status = "emDoca";
-        ts.emDoca = ts.emDoca || agora;
+        
+        if(!dados.timestamp.emDoca){
+          dados.timestamp.emDoca = agora
+        }
+        
+        payloadParaOBanco = { 
+          doca: dados.doca, 
+          status: dados.status,
+          timestamp: {
+            emDoca: agora
+          }
+        };
+      }else{
+        payloadParaOBanco = {
+          doca: dados.doca
+        }
       }
-      payloadParaOBanco = { 
-        doca: dados.doca, 
-        status: dados.status,
-        timeStamp: ts
-      };
-
     } else if (activeModal === "carga") {
       payloadParaOBanco = { carga: dados.carga };
-
     } else if (activeModal === "horarios") {
       payloadParaOBanco = { horarios: dados.horarios };
       if (dados.horarios?.inicioCarregamento?.trim() && dados.status === "emDoca") {
         dados.status = "carregando";
-        ts.carregando = ts.carregando || agora;
+        if(!dados.timestamp.carregando){
+          dados.timestamp.carregando = agora
+        }
         payloadParaOBanco.status = "carregando";
-        payloadParaOBanco.timestamp = ts;
+        payloadParaOBanco.timestamp = {
+          carregando: dados.timestamp.carregando
+        }
       }
-
     } else if (activeModal === "lacres") {
       payloadParaOBanco = { lacres: dados.lacres };
     }
@@ -206,7 +220,9 @@ function DestinoContent() {
     if (temDoca && temSaida && temLacreTraseiro && temCargaCompleta && dados.status !== "liberado") {
       dados.status = "liberado";
       dados.finalizado = true; 
-      ts.liberado = ts.liberado || agora;
+      if(!dados.timestamp.liberado){
+        dados.timestamp.liberado = agora
+      }
       
       const chave = `carregamentos_${destinoCodigo}_${facility}`;
       const salvos = JSON.parse(localStorage.getItem(chave) || "{}");
@@ -216,22 +232,26 @@ function DestinoContent() {
       
       dados.posicaoVeiculo = liberadosCount + 1;
       
-      payloadParaOBanco.status = "liberado";
-      payloadParaOBanco.finalizado = true;
-      payloadParaOBanco.posicaoVeiculo = dados.posicaoVeiculo;
-      payloadParaOBanco.timestamp = ts;
+      payloadParaOBanco = {
+        ...payloadParaOBanco,
+        
+        status: "liberado",
+        finalizado: true,
+        posicaoVeiculo: dados.posicaoVeiculo,
+        
+        timestamp: {
+          liberado: dados.timestamp.liberado
+        }
+      }; 
     }
 
     // 🛠️ Validação e Injeção do Operador para "liberado" ou "not_used"
     if (dados.status === "liberado" || dados.status === "not_used") {
-      payloadParaOBanco.operador = operadorLogado;
       dados.operador = operadorLogado; // Sincroniza localmente na interface
+      payloadParaOBanco.operador = operadorLogado;
     }
 
-    dados.timestamp = ts;
-    payloadParaOBanco.timestamps = ts;
-
-    enviarIncremental(motoristaId, payloadParaOBanco);
+    await enviarIncremental(motoristaId, payloadParaOBanco);
     
     const updated = { ...carregamentos, [motoristaId]: dados };
     setCarregamentos(updated);

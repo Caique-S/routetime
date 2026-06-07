@@ -11,7 +11,7 @@ import {
 } from "../lib/utils/dateUtils";
 import { getNomeDestino } from "../lib/utils/destinos";
 import { StatusCarregamento, COLUNAS_KANBAN, COLUNA_LABELS, STATUS_BADGE, STATUS_LABELS } from "../lib/utils/status";
-
+import { useLiveTimer } from "../hooks/useLiveTimer";
 const INTERVALO_POLLING = 10000; // 10s
 
 // Interface simplificada para o frontend (alinhada com ICarregamento)
@@ -38,45 +38,9 @@ const COLUMN_STYLES: Record<StatusCarregamento, { titulo: string; cor: string }>
   not_used:   { titulo: "⚠️ Not Used",  cor: "border-red-400" },
 };
 
-// Formata segundos em HH:MM:SS
-function formatarSegundos(segundos: number): string {
-  const h = Math.floor(segundos / 3600).toString().padStart(2, "0");
-  const m = Math.floor((segundos % 3600) / 60).toString().padStart(2, "0");
-  const s = (segundos % 60).toString().padStart(2, "0");
-  return `${h}:${m}:${s}`;
-}
-
-// Calcula tempo decorrido em uma etapa ou tempo total (liberado)
-function calcularTempo(
-  status: StatusCarregamento,
-  timestamps?: Record<string, string>
-): string {
-  if (!timestamps) return "00:00:00";
-
-  if (status === "liberado") {
-    const inicio = timestamps.aguardando;
-    const fim = timestamps.liberado;
-    if (!inicio || !fim) return "—";
-    const diffSeg = Math.max(
-      0,
-      Math.floor((new Date(fim).getTime() - new Date(inicio).getTime()) / 1000)
-    );
-    return formatarSegundos(diffSeg);
-  }
-
-  const inicio = timestamps[status];
-  if (!inicio) return "00:00:00";
-  const diffSeg = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(inicio).getTime()) / 1000)
-  );
-  return formatarSegundos(diffSeg);
-}
-
 // Componente de Card individual (estilo similar ao MotoristaCard)
 function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; columnStatus: StatusCarregamento }) {
   const destinoNome = getNomeDestino(motorista.destino);
-  const tempo = calcularTempo(columnStatus, motorista.timestamp);
   const temCarga = motorista.carga &&
     (motorista.carga.gaiolas > 0 || motorista.carga.volumosos > 0 || motorista.carga.manga > 0);
 
@@ -88,6 +52,15 @@ function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; c
     liberado:   "bg-green-100 text-green-800",
     not_used:   "bg-red-100 text-red-800",
   }[columnStatus];
+
+ /* const formatarTempo = (segundos: number): string => {
+  if (!segundos || segundos < 0) return '00:00:00';
+  const h = Math.floor(segundos / 3600);
+  const m = Math.floor((segundos % 3600) / 60);
+  const s = segundos % 60;
+  return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':');
+};
+*/
 
   const borderCor = COLUMN_STYLES[columnStatus]?.cor ?? "border-gray-300";
 
@@ -117,11 +90,14 @@ function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; c
           </Badge>
         )}
 
-        {/* Timer ao vivo */}
+        {/* Timer ao vivo 
         <div className="flex items-center gap-1 text-xs mt-1">
           <Clock className="h-3 w-3" />
-          <span className="tabular-nums font-mono font-bold text-base">{tempo}</span>
+          <span className=" font-mono text-xs">{formatarTempo(useLiveTimer(
+            motorista.timestamp?.aguardando))}</span>
         </div>
+              
+        */}
 
         {/* Carga (se disponível) */}
         {temCarga && (
@@ -146,19 +122,35 @@ function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; c
 
         {/* Linha do tempo (horários) */}
         {motorista.timestamp && (
-          <div className=" flex gap-3 mt-2 space-y-0.5 text-[11px] text-muted-foreground border-t pt-1.5">
+          <div className=" flex justify-start gap-4 text-xs text-muted-foreground  ">
+            <div className="flex flex-col gap-1 items-start">
             {motorista.timestamp.aguardando && (
-              <p>🕒 Chegada: {formatarHoraBrasil(motorista.timestamp.aguardando)}</p>
+              <div className="flex flex-row items-start justify-center">
+                <span className="font-mono">{"🕒 Chegada: "}</span>
+                <span>{formatarHoraBrasil(motorista.timestamp.aguardando)}</span>
+              </div>
             )}
             {motorista.timestamp.emDoca && (
-              <p>📥 Em doca: {formatarHoraBrasil(motorista.timestamp.emDoca)}</p>
+              <div className="flex flex-row items-start justify-center">
+                <span className="font-mono">{"📥 Em doca: "}</span>
+                <span>{formatarHoraBrasil(motorista.timestamp.emDoca)}</span> 
+                </div>
             )}
+            </div>
+            <div className="flex flex-col gap-1 items-start ">
             {motorista.timestamp.carregando && (
-              <p>🚛 Início carreg.: {formatarHoraBrasil(motorista.timestamp.carregando)}</p>
+              <div className="flex flex-row items-start justify-center">
+                <span className="font-mono">{"🚛 Início carreg.: "}</span>
+                <span>{formatarHoraBrasil(motorista.timestamp.carregando)}</span>
+              </div>
             )}
             {motorista.timestamp.liberado && (
-              <p>✅ Liberado: {formatarHoraBrasil(motorista.timestamp.liberado)}</p>
+              <div className="flex flex-row items-start justify-center">
+                <span className="font-mono">{"✅ Liberado: "}</span>
+                <span>{formatarHoraBrasil(motorista.timestamp.liberado)}</span>
+              </div>
             )}
+            </div>
           </div>
         )}
       </CardContent>
@@ -175,7 +167,6 @@ interface KanbanBoardProps {
 
 export default function KanbanBoard({ dataInicio, dataFim, facility }: KanbanBoardProps) {
   const [motoristas, setMotoristas] = useState<MotoristaKanban[]>([]);
-  const [, setTick] = useState(0); // força re-render a cada segundo
 
   const buscarDados = async () => {
     try {
@@ -200,7 +191,7 @@ export default function KanbanBoard({ dataInicio, dataFim, facility }: KanbanBoa
             destino: c.destino,
             doca: c.doca,
             status: c.status ?? "aguardando",
-            timestamps: c.timestamps,
+            timestamp: c.timestamp,
             carga: c.carga,
           }))
         );
@@ -216,12 +207,6 @@ export default function KanbanBoard({ dataInicio, dataFim, facility }: KanbanBoa
     const id = setInterval(buscarDados, INTERVALO_POLLING);
     return () => clearInterval(id);
   }, [dataInicio, dataFim, facility]);
-
-  // Ticker para atualizar os contadores ao vivo a cada 1s
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
