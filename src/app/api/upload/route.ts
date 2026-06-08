@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
           updateOne: {
             filter: { motoristaId: carregamento.motoristaId },
             update: {
-              $setOnInsert: dadosParaInserir,
+              $setOnInsert: { ...dadosParaInserir, dataCriacao: new Date(), },
               $set: { dataEnvio: new Date() },
             },
             upsert: true,

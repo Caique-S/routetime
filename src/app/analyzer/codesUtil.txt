@@ -22,3 +22,327 @@ useEffect(() => {
   }
   preSelectFacility();
 }, []);
+
+
+1) Adicione estes helpers logo abaixo do COLUMN_STYLES
+const STATUS_TIMESTAMP_MAP = {
+  aguardando: "aguardando",
+  emDoca: "emDoca",
+  carregando: "carregando",
+  liberado: "liberado",
+} as const;
+
+function formatarDuracao(segundos: number): string {
+  const h = Math.floor(segundos / 3600);
+  const m = Math.floor((segundos % 3600) / 60);
+  const s = segundos % 60;
+
+  return [h, m, s]
+    .map(v => String(v).padStart(2, "0"))
+    .join(":");
+}
+
+function obterCorSLA(
+  status: StatusCarregamento,
+  segundos: number
+): string {
+
+  const minutos = segundos / 60;
+
+  if (status === "emDoca") {
+    if (minutos <= 15) return "border-green-500";
+    if (minutos <= 30) return "border-yellow-500";
+    return "border-red-500";
+  }
+
+  if (status === "carregando") {
+    if (minutos <= 20) return "border-green-500";
+    if (minutos <= 30) return "border-yellow-500";
+    return "border-red-500";
+  }
+
+  return "";
+}
+2) Substitua o KanbanCard inteiro
+
+Troque apenas a função:
+
+function KanbanCard(...)
+
+pela versão abaixo:
+
+function KanbanCard({
+  motorista,
+  columnStatus,
+}: {
+  motorista: MotoristaKanban;
+  columnStatus: StatusCarregamento;
+}) {
+
+  const destinoNome = getNomeDestino(motorista.destino);
+
+  const timestampAtual =
+    columnStatus === "aguardando"
+      ? motorista.timestamp?.aguardando
+      : columnStatus === "emDoca"
+      ? motorista.timestamp?.emDoca
+      : columnStatus === "carregando"
+      ? motorista.timestamp?.carregando
+      : motorista.timestamp?.liberado;
+
+  const segundos = useLiveTimer(timestampAtual);
+
+  const slaColor = obterCorSLA(columnStatus, segundos);
+
+  const temCarga =
+    motorista.carga &&
+    (
+      motorista.carga.gaiolas > 0 ||
+      motorista.carga.volumosos > 0 ||
+      motorista.carga.manga > 0
+    );
+
+  const badgeCor = motorista.status === "not_used"
+    ? "bg-red-100 text-red-800"
+    : {
+        aguardando: "bg-yellow-100 text-yellow-800",
+        emDoca: "bg-blue-100 text-blue-800",
+        carregando: "bg-orange-100 text-orange-800",
+        liberado: "bg-green-100 text-green-800",
+      }[columnStatus];
+
+  return (
+    <Card
+      className={`
+        border-l-4
+        transition-all
+        hover:shadow-md
+        ${slaColor}
+      `}
+    >
+      <CardContent className="p-3 space-y-2">
+
+        <div className="flex justify-between items-start">
+
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            <span className="font-medium text-sm">
+              {motorista.nome}
+            </span>
+          </div>
+
+          <Badge className={badgeCor}>
+            {
+              motorista.status === "not_used"
+                ? "⚠️ Not Used"
+                : STATUS_LABELS[columnStatus]
+            }
+          </Badge>
+
+        </div>
+
+        <div className="text-xs text-muted-foreground flex items-center gap-1">
+          <span className="font-mono bg-muted px-1 rounded">
+            {motorista.motoristaId.split("_")[0]}
+          </span>
+          •
+          {destinoNome}
+        </div>
+
+        {motorista.doca && (
+          <Badge variant="outline">
+            Doca {motorista.doca}
+          </Badge>
+        )}
+
+        {(columnStatus === "aguardando" ||
+          columnStatus === "emDoca" ||
+          columnStatus === "carregando") && (
+          <div className="flex items-center gap-2 text-sm font-mono">
+
+            <Clock className="h-4 w-4" />
+
+            <span>
+              {formatarDuracao(segundos)}
+            </span>
+
+          </div>
+        )}
+
+        {temCarga && (
+          <div className="bg-muted/40 rounded p-2 text-xs">
+
+            <div>📦 Gaiolas: {motorista.carga!.gaiolas}</div>
+
+            <div>📦 Volumosos: {motorista.carga!.volumosos}</div>
+
+            <div>📦 Manga: {motorista.carga!.manga}</div>
+
+          </div>
+        )}
+
+        {motorista.timestamp && (
+          <div className="text-xs text-muted-foreground space-y-1">
+
+            {motorista.timestamp.aguardando && (
+              <div>
+                🕒 {formatarHoraBrasil(motorista.timestamp.aguardando)}
+              </div>
+            )}
+
+            {motorista.timestamp.emDoca && (
+              <div>
+                📥 {formatarHoraBrasil(motorista.timestamp.emDoca)}
+              </div>
+            )}
+
+            {motorista.timestamp.carregando && (
+              <div>
+                🚛 {formatarHoraBrasil(motorista.timestamp.carregando)}
+              </div>
+            )}
+
+            {motorista.timestamp.liberado && (
+              <div>
+                ✅ {formatarHoraBrasil(motorista.timestamp.liberado)}
+              </div>
+            )}
+
+          </div>
+        )}
+
+      </CardContent>
+    </Card>
+  );
+}
+3) Dentro do return principal do KanbanBoard
+
+Substitua:
+
+const itens = motoristas.filter((m) => m.status === status);
+
+por:
+
+const itens = motoristas
+  .filter((m) => {
+
+    if (status === "aguardando") {
+      return (
+        m.status === "aguardando" ||
+        m.status === "not_used"
+      );
+    }
+
+    return m.status === status;
+  })
+  .sort((a, b) => {
+
+    if (status === "liberado") {
+
+      const ta = a.timestamp?.liberado
+        ? new Date(a.timestamp.liberado).getTime()
+        : 0;
+
+      const tb = b.timestamp?.liberado
+        ? new Date(b.timestamp.liberado).getTime()
+        : 0;
+
+      return tb - ta;
+    }
+
+    const campo = STATUS_TIMESTAMP_MAP[
+      status as keyof typeof STATUS_TIMESTAMP_MAP
+    ];
+
+    const ta = a.timestamp?.[campo]
+      ? new Date(a.timestamp[campo]).getTime()
+      : 0;
+
+    const tb = b.timestamp?.[campo]
+      ? new Date(b.timestamp[campo]).getTime()
+      : 0;
+
+    return ta - tb;
+  });
+4) Adicione tempo médio no cabeçalho das colunas
+
+Logo antes do:
+
+<Badge variant="secondary">
+
+adicione:
+
+const mediaSegundos =
+  itens.length > 0
+    ? Math.round(
+        itens.reduce((acc, item) => {
+
+          const campo =
+            status === "aguardando"
+              ? "aguardando"
+              : status === "emDoca"
+              ? "emDoca"
+              : status === "carregando"
+              ? "carregando"
+              : "liberado";
+
+          const valor = item.timestamp?.[campo];
+
+          if (!valor) return acc;
+
+          return (
+            acc +
+            Math.floor(
+              (Date.now() - new Date(valor).getTime()) / 1000
+            )
+          );
+
+        }, 0) / itens.length
+      )
+    : 0;
+
+E substitua:
+
+<div className="flex items-center justify-between mb-3">
+
+por:
+
+<div className="flex items-center justify-between mb-3">
+  <div>
+    <h3
+      className={`font-semibold text-sm flex items-center gap-2 border-l-4 pl-2 ${colStyle.cor}`}
+    >
+      {colStyle.titulo}
+    </h3>
+
+    {status !== "liberado" && itens.length > 0 && (
+      <p className="text-xs text-muted-foreground pl-2">
+        Média: {formatarDuracao(mediaSegundos)}
+      </p>
+    )}
+  </div>
+Resultado final esperado
+
+Você ganha imediatamente:
+
+✅ Ordenação correta por fila operacional
+
+✅ Liberados mais recentes primeiro
+
+✅ Not Used na coluna Aguardando
+
+✅ Timer em tempo real
+
+✅ SLA visual verde/amarelo/vermelho
+
+✅ Tempo médio por coluna
+
+✅ Destaque automático dos gargalos
+
+✅ Sem alterar API
+
+✅ Sem alterar MongoDB
+
+✅ Sem alterar hook useLiveTimer
+
+Tudo isso apenas com alterações no kanban-board.tsx.

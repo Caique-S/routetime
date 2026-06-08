@@ -264,82 +264,6 @@ export default function CarregamentosPage() {
     }
   };
 
-  const exportarCSV = () => {
-    const cabecalhos = [
-      "Travel ID",
-      "Data",
-      "Condutor",
-      "Categoria",
-      "Placa de Tração",
-      "Placa de Carga",
-      "Facility",
-      "Destino",
-      "Status",
-      "Posição de Saída",
-      "ID Carregamento",
-      "Doca Carregamento",
-      "Encostado na Doca",
-      "Início do Carregamento",
-      "Término de Carregamento",
-      "Saída Liberada",
-      "Previsão de Chegada",
-      "Lacre Traseiro",
-      "Lacre Lateral 1",
-      "Lacre Lateral 2",
-      "Gaiolas",
-      "Volumosos",
-      "Manga Palets",
-      "Operador",
-      "Transportadora",
-    ];
-
-    const linhas = carregamentosFiltrados.map((c) => [
-      c.travelId,
-      new Date(c.dataCriacao).toLocaleDateString("pt-BR"),
-      c.condutor,
-      c.categoria,
-      c.placaTracao,
-      c.placaCarga,
-      c.facility,
-      c.destino,
-      c.status,
-      c.posicaoSaida,
-      c.idCarregamento,
-      c.docaCarregamento,
-      c.encostadoDoca,
-      c.inicioCarregamento,
-      c.terminoCarregamento,
-      c.saidaLiberada,
-      c.previsaoChegada,
-      c.lacreTraseiro,
-      c.lacreLateral1,
-      c.lacreLateral2,
-      c.gaiolas,
-      c.volumosos,
-      c.mangaPalets,
-      c.operador,
-      c.transportadora,
-    ]);
-
-    const csvContent = [cabecalhos, ...linhas]
-      .map((row) =>
-        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
-      )
-      .join("\n");
-
-    const blob = new Blob(["\uFEFF" + csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `carregamentos_${dataSelecionada}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
   const formatarHora = (hora: string) => {
     if (!hora) return "";
     if (/^\d{2}:\d{2}$/.test(hora)) return hora;
@@ -406,12 +330,6 @@ export default function CarregamentosPage() {
                 className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
               >
                 Limpar Filtros
-              </button>
-              <button
-                onClick={exportarCSV}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
-              >
-                📥 Exportar CSV
               </button>
               <button
                 onClick={fetchCarregamentos}

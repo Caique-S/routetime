@@ -22,6 +22,7 @@ interface MotoristaKanban {
   doca?: string;
   status: StatusCarregamento;
   timestamp?: Record<string, string>; // ISO
+  dataAtualizacao?: string,
   carga?: {
     gaiolas: number;
     volumosos: number;
@@ -39,7 +40,7 @@ const COLUMN_STYLES: Record<StatusCarregamento, { titulo: string; cor: string }>
 };
 
 // Componente de Card individual (estilo similar ao MotoristaCard)
-function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; columnStatus: StatusCarregamento }) {
+function KanbanCard({ motorista }: { motorista: MotoristaKanban; }) {
   const destinoNome = getNomeDestino(motorista.destino);
   const temCarga = motorista.carga &&
     (motorista.carga.gaiolas > 0 || motorista.carga.volumosos > 0 || motorista.carga.manga > 0);
@@ -51,18 +52,9 @@ function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; c
     carregando: "bg-orange-100 text-orange-800",
     liberado:   "bg-green-100 text-green-800",
     not_used:   "bg-red-100 text-red-800",
-  }[columnStatus];
+  }[motorista.status];
 
- /* const formatarTempo = (segundos: number): string => {
-  if (!segundos || segundos < 0) return '00:00:00';
-  const h = Math.floor(segundos / 3600);
-  const m = Math.floor((segundos % 3600) / 60);
-  const s = segundos % 60;
-  return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':');
-};
-*/
-
-  const borderCor = COLUMN_STYLES[columnStatus]?.cor ?? "border-gray-300";
+  const borderCor = COLUMN_STYLES[motorista.status]?.cor ?? "border-gray-300";
 
   return (
     <Card className={`cursor-default hover:shadow-md transition-shadow border-l-4 ${borderCor}`}>
@@ -71,9 +63,9 @@ function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; c
         <div className="flex justify-between items-start gap-2">
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium text-sm">{motorista.nome}</span>
+            <span className="font-medium font-semibold text-gray-800 text-xs">{motorista.nome}</span>
           </div>
-          <Badge className={badgeCor}>{STATUS_LABELS[columnStatus] || columnStatus}</Badge>
+          <Badge className={badgeCor}>{STATUS_LABELS[motorista.status]}</Badge>
         </div>
 
         {/* Destino */}
@@ -90,14 +82,6 @@ function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; c
           </Badge>
         )}
 
-        {/* Timer ao vivo 
-        <div className="flex items-center gap-1 text-xs mt-1">
-          <Clock className="h-3 w-3" />
-          <span className=" font-mono text-xs">{formatarTempo(useLiveTimer(
-            motorista.timestamp?.aguardando))}</span>
-        </div>
-              
-        */}
 
         {/* Carga (se disponível) */}
         {temCarga && (
@@ -136,6 +120,12 @@ function KanbanCard({ motorista, columnStatus }: { motorista: MotoristaKanban; c
                 <span>{formatarHoraBrasil(motorista.timestamp.emDoca)}</span> 
                 </div>
             )}
+              {motorista.status === "not_used" && (
+                <div className="flex flex-row items-start justify-center">
+                  <span className="font-mono">{"⚠️ Não Utilizado : "}</span>
+                  <span>{formatarHoraBrasil(motorista.dataAtualizacao)}</span>
+                </div>
+              )}
             </div>
             <div className="flex flex-col gap-1 items-start ">
             {motorista.timestamp.carregando && (
@@ -187,6 +177,7 @@ export default function KanbanBoard({ dataInicio, dataFim, facility }: KanbanBoa
         setMotoristas(
           json.data.map((c: any) => ({
             motoristaId: c.motoristaId,
+            dataAtualizacao: c.dataAtualizacao,
             nome: c.motorista?.nome ?? c.nomeMotorista ?? "Não identificado",
             destino: c.destino,
             doca: c.doca,
@@ -212,7 +203,17 @@ export default function KanbanBoard({ dataInicio, dataFim, facility }: KanbanBoa
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {COLUNAS_KANBAN.map((status) => {
         const colStyle = COLUMN_STYLES[status];
-        const itens = motoristas.filter((m) => m.status === status);
+        const itens = motoristas.filter((m) => {
+
+          if (status === 'aguardando') {
+            return (
+              m.status === "aguardando" ||
+              m.status === "not_used"
+            );
+          }
+          return m.status === status
+        })
+
         return (
           <div key={status} className="bg-muted/50 rounded-xl p-3">
             <div className="flex items-center justify-between mb-3">
@@ -224,7 +225,7 @@ export default function KanbanBoard({ dataInicio, dataFim, facility }: KanbanBoa
             <ScrollArea className="h-[500px] pr-2">
               <div className="space-y-2">
                 {itens.map((m) => (
-                  <KanbanCard key={m.motoristaId} motorista={m} columnStatus={status} />
+                  <KanbanCard key={m.motoristaId} motorista={m} />
                 ))}
               </div>
             </ScrollArea>
