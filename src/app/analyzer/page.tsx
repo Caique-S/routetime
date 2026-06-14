@@ -18,6 +18,15 @@ import { getNomeDestino } from "../lib/utils/destinos";
 import { formatarHoraBrasil, formatarDataBrasil, getTodayBrasilia } from "../lib/utils/dateUtils";
 import { ICarregamento } from "@/app/lib/models/carregamento";
 
+const Storage = (chave: string, valor: any) => {
+  try {
+    const valorString = JSON.stringify(valor);
+    localStorage.setItem(chave, valorString);
+  } catch (erro) {
+    console.error("Erro ao salvar no localStorage:", erro);
+  }
+};
+
 const parseTimeToMinutes = (time: string | null | undefined): number | null => {
   if (!time) return null;
   const cleaned = time.includes("T")
@@ -36,6 +45,7 @@ const calcularDiferencaHoras = (inicio: string | null | undefined, fim: string |
   return diff;
 };
 
+
 const getTodayStr = () => getTodayBrasilia().split("/").reverse().join("-");
 const getYesterdayStr = () => {
   const ontem = new Date();
@@ -43,17 +53,6 @@ const getYesterdayStr = () => {
   return ontem.toISOString().split("T")[0];
 };
 
-const Storage = (chave: string, valor: any) => {
-  try {
-    const valorString = JSON.stringify(valor);
-    localStorage.setItem(chave, valorString);
-  } catch (erro) {
-    console.error("Erro ao salvar no localStorage:", erro);
-  }
-};
-
-
-// Hook de dados (substitui a função grande e confusa)
 function useCarregamentos(dataInicio: string, dataFim: string) {
   const [carregamentos, setCarregamentos] = useState<ICarregamento[]>([]);
   const [loading, setLoading] = useState(true);

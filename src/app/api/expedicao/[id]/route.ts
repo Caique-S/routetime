@@ -2,12 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { getDatabase } from '@/app/lib/mongodb';
 
-/**
- * PUT /api/expedicao/[id]
- *
- * Atualiza um carregamento da coleção pelo _id.
- * Remove o campo _id do body antes de atualizar para evitar conflitos.
- */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
