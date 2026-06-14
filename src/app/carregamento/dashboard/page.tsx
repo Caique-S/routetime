@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Dialog, Transition } from "@headlessui/react";
+import { criarIntervaloDia, getTodayBrasilia } from "@/app/lib/utils/dateUtils"
 
 declare global {
   interface Window {
@@ -94,15 +95,6 @@ const getNomeDestino = (codigo: string): string => {
   return mapeamento[codigo] || codigo;
 };
 
-// Retorna a data atual no formato YYYY-MM-DD (considerando o fuso do navegador)
-const getTodayDateString = (): string => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 // ------------------------------------------------------------
 // Componente principal
 // ------------------------------------------------------------
@@ -116,18 +108,29 @@ export default function DashboardPage() {
     facility: "SBA4",
   });
 
+  const [carregamentoDetails, setCarregamentoDetails] = useState<any>(null)
+
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportFilters, setExportFilters] = useState({ 
-    dataInicio: getTodayDateString(), 
-    dataFim: getTodayDateString(), 
-    facility: "" 
+  const [exportFilters, setExportFilters] = useState({
+    dataInicio: getTodayBrasilia(),
+    dataFim: getTodayBrasilia(),
+    facility: ""
   });
+
+  const buscarDetalhes = async () => {
+    try {
+      setLoading(true)
+
+    } catch (error) {
+      
+    }
+  }
 
   // Busca o upload da data atual
   const fetchUploadDoDia = async () => {
     try {
       setLoadingUpload(true);
-      const today = getTodayDateString();
+      const today = getTodayBrasilia();
       const response = await fetch(`/api/upload?date=${today}`);
       const result = await response.json();
       if (result.success && result.data && result.data.length > 0) {
@@ -148,9 +151,11 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       const queryParams = new URLSearchParams();
+      
       if (filter.facility) queryParams.append("facility", filter.facility);
       const response = await fetch(`/api/carregamento?${queryParams}`);
       const data = await response.json();
+
       if (data.success) {
         setAllCarregamentos(data.data);
       }
@@ -166,21 +171,13 @@ export default function DashboardPage() {
     fetchUploadDoDia();
   }, [filter.facility]);
 
-  // ------------------------------------------------------------
-  // Filtrar carregamentos apenas do dia atual
-  // ------------------------------------------------------------
-  const hojeStr = getTodayDateString(); // YYYY-MM-DD
-  const inicioHoje = new Date(hojeStr + 'T00:00:00-03:00').getTime();
-  const fimHoje = new Date(hojeStr + 'T23:59:59-03:00').getTime();
+  const hojeStr = criarIntervaloDia(getTodayBrasilia()); // YYYY-MM-DD
 
   const carregamentosDoDia = allCarregamentos.filter((c) => {
     const createdAt = new Date(c.dataCriacao).getTime();
-    return createdAt >= inicioHoje && createdAt < fimHoje;
+    return createdAt >= hojeStr.start.getTime() && createdAt < hojeStr.end.getTime();
   });
 
-  // ------------------------------------------------------------
-  // Normalização de status: considera 'liberado' como concluído
-  // ------------------------------------------------------------
   const carregamentosNormalizados = carregamentosDoDia.map(c => ({
     ...c,
     statusNormalizado: c.status === 'liberado' ? 'concluido' : c.status
@@ -246,13 +243,13 @@ export default function DashboardPage() {
   const generateCSV = async () => {
     try {
       const queryParams = new URLSearchParams();
-      
+
       // Se a facility não estiver vazia, adiciona ao filtro. Caso contrário, traz todas.
       if (exportFilters.facility.trim() !== "") {
         queryParams.append("facility", exportFilters.facility.trim());
       }
       // Garante que o relatório traga todos os dados do período e não pare no limite padrão de 50
-      queryParams.append("limit", "10000"); 
+      queryParams.append("limit", "10000");
 
       const response = await fetch(`/api/carregamento?${queryParams}`);
       const data = await response.json();
@@ -269,7 +266,7 @@ export default function DashboardPage() {
         const start = new Date(exportFilters.dataInicio + 'T00:00:00').getTime();
         // Adiciona 24 horas ao dia final para incluir o dia inteiro na busca
         const end = new Date(exportFilters.dataFim + 'T00:00:00').getTime() + 24 * 60 * 60 * 1000;
-        
+
         carregamentos = carregamentos.filter((c) => {
           const createdAt = new Date(c.dataCriacao).getTime();
           return createdAt >= start && createdAt < end;
@@ -379,9 +376,6 @@ export default function DashboardPage() {
     }
   };
 
-  // ------------------------------------------------------------
-  // Renderização
-  // ------------------------------------------------------------
   return (
     <div className="min-h-screen bg-linear-to-br from-indigo-50 via-white to-purple-50">
       {/* Header */}
@@ -541,7 +535,7 @@ export default function DashboardPage() {
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 overflow-hidden">
           <div className="p-5 border-b border-white/20">
             <h2 className="text-lg font-bold text-gray-900">
-              Destinos · {filter.facility} ·  {hojeStr.split('-').reverse().join('/')}
+              Destinos · {filter.facility} ·  {getTodayBrasilia()}  
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
               Progresso de carregamentos concluídos por destino (baseado no upload do dia)
@@ -565,7 +559,7 @@ export default function DashboardPage() {
           ) : (
             <div className="divide-y divide-gray-100">
               {destinosProgresso.map((destino) => (
-                <div key={destino.nome} className="p-5 hover:bg-white/40 transition-colors">
+                <button key={destino.nome} className="w-full block text-left p-5 bg-white/20 hover:bg-white/40 hover:shadow-lg hover:-translate-y-1 transform transition-all duration-200 rounded-xl border border-transparent hover:border-white/30">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-blue-500 shrink-0" />
@@ -583,7 +577,7 @@ export default function DashboardPage() {
                       style={{ width: `${destino.progresso}%` }}
                     />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

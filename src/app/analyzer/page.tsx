@@ -259,15 +259,6 @@ export default function AnalyserPage() {
     setDrawerOpen(true);
   };
 
-  const Storage = (chave: string, valor: any) => {
-    try {
-      const valorString = JSON.stringify(valor);
-      localStorage.setItem(chave, valorString);
-    } catch (erro) {
-      console.error("Erro ao salvar no localStorage:", erro);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -341,8 +332,7 @@ export default function AnalyserPage() {
           <MetricCard title="Total" value={stats.total} subtitle="viagens" icon={<Activity className="h-5 w-5" />} onClick={() => abrirDetalhes("Todas as viagens", carregamentos )} />
           <MetricCard title="Em Andamento" value={stats.emDoca + stats.carregando} subtitle={`${stats.emDoca} Doca, ${stats.carregando} carregando`} icon={<Truck className="h-5 w-5" />} onClick={() => abrirDetalhes("Em andamento", carregamentos.filter(c => ["emDoca" , "aguardando"].includes(c.status) ))} />
           <MetricCard title="Concluídos" value={stats.liberados + stats.not_used} subtitle={`${stats.liberados} liberados`} icon={<CheckCircle className="h-5 w-5" />} onClick={() => abrirDetalhes("Concluídos", carregamentos.filter(c =>["liberado","not_used"].includes(c.status)))} />
-          <MetricCard title="Gaiolas" value={stats.gaiolas} subtitle={`${stats.volumosos} vol. / ${stats.manga} manga`} icon={<Box className="h-5 w-5" />} onClick={() => abrirDetalhes("Com carga", carregamentos.filter(c => c.carga?.gaiolas > 0))} />
-          {`${Storage("metricaCard",stats)}`}        
+          <MetricCard title="Gaiolas" value={stats.gaiolas} subtitle={`${stats.volumosos} vol. / ${stats.manga} manga`} icon={<Box className="h-5 w-5" />} onClick={() => abrirDetalhes("Com carga", carregamentos.filter(c => c.carga?.gaiolas > 0))} />     
         </div>
 
         {/* Gráfico de Liberações por Facility - Mantido */}
