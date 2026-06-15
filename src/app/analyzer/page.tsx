@@ -100,8 +100,6 @@ export default function AnalyserPage() {
   const [periodoPredefinido, setPeriodoPredefinido] = useState("hoje");
   const [dataInicio, setDataInicio] = useState(getTodayStr());
   const [dataFim, setDataFim] = useState(getTodayStr());
-  const [facilitySelecionada, setFacilitySelecionada] = useState("");
-  const [kanbanFacility, setKanbanFacility] = useState<string>("todas");
   const [activeTab, setActiveTab] = useState("kanban");
   const [chartFacility, setChartFacility] = useState("todas");
 
@@ -459,23 +457,7 @@ export default function AnalyserPage() {
           </TabsContent>
 
           <TabsContent value="kanban">
-            <div className="flex items-center gap-4 mb-4">
-              <Select value={kanbanFacility} onValueChange={setKanbanFacility}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Escolha a facility" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas</SelectItem>
-                  {facilitiesDisponiveis.map((fac) => (
-                    <SelectItem key={fac} value={fac}>{fac}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <KanbanBoard
-              dataInicio={dataInicio}
-              dataFim={dataFim}
-              facility={kanbanFacility === "todas" ? "" : kanbanFacility} />
+            <KanbanBoard/>
           </TabsContent>
 
           <TabsContent value="distribution" className="space-y-6">
