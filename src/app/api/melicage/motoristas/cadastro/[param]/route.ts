@@ -2,14 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-// Helper que retorna um filtro que inclui motoristas antigos (sem transportadora_id)
-// Mas apenas quando o motorista é buscado por ID ou CPF.
 function buildFilter(param: string, transportadoraId: string) {
   const filter: any = { $or: [] };
 
-  // Condição para motoristas que pertencem à transportadora logada
   const ownFilter: any = { transportadora_id: transportadoraId };
-  // Condição para motoristas antigos (sem transportadora_id)
   const legacyFilter: any = { transportadora_id: { $exists: false } };
 
   if (/^[a-f\d]{24}$/i.test(param)) {
@@ -23,8 +19,6 @@ function buildFilter(param: string, transportadoraId: string) {
   filter.$or = [ownFilter, legacyFilter];
   return filter;
 }
-
-// GET /api/.../[param] – busca motorista por ID ou CPF (incluindo antigos)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ param: string }> }
@@ -35,19 +29,19 @@ export async function GET(
     const isCpf = /^\d{11}$/.test(param.replace(/\D/g, ''));
     const isObjectId = /^[a-f\d]{24}$/i.test(param);
 
-    // ✅ Busca por CPF (app do motorista): não exige autenticação
     if (isCpf) {
       const cpfLimpo = param.replace(/\D/g, '');
       const motorista = await db.collection('melicages_motoristas_cadastro').findOne({ cpf: cpfLimpo });
-      let nomeTransportadoraResolvido = "Não Informado"
+      let nomeTransportadoraResolvido = "Não Informado";
 
-      if (motorista?.tranportadora_id) {
+
+      if (motorista?.transportadora_id) {
         const transportadoraDoc = await db
           .collection('melicages_transportadoras')
-          .findOne({ _id: motorista.transportadora_id })
+          .findOne({ _id: motorista.transportadora_id });
 
         if (transportadoraDoc && transportadoraDoc.nome) {
-          nomeTransportadoraResolvido = transportadoraDoc.nome
+          nomeTransportadoraResolvido = transportadoraDoc.nome;
         }
       }
 
@@ -67,7 +61,6 @@ export async function GET(
       return NextResponse.json({ success: true, data });
     }
 
-    // 🔒 Busca por ID (painel da transportadora): exige autenticação
     const transportadoraId = request.headers.get('x-transportadora-id');
     if (!transportadoraId) {
       return NextResponse.json(
@@ -93,6 +86,25 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    let nomeTransportadoraResolvido = "Não Informado";
+    if (motorista.transportadora_id) {
+      const transportadoraDoc = await db
+        .collection('melicages_transportadoras')
+        .findOne({ _id: motorista.transportadora_id });
+
+      if (transportadoraDoc && transportadoraDoc.nome) {
+        nomeTransportadoraResolvido = transportadoraDoc.nome;
+      }
+    }
+
+    const data = {
+      id: motorista._id.toString(),
+      ...motorista,
+      transportadora: nomeTransportadoraResolvido
+    };
+
+    return NextResponse.json({ success: true, data });
 
   } catch (error: any) {
     console.error('[API] GET /motoristas/cadastro/[param] error:', error);
