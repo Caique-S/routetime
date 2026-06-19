@@ -38,9 +38,18 @@ export async function GET(
     // ✅ Busca por CPF (app do motorista): não exige autenticação
     if (isCpf) {
       const cpfLimpo = param.replace(/\D/g, '');
-      const motorista = await db
-        .collection('melicages_motoristas_cadastro')
-        .findOne({ cpf: cpfLimpo });
+      const motorista = await db.collection('melicages_motoristas_cadastro').findOne({ cpf: cpfLimpo });
+      let nomeTransportadoraResolvido = "Não Informado"
+
+      if (motorista?.tranportadora_id) {
+        const transportadoraDoc = await db
+          .collection('melicages_transportadoras')
+          .findOne({ _id: motorista.transportadora_id })
+
+        if (transportadoraDoc && transportadoraDoc.nome) {
+          nomeTransportadoraResolvido = transportadoraDoc.nome
+        }
+      }
 
       if (!motorista) {
         return NextResponse.json(
@@ -49,11 +58,13 @@ export async function GET(
         );
       }
 
-      const { _id, ...rest } = motorista;
-      return NextResponse.json({
-        success: true,
-        data: { id: _id.toString(), ...rest },
-      });
+      const data = {
+        id: motorista._id.toString(),
+        ...motorista,
+        transportadora: nomeTransportadoraResolvido
+      };
+
+      return NextResponse.json({ success: true, data });
     }
 
     // 🔒 Busca por ID (painel da transportadora): exige autenticação
@@ -83,11 +94,6 @@ export async function GET(
       );
     }
 
-    const { _id, ...rest } = motorista;
-    return NextResponse.json({
-      success: true,
-      data: { id: _id.toString(), ...rest },
-    });
   } catch (error: any) {
     console.error('[API] GET /motoristas/cadastro/[param] error:', error);
     return NextResponse.json(
