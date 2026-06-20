@@ -35,12 +35,12 @@ export async function GET(
       let nomeTransportadoraResolvido = "Não Informado";
 
 
-      if (motorista?.data.transportadora_id) {
+      if (motorista?.transportadora_id) {
         const transportadoraDoc = await db
           .collection('melicages_transportadoras')
-          .findOne({ _id: motorista.data.transportadora_id });
+          .findOne({ _id: motorista.transportadora_id });
 
-        if (transportadoraDoc && transportadoraDoc.nome) {
+        if (transportadoraDoc?.nome) {
           nomeTransportadoraResolvido = transportadoraDoc.nome;
         }
       }
@@ -52,8 +52,10 @@ export async function GET(
         );
       }
 
+      const {_id, ...rest} = motorista;
       const data = {
-        ...motorista,
+        id: _id.toString(),
+        ...rest,
         nomeTransportadora: nomeTransportadoraResolvido
       };
 
