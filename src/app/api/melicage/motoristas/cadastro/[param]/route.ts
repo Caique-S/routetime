@@ -35,10 +35,10 @@ export async function GET(
       let nomeTransportadoraResolvido = "Não Informado";
 
 
-      if (motorista?.transportadora_id) {
+      if (motorista?.data.transportadora_id) {
         const transportadoraDoc = await db
           .collection('melicages_transportadoras')
-          .findOne({ _id: motorista.transportadora_id });
+          .findOne({ _id: motorista.data.transportadora_id });
 
         if (transportadoraDoc && transportadoraDoc.nome) {
           nomeTransportadoraResolvido = transportadoraDoc.nome;
@@ -53,9 +53,8 @@ export async function GET(
       }
 
       const data = {
-        id: motorista._id.toString(),
         ...motorista,
-        transportadora: nomeTransportadoraResolvido
+        nomeTransportadora: nomeTransportadoraResolvido
       };
 
       return NextResponse.json({ success: true, data });
