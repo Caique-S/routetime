@@ -36,12 +36,16 @@ export async function GET(
 
 
       if (motorista?.transportadora_id) {
-        const transportadoraDoc = await db
+        try {
+          const transportadoraDoc = await db
           .collection('melicages_transportadoras')
-          .findOne({ _id: motorista.transportadora_id });
+          .findOne({ _id: new ObjectId(motorista.transportadora_id) });
 
-        if (transportadoraDoc?.nome) {
-          nomeTransportadoraResolvido = transportadoraDoc.nome;
+          if (transportadoraDoc?.nome) {
+            nomeTransportadoraResolvido = transportadoraDoc.nome;
+          }
+        } catch (err) {
+          console.log('ID da Transportadora invalido',err )
         }
       }
 
@@ -52,7 +56,7 @@ export async function GET(
         );
       }
 
-      const {_id, ...rest} = motorista;
+      const { _id, ...rest } = motorista;
       const data = {
         id: _id.toString(),
         ...rest,
