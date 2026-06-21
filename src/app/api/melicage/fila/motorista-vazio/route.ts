@@ -83,21 +83,14 @@ export async function POST(request: NextRequest) {
     const result = await collection.insertOne(novoRegistro);
     const insertedId = result.insertedId.toString();
 
-    try {
-      await dbFirestore.collection(FIRESTORE_COLLECTION).doc(insertedId).set({
-        ...novoRegistro,
-        _id: insertedId,
-      });
-    } catch (firestoreError) {
-      console.error('Erro ao escrever no Firestore:', firestoreError);
-    }
-
     return NextResponse.json({
       message: 'Chegada registrada com sucesso',
       data: {
         id: insertedId,
         destino: novoRegistro.destino,
         timestampChegada: novoRegistro.timestampChegada,
+        dataChegada: novoRegistro.dataChegada,
+        horaChegada: novoRegistro.horaChegada,
         status: novoRegistro.status,
       },
     }, { status: 201 });
