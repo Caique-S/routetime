@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '../../../../lib/mongodb';
-import { dbFirestore, FIRESTORE_COLLECTION } from '../../../../lib/firebaseAdmin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +16,13 @@ export async function POST(request: NextRequest) {
     const db = await getDatabase('brj_transportes');
     const collection = db.collection('melicages_motoristas');
 
+    const dataHora = new Date()
+    const inicioDia = new Date(dataHora)
+    inicioDia.setHours(0, 0, 0, 0)
+
+    const fimDia = new Date(dataHora)
+    fimDia.setHours(23, 59, 58, 990)
+
     
     const ativo = await collection.findOne({
       cpf,
@@ -31,8 +37,13 @@ export async function POST(request: NextRequest) {
 
    
     const uploadsCollection = db.collection('uploads_atribuicao');
-    const lastUpload = await uploadsCollection.find().sort({ uploadDate: -1 }).limit(1).toArray();
-    let destino = 'Aguardando atribuição';
+    const lastUpload = await uploadsCollection.find({
+      uploadDate: {$gte: inicioDia, $lte: fimDia}
+    }).sort({ uploadDate: -1 }).limit(1).toArray();
+    
+    let destinoCodigo = 'Aguardando atribuição';
+    let destinoCidade = 'Aguardando atribuição'
+
     if (lastUpload.length > 0) {
       const uploadData = lastUpload[0].data;
       
@@ -40,7 +51,7 @@ export async function POST(request: NextRequest) {
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
-        .trim();
+        .replace(/\s+/g, '');
       const registroEncontrado = uploadData.find((item: any) => {
         const nomeCSV = item['Nome do motorista 1'];
         if (!nomeCSV) return false;
@@ -48,11 +59,23 @@ export async function POST(request: NextRequest) {
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '')
           .toLowerCase()
-          .trim();
+          .replace(/\s+/g, '');
         return nomeCSVNormalizado === nomeNormalizado;
       });
       if (registroEncontrado) {
-        destino = registroEncontrado['Destino'] || 'Destino não especificado';
+        const codigoSemFormatacao = registroEncontrado['Destino'] || 'Destino não especificado';
+        destinoCodigo = codigoSemFormatacao ? codigoSemFormatacao.toString().trim().toUpperCase() : 'Destino não encontrado'
+
+        if(destinoCodigo !== 'Aguardando atribuição'){
+          const destinosCollection = db.collection('melicages_xpts')
+          const destinoDoc = await destinosCollection.findOne({codigo: destinoCodigo})
+
+          if(destinoDoc && destinoDoc.cidade){
+            destinoCidade = destinoDoc.cidade
+          }else{
+            destinoCidade = `${destinoCodigo} sem Cadastro`
+          }
+        }
       }
     }
 
@@ -61,7 +84,8 @@ export async function POST(request: NextRequest) {
       cpf,
       nome,
       chave_identificacao,
-      destino,                     
+      destino: destinoCodigo,
+      cidadeDestino: destinoCidade,                     
       status: 'aguardando_carregamento',
       tipo: 'vazio',                
       dataChegada: agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
@@ -88,6 +112,7 @@ export async function POST(request: NextRequest) {
       data: {
         id: insertedId,
         destino: novoRegistro.destino,
+        cidadeDestino: novoRegistro.cidadeDestino,
         timestampChegada: novoRegistro.timestampChegada,
         dataChegada: novoRegistro.dataChegada,
         horaChegada: novoRegistro.horaChegada,
