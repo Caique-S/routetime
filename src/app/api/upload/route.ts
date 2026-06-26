@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
     const db = await getDatabase();
     const { searchParams } = new URL(request.url);
 
-    const limit    = parseInt(searchParams.get('limit')  ?? '10');
+    const limit    = parseInt(searchParams.get('limit')  ?? '1');
     const page     = parseInt(searchParams.get('page')   ?? '1');
     const date     = searchParams.get('date');
     const facility = searchParams.get('facility');
