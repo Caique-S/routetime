@@ -226,6 +226,7 @@ export async function GET(request: NextRequest) {
         cidadeDestino: motorista.cidadeDestino,
         status: motorista.status,
         timestampChegada: motorista.timestampChegada,
+        chave_identificacao: motorista.chave_identificacao,
         posicaoFila,
         totalFilaDestino,
         inicioViagem: motorista.inicioViagem
