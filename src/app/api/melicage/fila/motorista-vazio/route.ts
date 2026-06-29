@@ -93,15 +93,7 @@ export async function POST(request: NextRequest) {
       timestampChegada: agora.toISOString(),
       latitude,
       longitude,
-      tempoFila: 0,
-      tempoDescarga: 0,
-      timestampInicioDescarga: null,
-      timestampFimDescarga: null,
-      doca: null,
-      docaNotifiedAt: null,
-      gaiolas: null,
-      palets: null,
-      mangas: null,
+      InicioViagem: null,
     };
 
     const result = await collection.insertOne(novoRegistro);
