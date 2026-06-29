@@ -109,6 +109,7 @@ export async function POST(request: NextRequest) {
         dataChegada: novoRegistro.dataChegada,
         horaChegada: novoRegistro.horaChegada,
         status: novoRegistro.status,
+        inicioViagem: novoRegistro.inicioViagem
       },
     }, { status: 201 });
 
@@ -226,7 +227,8 @@ export async function GET(request: NextRequest) {
         status: motorista.status,
         timestampChegada: motorista.timestampChegada,
         posicaoFila,
-        totalFilaDestino
+        totalFilaDestino,
+        inicioViagem: motorista.inicioViagem
       }
     });
 
