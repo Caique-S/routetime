@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const fimDia = new Date(dataHora)
     fimDia.setHours(23, 59, 58, 990)
 
-    
+
     const ativo = await collection.findOne({
       cpf,
       status: { $in: ['aguardando_carregamento', 'carregando'] }
@@ -35,18 +35,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-   
+
     const uploadsCollection = db.collection('uploads_atribuicao');
     const lastUpload = await uploadsCollection.find({
-      uploadDate: {$gte: inicioDia, $lte: fimDia}
+      uploadDate: { $gte: inicioDia, $lte: fimDia }
     }).sort({ uploadDate: -1 }).limit(1).toArray();
-    
+
     let destinoCodigo = 'Aguardando atribuição';
     let destinoCidade = 'Aguardando atribuição'
 
     if (lastUpload.length > 0) {
       const uploadData = lastUpload[0].data;
-      
+
       const nomeNormalizado = nome
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
@@ -66,13 +66,13 @@ export async function POST(request: NextRequest) {
         const codigoSemFormatacao = registroEncontrado['Destino'] || 'Destino não especificado';
         destinoCodigo = codigoSemFormatacao ? codigoSemFormatacao.toString().trim().toUpperCase() : 'Destino não encontrado'
 
-        if(destinoCodigo !== 'Aguardando atribuição'){
+        if (destinoCodigo !== 'Aguardando atribuição') {
           const destinosCollection = db.collection('melicages_xpts')
-          const destinoDoc = await destinosCollection.findOne({codigo: destinoCodigo})
+          const destinoDoc = await destinosCollection.findOne({ codigo: destinoCodigo })
 
-          if(destinoDoc && destinoDoc.cidade){
+          if (destinoDoc && destinoDoc.cidade) {
             destinoCidade = destinoDoc.cidade
-          }else{
+          } else {
             destinoCidade = `${destinoCodigo} sem Cadastro`
           }
         }
@@ -85,9 +85,9 @@ export async function POST(request: NextRequest) {
       nome,
       chave_identificacao,
       destino: destinoCodigo,
-      cidadeDestino: destinoCidade,                     
+      cidadeDestino: destinoCidade,
       status: 'aguardando_carregamento',
-      tipo: 'vazio',                
+      tipo: 'vazio',
       dataChegada: agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
       horaChegada: agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
       timestampChegada: agora.toISOString(),
@@ -98,6 +98,23 @@ export async function POST(request: NextRequest) {
 
     const result = await collection.insertOne(novoRegistro);
     const insertedId = result.insertedId.toString();
+    let posicaoFila = null;
+    let totalFilaDestino = 0;
+
+    if (destinoCodigo !== 'Aguardando atribuição') {
+      const motoristasNaFrente = await collection.countDocuments({
+        destino: destinoCodigo,
+        status: 'aguardando_carregamento',
+        timestampChegada: { $lt: novoRegistro.timestampChegada }
+      });
+      posicaoFila = motoristasNaFrente + 1;
+      totalFilaDestino = await collection.countDocuments({
+        destino: destinoCodigo,
+        status: 'aguardando_carregamento'
+      });
+    }
+
+
 
     return NextResponse.json({
       message: 'Chegada registrada com sucesso',
@@ -109,7 +126,9 @@ export async function POST(request: NextRequest) {
         dataChegada: novoRegistro.dataChegada,
         horaChegada: novoRegistro.horaChegada,
         status: novoRegistro.status,
-        inicioViagem: novoRegistro.inicioViagem
+        inicioViagem: novoRegistro.inicioViagem,
+        posicaoFila,
+        totalFilaDestino
       },
     }, { status: 201 });
 
