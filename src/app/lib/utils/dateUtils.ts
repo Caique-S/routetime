@@ -48,7 +48,7 @@ export function formatarDataBrasil(iso: string | Date | null | undefined): strin
 export function criarIntervaloDia(dataStr: string): { start: Date; end: Date } {
   const [day, month, year] = dataStr.split('/').map(Number);
   const start = new Date(Date.UTC(year, month - 1, day, 3, 0, 0, 0));
-  const end = new Date(Date.UTC(year, month - 1, day , 23, 59, 59, 999));
+  const end = new Date(Date.UTC(year, month - 1, day +1, 2, 59, 58, 990));
   return { start, end };
 }
 
