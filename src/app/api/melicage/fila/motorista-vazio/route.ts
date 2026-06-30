@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       tipo: 'vazio',
       dataChegada: agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
       horaChegada: agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
-      timestampChegada: agora.toISOString(),
+      timestampChegada: agora,
       latitude,
       longitude,
       inicioViagem: null,
@@ -113,8 +113,6 @@ export async function POST(request: NextRequest) {
         status: 'aguardando_carregamento'
       });
     }
-
-
 
     return NextResponse.json({
       message: 'Chegada registrada com sucesso',
