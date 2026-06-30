@@ -204,6 +204,15 @@ export async function GET(request: NextRequest) {
           motorista.destino = destinoCodigo;
           motorista.cidadeDestino = destinoCidade;
         }
+      } else {
+        if (motorista.destino !== 'Aguardando atribuição') {
+          await collection.updateOne(
+            { _id: motorista._id },
+            { $set: { destino: 'Aguardando atribuição', cidadeDestino: 'Aguardando atribuição' } }
+          );
+          motorista.destino = 'Aguardando atribuição';
+          motorista.cidadeDestino = 'Aguardando atribuição';
+        }
       }
 
       let posicaoFila = null;
