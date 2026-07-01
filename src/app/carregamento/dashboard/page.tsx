@@ -13,10 +13,11 @@ import {
   ArrowLeft,
   Download,
   X,
+  ChevronDown, // ◄ Adicionado para o menu sanfona
 } from "lucide-react";
 import Link from "next/link";
 import { Dialog, Transition } from "@headlessui/react";
-import { criarIntervaloDia, getTodayBrasilia } from "@/app/lib/utils/dateUtils"
+import { criarIntervaloDia, getTodayBrasilia } from "@/app/lib/utils/dateUtils";
 
 declare global {
   interface Window {
@@ -71,6 +72,7 @@ interface Carregamento {
 }
 
 interface DestinoProgresso {
+  id: string; // ◄ Guardará o código original (ex: EBA14) para cruzamento de dados
   nome: string;
   total: number;
   concluidos: number;
@@ -108,7 +110,8 @@ export default function DashboardPage() {
     facility: "SBA4",
   });
 
-  const [carregamentoDetails, setCarregamentoDetails] = useState<any>(null)
+  // Estado para controlar qual item da sanfona está expandido
+  const [expandedDestino, setExpandedDestino] = useState<string | null>(null);
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFilters, setExportFilters] = useState({
@@ -116,15 +119,6 @@ export default function DashboardPage() {
     dataFim: getTodayBrasilia(),
     facility: ""
   });
-
-  const buscarDetalhes = async () => {
-    try {
-      setLoading(true)
-
-    } catch (error) {
-      
-    }
-  }
 
   // Busca o upload da data atual
   const fetchUploadDoDia = async () => {
@@ -153,6 +147,12 @@ export default function DashboardPage() {
       const queryParams = new URLSearchParams();
       
       if (filter.facility) queryParams.append("facility", filter.facility);
+      
+      const hoje = getTodayBrasilia(); // Formato YYYY-MM-DD
+      
+      queryParams.append("dataInicio", hoje);
+      queryParams.append("dataFim", hoje);
+
       const response = await fetch(`/api/carregamento?${queryParams}`);
       const data = await response.json();
 
@@ -190,9 +190,9 @@ export default function DashboardPage() {
 
   const stats = {
     total: filteredCarregamentos.length,
-    pendentes: filteredCarregamentos.filter((c) => c.statusNormalizado === "em_fila").length,
+    pendentes: filteredCarregamentos.filter((c) => c.statusNormalizado ===  "emDoca" || c.statusNormalizado === "aguardando").length,
     emAndamento: filteredCarregamentos.filter((c) => c.statusNormalizado === "carregando").length,
-    concluidos: filteredCarregamentos.filter((c) => c.statusNormalizado === "liberado").length,
+    concluidos: filteredCarregamentos.filter((c) => c.statusNormalizado === "liberado" || c.statusNormalizado === "concluido").length,
   };
 
   // ------------------------------------------------------------
@@ -201,7 +201,6 @@ export default function DashboardPage() {
   const destinosProgresso: DestinoProgresso[] = (() => {
     if (!uploadDoDia || !uploadDoDia.data || uploadDoDia.data.length === 0) return [];
 
-    // Mapa de totais por destino a partir do upload do dia (campo "Destino" ou "destino")
     const totalPorDestino = new Map<string, number>();
     uploadDoDia.data.forEach((item: any) => {
       const destino = item.Destino || item.destino;
@@ -210,7 +209,6 @@ export default function DashboardPage() {
       }
     });
 
-    // Mapa de concluídos a partir dos carregamentos do dia (status 'liberado')
     const concluidosPorDestino = new Map<string, number>();
     carregamentosDoDia.forEach((c) => {
       if (c.status === 'liberado') {
@@ -223,6 +221,7 @@ export default function DashboardPage() {
     for (const [destino, total] of totalPorDestino.entries()) {
       const concluidos = concluidosPorDestino.get(destino) || 0;
       destinosArray.push({
+        id: destino, // ◄ Preservando código original (ex: EBA14)
         nome: getNomeDestino(destino) || destino,
         total,
         concluidos,
@@ -237,19 +236,20 @@ export default function DashboardPage() {
     if (!isoString) return "";
     const date = new Date(isoString);
     if (isNaN(date.getTime())) return isoString;
-    return date.toLocaleDateString("pt-BR"); // Ex: 16/03/2026
+    return date.toLocaleDateString("pt-BR");
   };
 
   const generateCSV = async () => {
     try {
       const queryParams = new URLSearchParams();
-
-      // Se a facility não estiver vazia, adiciona ao filtro. Caso contrário, traz todas.
       if (exportFilters.facility.trim() !== "") {
         queryParams.append("facility", exportFilters.facility.trim());
       }
-      // Garante que o relatório traga todos os dados do período e não pare no limite padrão de 50
-      queryParams.append("limit", "10000");
+      if (exportFilters.dataInicio && exportFilters.dataFim) {
+      queryParams.append("dataInicio", exportFilters.dataInicio);
+      queryParams.append("dataFim", exportFilters.dataFim);
+    }
+      queryParams.append("limit", "1000");
 
       const response = await fetch(`/api/carregamento?${queryParams}`);
       const data = await response.json();
@@ -261,10 +261,8 @@ export default function DashboardPage() {
 
       let carregamentos: Carregamento[] = data.data;
 
-      // Filtro por período de datas (considerando fuso local)
       if (exportFilters.dataInicio && exportFilters.dataFim) {
         const start = new Date(exportFilters.dataInicio + 'T00:00:00').getTime();
-        // Adiciona 24 horas ao dia final para incluir o dia inteiro na busca
         const end = new Date(exportFilters.dataFim + 'T00:00:00').getTime() + 24 * 60 * 60 * 1000;
 
         carregamentos = carregamentos.filter((c) => {
@@ -279,74 +277,33 @@ export default function DashboardPage() {
       }
 
       const headers = [
-        "Travel ID",
-        "Data",
-        "Condutor",
-        "Categoria",
-        "Placa de Tração",
-        "Placa de Carga",
-        "Facility",
-        "Destino",
-        "Status",
-        "Posição de Saída",
-        "ID Carregamento",
-        "Doca Carregamento",
-        "Encostado na Doca",
-        "Início do Carregamento",
-        "Término de Carregamento",
-        "Saída Liberada",
-        "Previsão de Chegada",
-        "Lacre Traseiro",
-        "Lacre Lateral 1",
-        "Lacre Lateral 2",
-        "Gaiolas",
-        "Volumosos",
-        "Manga Palets",
-        "Operador",
-        "Transportadora",
+        "Travel ID", "Data", "Condutor", "Categoria", "Placa de Tração", "Placa de Carga",
+        "Facility", "Destino", "Status", "Posição de Saída", "ID Carregamento", "Doca Carregamento",
+        "Encostado na Doca", "Início do Carregamento", "Término de Carregamento", "Saída Liberada",
+        "Previsão de Chegada", "Lacre Traseiro", "Lacre Lateral 1", "Lacre Lateral 2",
+        "Gaiolas", "Volumosos", "Manga Palets", "Operador", "Transportadora"
       ];
 
-      const rows = carregamentos.map((c) => {
-        return [
-          c.motorista?.travelId ?? "",
-          formatDate(c.dataCriacao),
-          c.motorista?.nome ?? "",
-          c.motorista?.tipoVeiculo ?? "",
-          c.motorista?.veiculoTracao ?? "",
-          c.motorista?.veiculoCarga ?? "",
-          c.facility ?? "",
-          c.destino ?? "",
-          c.status ?? "",
-          c.posicaoVeiculo ?? "",
-          c._id ?? "",
-          c.doca ?? "",
-          c.horarios?.encostadoDoca ?? "",
-          c.horarios?.inicioCarregamento ?? "",
-          c.horarios?.terminoCarregamento ?? "",
-          c.horarios?.saidaLiberada ?? "",
-          c.horarios?.previsaoChegada ?? "",
-          c.lacres?.traseiro ?? "",
-          c.lacres?.lateral1 ?? "",
-          c.lacres?.lateral2 ?? "",
-          c.carga?.gaiolas?.toString() ?? "",
-          c.carga?.volumosos?.toString() ?? "",
-          c.carga?.manga?.toString() ?? "",
-          c.operador ?? "",
-          c.motorista?.transportadora ?? "",
-        ];
-      });
+      const rows = carregamentos.map((c) => [
+        c.motorista?.travelId ?? "", formatDate(c.dataCriacao), c.motorista?.nome ?? "",
+        c.motorista?.tipoVeiculo ?? "", c.motorista?.veiculoTracao ?? "", c.motorista?.veiculoCarga ?? "",
+        c.facility ?? "", c.destino ?? "", c.status ?? "", c.posicaoVeiculo ?? "", c._id ?? "",
+        c.doca ?? "", c.horarios?.encostadoDoca ?? "", c.horarios?.inicioCarregamento ?? "",
+        c.horarios?.terminoCarregamento ?? "", c.horarios?.saidaLiberada ?? "", c.horarios?.previsaoChegada ?? "",
+        c.lacres?.traseiro ?? "", c.lacres?.lateral1 ?? "", c.lacres?.lateral2 ?? "",
+        c.carga?.gaiolas?.toString() ?? "", c.carga?.volumosos?.toString() ?? "", c.carga?.manga?.toString() ?? "",
+        c.operador ?? "", c.motorista?.transportadora ?? ""
+      ]);
 
       const csvContent = [
         headers.join(","),
         ...rows.map((row) =>
-          row
-            .map((cell) => {
-              if (typeof cell === "string" && (cell.includes(",") || cell.includes("\n") || cell.includes('"'))) {
-                return `"${cell.replace(/"/g, '""')}"`;
-              }
-              return cell;
-            })
-            .join(",")
+          row.map((cell) => {
+            if (typeof cell === "string" && (cell.includes(",") || cell.includes("\n") || cell.includes('"'))) {
+              return `"${cell.replace(/"/g, '""')}"`;
+            }
+            return cell;
+          }).join(",")
         ),
       ].join("\n");
 
@@ -414,7 +371,7 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Cards de estatísticas - MOBILE */}
         <div className="flex flex-row gap-3 mb-6 md:hidden">
-          <div className="bg-white/70 backdrop-blur-sm rounded-xl border border-white/20 p-3">
+          <div className="bg-white/70 backdrop-blur-sm rounded-xl border border-white/20 p-3 flex-1">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center shrink-0">
                 <Clock className="w-6 h-6 text-yellow-600" />
@@ -425,7 +382,7 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white/70 backdrop-blur-sm rounded-xl border border-white/20 p-3">
+          <div className="bg-white/70 backdrop-blur-sm rounded-xl border border-white/20 p-3 flex-1">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center shrink-0">
                 <CheckCircle className="w-6 h-6 text-green-600" />
@@ -502,7 +459,8 @@ export default function DashboardPage() {
                   className="px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm w-full sm:w-auto"
                 >
                   <option value="">Todos os Status</option>
-                  <option value="pendente">Pendentes</option>
+                  <option value="aguardando">Pendentes</option>
+                  <option value="carregando">Em Carregamento</option>
                   <option value="concluido">Concluídos</option>
                 </select>
               </div>
@@ -531,16 +489,17 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Lista de Destinos com Progresso */}
+        {/* LISTA DE DESTINOS COM MENU SANFONA (ACCORDION) */}
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 overflow-hidden">
           <div className="p-5 border-b border-white/20">
             <h2 className="text-lg font-bold text-gray-900">
               Destinos · {filter.facility} ·  {getTodayBrasilia()}  
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Progresso de carregamentos concluídos por destino (baseado no upload do dia)
+              Clique em um destino para expandir e verificar os detalhes operacionais dos veículos.
             </p>
           </div>
+          
           {loading || loadingUpload ? (
             <div className="p-10 text-center">
               <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -551,34 +510,113 @@ export default function DashboardPage() {
               <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-600 font-medium text-sm">Nenhum destino encontrado</p>
               <p className="text-xs text-gray-500 mt-1">
-                {!uploadDoDia
-                  ? "Nenhum upload encontrado para hoje."
-                  : "Não há carregamentos programados para esta facility."}
+                {!uploadDoDia ? "Nenhum upload encontrado para hoje." : "Não há carregamentos programados para esta facility."}
               </p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {destinosProgresso.map((destino) => (
-                <button key={destino.nome} className="w-full block text-left p-5 bg-white/20 hover:bg-white/40 hover:shadow-lg hover:-translate-y-1 transform transition-all duration-200 rounded-xl border border-transparent hover:border-white/30">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-blue-500 shrink-0" />
-                      <span className="font-medium text-gray-900 text-sm wrap-break-word">
-                        {destino.nome}
-                      </span>
+              {destinosProgresso.map((destino) => {
+                const isExpanded = expandedDestino === destino.id;
+                
+                // Filtra os carregamentos correspondentes a este destino específico
+                const carregamentosFiltradosPorDestino = filteredCarregamentos.filter(
+                  (c) => c.destino === destino.id
+                );
+
+                return (
+                  <div key={destino.id} className="transition-colors duration-200">
+                    {/* Botão de Gatilho da Sanfona */}
+                    <button 
+                      onClick={() => setExpandedDestino(isExpanded ? null : destino.id)}
+                      className={`w-full text-left p-5 flex flex-col transition-all duration-200 outline-none ${
+                        isExpanded ? 'bg-blue-50/40' : 'bg-white/10 hover:bg-white/40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1.5 w-full mb-2">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-blue-500 shrink-0" />
+                          <span className="font-semibold text-gray-900 text-sm">
+                            {destino.nome} <span className="text-xs font-normal text-gray-400">({destino.id})</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-medium text-gray-600 bg-white/80 border border-gray-200 px-2.5 py-1 rounded-full shadow-xs">
+                            {destino.concluidos}/{destino.total} concluídos
+                          </span>
+                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-blue-600' : ''}`} />
+                        </div>
+                      </div>
+                      
+                      <div className="w-full h-1.5 bg-gray-200/80 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-linear-to-r from-green-400 to-green-500 rounded-full transition-all duration-500"
+                          style={{ width: `${destino.progresso}%` }}
+                        />
+                      </div>
+                    </button>
+
+                    {/* Conteúdo Expansível (Detalhes Ocultos) */}
+                    <div 
+                      className={`overflow-hidden transition-all duration-300 ease-in-out bg-gray-50/40 ${
+                        isExpanded ? 'max-h-[1200px] border-t border-gray-100 p-4' : 'max-h-0'
+                      }`}
+                    >
+                      {carregamentosFiltradosPorDestino.length === 0 ? (
+                        <div className="py-4 text-center text-xs text-gray-400 font-medium">
+                          Nenhum veículo em pátio ou carregando com este filtro aplicado no momento.
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5">
+                          {carregamentosFiltradosPorDestino.map((c) => (
+                            <div 
+                              key={c._id} 
+                              className="bg-white border border-gray-200/70 p-3.5 rounded-xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-gray-300 transition-colors"
+                            >
+                              <div className="space-y-1 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-xs font-bold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md border border-blue-100">
+                                    Travel ID • {c.motorista?.travelId || "S/N"}
+                                  </span>
+                                  <h4 className="text-sm font-semibold text-gray-800">
+                                    {c.motorista?.nome || "Motorista não identificado"}
+                                  </h4>
+                                </div>
+                                <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                                  <p>Placa Tração: <strong className="text-gray-700 px-2 py-0.5 bg-green-50">{c.motorista?.veiculoTracao || "---"}</strong></p>
+                                  {c.doca && <p>Doca: <strong className="text-blue-600 font-semibold">{c.doca}</strong></p>}
+                                  {c.operador && <p>Operador: <strong className="text-gray-700">{c.operador}</strong></p>}
+                                  {c.motorista?.transportadora && (
+                                    <p className="col-span-2 sm:col-span-1">Transportadora: <strong className="text-gray-600 font-normal">{c.motorista.transportadora}</strong></p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Coluna Lateral de Status */}
+                              <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                                {c.horarios?.inicioCarregamento && (
+                                  <span className="text-[11px] text-gray-400 font-medium hidden md:inline">
+                                    Início: {c.horarios.inicioCarregamento}
+                                  </span>
+                                )}
+                                <span className={`text-xs px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1.5 ${
+                                  c.status === 'liberado' ? 'bg-green-50 text-green-700 border border-green-200' :
+                                  c.status === 'carregando' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                  'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}>
+                                  {c.status === 'liberado' && <CheckCircle className="w-3.5 h-3.5" />}
+                                  {c.status === 'carregando' && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                                  {c.status === 'em_fila' && <Clock className="w-3.5 h-3.5" />}
+                                  {c.status === 'liberado' ? 'Concluído' : c.status === 'carregando' ? 'Carregando' : 'Em Fila'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <span className="text-xs text-gray-500">
-                      {destino.concluidos}/{destino.total} concluídos
-                    </span>
                   </div>
-                  <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-linear-to-r from-green-400 to-green-500 rounded-full transition-all duration-500"
-                      style={{ width: `${destino.progresso}%` }}
-                    />
-                  </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -632,6 +670,7 @@ export default function DashboardPage() {
                         </label>
                         <input
                           type="date"
+                          lang="pt-BR"
                           id="export-date-start"
                           value={exportFilters.dataInicio}
                           onChange={(e) => setExportFilters({ ...exportFilters, dataInicio: e.target.value })}

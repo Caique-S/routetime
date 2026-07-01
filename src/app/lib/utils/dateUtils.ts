@@ -46,7 +46,21 @@ export function formatarDataBrasil(iso: string | Date | null | undefined): strin
 }
 
 export function criarIntervaloDia(dataStr: string): { start: Date; end: Date } {
-  const [day, month, year] = dataStr.split('/').map(Number);
+  if (!dataStr) {
+    const agora = new Date();
+    return { start: agora, end: agora };
+  }
+
+  let year: number, month: number, day: number;
+  // Detecta o formato enviado pelo componente
+  if (dataStr.includes('-')) {
+    // Formato: YYYY-MM-DD (Padrão de inputs HTML5)
+    [year, month, day] = dataStr.split('-').map(Number);
+  } else {
+    // Formato: DD/MM/YYYY (Padrão pt-BR manual)
+    [day, month, year] = dataStr.split('/').map(Number);
+  }
+  
   const start = new Date(Date.UTC(year, month - 1, day, 3, 0, 0, 0));
   const end = new Date(Date.UTC(year, month - 1, day +1, 2, 59, 58, 990));
   return { start, end };
