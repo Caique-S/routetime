@@ -4,7 +4,7 @@ if (!process.env.MONGODB_URI_PREVIEW) {
   throw new Error('Variável MONGODB_URI não encontrada. Adicione-a no .env.local');
 }
 
-const  uri  = process.env.MONGODB_URI_PREVIEW
+const  uri  = process.env.MONGODB_URI
 
 const options: MongoClientOptions = {
   maxPoolSize:                50,
@@ -25,7 +25,7 @@ declare global {
 
 export async function getClient(): Promise<MongoClient> {
   if (!global._mongoClientPromise) {
-    const client = new MongoClient(uri, options);
+    const client = new MongoClient(uri!, options);
     global._mongoClientPromise = client
       .connect()
       .then((c) => {
