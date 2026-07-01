@@ -75,7 +75,7 @@ export async function PATCH(
         { success: false, erro: "Motorista não encontrado" },
         { status: 404 },
       );
-    }
+}
 
     const updated = await db
       .collection("melicages_motoristas")

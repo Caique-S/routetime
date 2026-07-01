@@ -1,0 +1,80 @@
+1. No arquivo kanban-board.tsx
+
+Substitua as funções de geração de data por esta lógica baseada no fuso brasileiro:
+TypeScript
+
+// Substitua as funções antigas dataAtual e dataOntem por esta lógica:
+
+const obterDataLocalSubtraida = (diasParaSubtrair: number) => {
+  // Pega a data de hoje correta de Brasília (DD/MM/YYYY)
+  const hojeBr = getTodayBrasilia(); 
+  const [dia, mes, ano] = hojeBr.split("/").map(Number);
+  
+  // Criamos um Date local seguro usando meio-dia (12:00) para evitar transições de fuso
+  const data = new Date(ano, mes - 1, dia, 12, 0, 0);
+  data.setDate(data.getDate() - diasParaSubtrair);
+  
+  const yAno = data.getFullYear();
+  const yMes = String(data.getMonth() + 1).padStart(2, "0");
+  const yDia = String(data.getDate()).padStart(2, "0");
+  
+  return `${yAno}-${yMes}-${yDia}`; // Retorna formato YYYY-MM-DD estável
+};
+
+const dataAtual = () => obterDataLocalSubtraida(0);
+const dataOntem = () => obterDataLocalSubtraida(1);
+
+2. No arquivo page.tsx
+
+No seu painel principal, as opções "ultimos7" e "ultimos30" também quebrariam à noite pelo mesmo motivo. Vamos aplicar a mesma função utilitária no topo do arquivo para corrigir todo o ciclo de vida do componente:
+TypeScript
+
+// 1. Substitua as funções getTodayStr e getYesterdayStr por estas no topo do page.tsx:
+
+const obterDataLocalSubtraida = (diasParaSubtrair: number) => {
+  const hojeBr = getTodayBrasilia();
+  const [dia, mes, ano] = hojeBr.split("/").map(Number);
+  
+  const data = new Date(ano, mes - 1, dia, 12, 0, 0);
+  data.setDate(data.getDate() - diasParaSubtrair);
+  
+  const yAno = data.getFullYear();
+  const yMes = String(data.getMonth() + 1).padStart(2, "0");
+  const yDia = String(data.getDate()).padStart(2, "0");
+  
+  return `${yAno}-${yMes}-${yDia}`;
+};
+
+const getTodayStr = () => obterDataLocalSubtraida(0);
+const getYesterdayStr = () => obterDataLocalSubtraida(1);
+
+TypeScript
+
+// 2. Dentro do componente AnalyserPage, atualize o useEffect do período:
+
+useEffect(() => {
+  switch (periodoPredefinido) {
+    case "hoje":
+      setDataInicio(getTodayStr());
+      setDataFim(getTodayStr());
+      break;
+    case "ontem":
+      setDataInicio(getYesterdayStr());
+      setDataFim(getYesterdayStr());
+      break;
+    case "ultimos7":
+      // CORREÇÃO: Usa a função local imune ao bug das 21h
+      setDataInicio(obterDataLocalSubtraida(6));
+      setDataFim(getTodayStr());
+      break;
+    case "ultimos30":
+      // CORREÇÃO: Usa a função local imune ao bug das 21h
+      setDataInicio(obterDataLocalSubtraida(29));
+      setDataFim(getTodayStr());
+      break;
+  }
+}, [periodoPredefinido]);
+
+O que essa mudança garante?
+
+Ao instanciar o new Date(ano, mes - 1, dia, 12, 0, 0), você força o JavaScript a criar o calendário usando o relógio interno do navegador local (já sintonizado com o fuso do usuário) operando ao meio-dia. Subtrair dias a partir do meio-dia elimina qualquer margem de erro ou deslocamento de fuso horário que o .toISOString() causava de madrugada.

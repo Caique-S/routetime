@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "jest",
+    "test:watch": "jest --watchAll"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
@@ -15,7 +17,7 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
+    "date-fns": "^4.4.0",
     "dotenv": "^17.3.1",
     "firebase-admin": "^13.7.0",
     "framer-motion": "^12.34.3",
@@ -27,6 +29,7 @@
     "papaparse": "^5.5.3",
     "radix-ui": "^1.4.3",
     "react": "^19.2.5",
+    "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.5",
     "react-hot-toast": "^2.6.0",
     "react-qr-code": "^2.0.18",
@@ -40,12 +43,14 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "babel-plugin-react-compiler": "1.0.0",
     "tailwindcss": "^4",
+    "ts-jest": "^29.4.11",
     "typescript": "^5"
   }
 }

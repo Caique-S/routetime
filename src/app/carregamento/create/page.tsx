@@ -17,6 +17,7 @@ import {
   BookType,
   CornerDownRight,
 } from "lucide-react";
+import { StatusCarregamento } from "@/app/lib/utils/status"
 
 interface CarregamentoData {
   id: string;
@@ -48,7 +49,7 @@ interface CarregamentoData {
     transportadora: string;
     dataInicio: string;
   };
-  status?: "emFila" | "carregando" | "liberado" | "";
+  status?: StatusCarregamento;
   posicaoVeiculo?: number;
   destino: string;
   facility: string;
@@ -69,151 +70,55 @@ export default function CreatePage() {
     loadCarregamentoData();
   }, []);
 
-  const loadCarregamentoData = () => {
+ const loadCarregamentoData = async () => {
     try {
-      // 1. Carregar informações do destino
-      const destinoData = localStorage.getItem("DestinoAtual");
-      let destinoInfoLocal = null;
-      if (destinoData) {
-        destinoInfoLocal = JSON.parse(destinoData);
-        setDestinoInfo(destinoInfoLocal);
-      }
-
-      // 2. Carregar informações do motorista
-      const motoristaData = localStorage.getItem("MotoristaSelecionado");
-      let motorista = null;
-      if (motoristaData) {
-        motorista = JSON.parse(motoristaData);
-      }
-
-      // 3. Carregar ID do motorista selecionado
+      
       const motoristaId = localStorage.getItem("motoristaSelecionadoId");
+      const destinoData = localStorage.getItem("DestinoAtual");
+      
+      if (destinoData) {
+        setDestinoInfo(JSON.parse(destinoData));
+      }
 
       if (!motoristaId) {
-        console.error("❌ Nenhum motorista selecionado encontrado");
+        console.error("❌ Identificador do motorista não localizado no cache.");
+        setLoading(false);
         return;
       }
 
-      // 4. Construir a chave do localStorage para buscar os dados do carregamento
-      let carregamentosData = null;
+      const response = await fetch(`/api/carregamento?motoristaId=${encodeURIComponent(motoristaId)}`);
+      const result = await response.json();
 
-      // Primeiro, tentar usar o destinoInfo para construir a chave
-      if (destinoInfoLocal) {
-        const chaveCarregamentos = `carregamentos_${destinoInfoLocal.codigo}_${destinoInfoLocal.facility}`;
-        const carregamentosStr = localStorage.getItem(chaveCarregamentos);
-        if (carregamentosStr) {
-          carregamentosData = JSON.parse(carregamentosStr);
-        }
-      }
-
-      // Se não encontrou, tentar buscar no localStorage todas as chaves que começam com "carregamentos_"
-      if (!carregamentosData) {
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith("carregamentos_")) {
-            const dataStr = localStorage.getItem(key);
-            if (dataStr) {
-              const data = JSON.parse(dataStr);
-              // Verificar se esta chave contém o motoristaId
-              if (data[motoristaId]) {
-                carregamentosData = data;
-                // Tentar extrair destino e facility da chave
-                const parts = key.split("_");
-                if (parts.length >= 3 && !destinoInfoLocal) {
-                  setDestinoInfo({
-                    codigo: parts[1],
-                    facility: parts[2],
-                  });
-                }
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      // 5. Combinar os dados
-      if (carregamentosData && carregamentosData[motoristaId]) {
-        const dadosCarregamento = carregamentosData[motoristaId];
-
-        // Se temos dados do motorista separados, mesclar
-        if (motorista) {
-          dadosCarregamento.motorista = {
-            ...dadosCarregamento.motorista,
-            ...motorista,
-          };
-        }
-
-        // Se o destino não foi carregado do localStorage, usar o do carregamento
-        if (!destinoInfoLocal && dadosCarregamento.destino) {
-          setDestinoInfo({
-            codigo: dadosCarregamento.destino,
-            facility: dadosCarregamento.facility,
-          });
-        }
-
-        setCarregamento(dadosCarregamento);
-        checkCompletion(dadosCarregamento);
-      } else if (motorista && destinoInfoLocal) {
-        // Se não encontrou dados, mas temos motorista e destino, criar um novo
-        console.log("⚠️ Criando novo carregamento com dados do motorista");
-
-        const motoristaId = `${destinoInfoLocal.codigo}_${destinoInfoLocal.facility}_${motorista.nome}_${motorista.travelId}`;
-        const chaveBase = `carregamentos_${destinoInfoLocal.codigo}_${destinoInfoLocal.facility}`;
-
-        const newCarregamento: CarregamentoData = {
-          id: Math.floor(10000000 + Math.random() * 90000000).toString(),
-          doca: "",
-          carga: { gaiolas: "", volumosos: "", manga: "" },
-          horarios: {
-            encostadoDoca: "",
-            inicioCarregamento: "",
-            terminoCarregamento: "",
-            saidaLiberada: "",
-            previsaoChegada: "",
-          },
-          lacres: { traseiro: "", lateral1: "", lateral2: "" },
-          motorista: motorista,
-          destino: destinoInfoLocal.codigo,
-          facility: destinoInfoLocal.facility,
-          timestamp: new Date().toISOString(),
-          status: "emFila", // <- adicionado
-          posicaoVeiculo: 0, // <- adicionado
+      if (result.success && result.data.length > 0) {
+        const dbData = result.data[0];
+        
+        const carregamentoData: CarregamentoData = {
+          ...dbData,
+          id: dbData._id || dbData.id,
         };
 
-        //  Persistir no localStorage 
-        const carregamentosExistentes = localStorage.getItem(chaveBase);
-        const carregamentosObj = carregamentosExistentes
-          ? JSON.parse(carregamentosExistentes)
-          : {};
-        carregamentosObj[motoristaId] = newCarregamento;
-        localStorage.setItem(chaveBase, JSON.stringify(carregamentosObj));
-
-        setCarregamento(newCarregamento);
-        checkCompletion(newCarregamento);
+        setCarregamento(carregamentoData);
+        checkCompletion(carregamentoData);
       } else {
-        console.error("❌ Não foi possível carregar dados do carregamento");
+        console.warn("⚠️ Nenhum carregamento ativo encontrado para este motorista.");
       }
     } catch (error) {
-      console.error("Erro ao carregar dados:", error);
+      console.error("Falha catastrófica ao sincronizar com a API:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const checkCompletion = (data: CarregamentoData) => {
-    // 1. Doca: deve estar preenchida
+
     const hasDoca = !!data.doca && data.doca.trim() !== "";
 
-    // 2. Carga: todos os campos devem ter valores numéricos (incluindo 0)
-    // Convertendo para número e verificando se não é NaN
     const gaiolas = Number(data.carga.gaiolas);
     const volumosos = Number(data.carga.volumosos);
     const manga = Number(data.carga.manga);
 
     const hasCarga = !isNaN(gaiolas) && !isNaN(volumosos) && !isNaN(manga);
 
-    // 3. Horários: todos os campos devem estar preenchidos
     const hasHorarios =
       !!data.horarios.encostadoDoca &&
       data.horarios.encostadoDoca.trim() !== "" &&
@@ -226,7 +131,6 @@ export default function CreatePage() {
       !!data.horarios.previsaoChegada &&
       data.horarios.previsaoChegada.trim() !== "";
 
-    // 4. Lacres: apenas o traseiro é obrigatório
     const hasLacres =
       !!data.lacres.traseiro && data.lacres.traseiro.trim() !== "";
 
@@ -294,15 +198,15 @@ export default function CreatePage() {
       const result = await response.json();
 
       if (result.success && result.data.length > 0) {
-        // Pega o primeiro registro (deve ser único)
+        
         const dbData = result.data[0];
 
-        // Converte _id para id e remove _id (para manter compatibilidade)
+      
         const { _id, ...rest } = dbData;
         const carregamentoData = {
           ...rest,
           id: _id,
-          // Garante que posicaoVeiculo seja número, se existir
+
           posicaoVeiculo: dbData.posicaoVeiculo,
         };
 
@@ -319,10 +223,8 @@ export default function CreatePage() {
   };
 
   const handleDespachar = async () => {
-    // Tenta usar o carregamento já carregado no estado
     let data = carregamento;
 
-    // Se não existir ou não tiver posição, busca do banco
     if (!data || !data.posicaoVeiculo) {
       const motoristaId = localStorage.getItem("motoristaSelecionadoId");
       if (motoristaId) {
@@ -375,7 +277,7 @@ export default function CreatePage() {
 
     const posicao = data.posicaoVeiculo?.toString().padStart(2, "0") || "";
     const content = `*ID:* ${data.motorista.travelId}
-*Doca:* (${data.doca || "Não definida"})
+*Doca:* (${data.doca || "Não definida"})    
 *${data.motorista.tipoVeiculo}:* ${getNomeDestino(data.destino)} (${posicao})
 *Condutor:* ${data.motorista.nome}
 *Placa Tração:* ${data.motorista.veiculoTracao}
@@ -415,25 +317,6 @@ ${data.motorista.veiculoCarga && data.motorista.veiculoCarga !== "Não especific
     router.back();
   };
 
-  const handleFinalizar = async () => {
-    // Validar novamente antes de finalizar
-    if (!carregamento) return;
-
-    checkCompletion(carregamento);
-
-    const enviado = await enviarParaBanco(carregamento);
-
-    if (enviado) {
-      localStorage.removeItem("motoristaSelecionadoId");
-      localStorage.removeItem("MotoristaSelecionado");
-      localStorage.removeItem("DestinoAtual");
-      router.push(
-        `/carregamento/destino/${carregamento.destino}?facility=${carregamento.facility}`,
-      );
-    } else {
-      alert("Erro ao salvar no banco de dados. Tente novamente.");
-    }
-  };
 
   const handleNotUsed = async () => {
     if (!carregamento) return;
@@ -448,14 +331,14 @@ Condutor: ${carregamento.motorista.nome}`;
 
     if (copiadoComSucesso) {
       setCopiado("notused");
+
       const enviado = await enviarNotUsedParaBanco(carregamento);
+
       if (enviado) {
         setTimeout(() => {
           setCopiado(null);
-          window.open(
-            "https://chat.whatsapp.com/KgobWakeXIx1M0VCGki5dN",
-            "_blank",
-          );
+          window.open("https://chat.whatsapp.com/KgobWakeXIx1M0VCGki5dN", "_blank");
+          router.push(`/carregamento/destino/${carregamento.destino}?facility=${carregamento.facility}`);
         }, 1000);
       } else {
         alert("Erro ao registrar. Tente novamente.");
@@ -466,135 +349,50 @@ Condutor: ${carregamento.motorista.nome}`;
     }
   };
 
-  const enviarParaBanco = async (carregamentoData: CarregamentoData) => {
+ const enviarNotUsedParaBanco = async (carregamentoData: CarregamentoData) => {
     try {
-      // 1. Gerar motoristaId
       const motoristaId = `${carregamentoData.destino}_${carregamentoData.facility}_${carregamentoData.motorista.nome}_${carregamentoData.motorista.travelId}`;
       const chaveBase = `carregamentos_${carregamentoData.destino}_${carregamentoData.facility}`;
+      const operadorLogado = typeof window !== "undefined"
+        ? (localStorage.getItem("operador_nome") || "Operador Não Identificado")
+        : "Operador Não Identificado";
 
-      // 2. Preparar payload para o banco
-      const dadosParaBanco = {
-        ...carregamentoData,
-        motoristaId, // <-- enviar também para o banco
-        operador: localStorage.getItem("operador_nome") || "Não identificado",
-        dataCriacao: carregamentoData.timestamp,
-        dataEnvio: new Date().toISOString(),
-        mensagemDespacho: `Veiculo ${getNomeDestino(carregamentoData.destino)} (${carregamentoData.posicaoVeiculo?.toString().padStart(2, "0")}) saindo nesse exato momento. Obs: ${carregamentoData.carga.gaiolas} Gaiolas, ${carregamentoData.carga.volumosos} Volumosos e ${carregamentoData.carga.manga} Manga Palets.`,
-        mensagemXPT: `*ID:* ${carregamentoData.motorista.travelId}
-*Doca:* (${carregamentoData.doca || "Não definida"})
-*${carregamentoData.motorista.tipoVeiculo}:* ${getNomeDestino(carregamentoData.destino)} (${carregamentoData.posicaoVeiculo?.toString().padStart(2, "0")})
-*Condutor:* ${carregamentoData.motorista.nome}
-*Placa Tração:* ${carregamentoData.motorista.veiculoTracao}
-${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoCarga !== "Não especificado" ? `*Placa Carga:* ${carregamentoData.motorista.veiculoCarga}` : ""}
-
-*Encostado na doca:* ${carregamentoData.horarios.encostadoDoca || "Não registrado"}
-*Início carregamento:* ${carregamentoData.horarios.inicioCarregamento || "Não registrado"}
-*Término carregamento:* ${carregamentoData.horarios.terminoCarregamento || "Não registrado"}
-*Saída liberada:* ${carregamentoData.horarios.saidaLiberada || "Não registrado"}
-*Previsão de chegada:* ${carregamentoData.horarios.previsaoChegada || "Não calculado"}
-
-*Lacre Traseiro:* ${carregamentoData.lacres.traseiro || ""}
-*Lacre Lateral 1:* ${carregamentoData.lacres.lateral1 || ""}
-*Lacre Lateral 2:* ${carregamentoData.lacres.lateral2 || ""}
-
-*Total de gaiolas:* ${carregamentoData.carga.gaiolas}
-*Total de volumosos:* ${carregamentoData.carga.volumosos}
-*Total de manga palete:* ${carregamentoData.carga.manga}`,
-      };
-
-      // 3. Enviar para o banco
       const response = await fetch("/api/carregamento", {
-        method: "POST",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dadosParaBanco),
+        body: JSON.stringify({ 
+          motoristaId, 
+          status: "not_used", 
+          finalizado: true,
+          operador: operadorLogado,
+          doca: "",
+          carga: { gaiolas: "", volumosos: "", manga: "" },
+          horarios: { encostadoDoca: "", inicioCarregamento: "", terminoCarregamento: "", saidaLiberada: "", previsaoChegada: "" },
+          lacres: { traseiro: "", lateral1: "", lateral2: "" }
+        }),
       });
 
-      if (response.ok) {
-        // ✅ 4. Marcar como finalizado no localStorage
-        const carregamentosStr = localStorage.getItem(chaveBase);
-        if (carregamentosStr) {
-          const carregamentos = JSON.parse(carregamentosStr);
-          if (carregamentos[motoristaId]) {
-            carregamentos[motoristaId] = {
-              ...carregamentos[motoristaId],
-              finalizado: true, // <-- flag de finalizado
-            };
-            localStorage.setItem(chaveBase, JSON.stringify(carregamentos));
-          }
-        }
+      if (!response.ok) throw new Error("Erro ao atualizar banco");
 
-        // 5. Limpeza das chaves temporárias
-        localStorage.removeItem("motoristaSelecionadoId");
-        localStorage.removeItem("MotoristaSelecionado");
-        localStorage.removeItem("DestinoAtual");
-
-        return true;
-      } else {
-        console.error("Erro ao enviar para o banco:", await response.json());
-        return false;
-      }
-    } catch (error) {
-      console.error("Erro ao enviar para o banco:", error);
-      return false;
-    }
-  };
-  const enviarNotUsedParaBanco = async (carregamentoData: CarregamentoData) => {
-    try {
-      const motoristaId = `${carregamentoData.destino}_${carregamentoData.facility}_${carregamentoData.motorista.nome}_${carregamentoData.motorista.travelId}`;
-      const chaveBase = `carregamentos_${carregamentoData.destino}_${carregamentoData.facility}`;
-
-      const dadosParaBanco = {
-        ...carregamentoData,
-        // Limpar campos não utilizados
+      const carregamentosExistentes = JSON.parse(localStorage.getItem(chaveBase) || '{}');
+      
+      carregamentosExistentes[motoristaId] = {
+        ...(carregamentosExistentes[motoristaId] || carregamentoData),
+        finalizado: true,
+        status: "not_used",
         doca: "",
         carga: { gaiolas: "", volumosos: "", manga: "" },
-        horarios: {
-          encostadoDoca: "",
-          inicioCarregamento: "",
-          terminoCarregamento: "",
-          saidaLiberada: "",
-          previsaoChegada: "",
-        },
-        lacres: { traseiro: "", lateral1: "", lateral2: "" },
-        status: "not_used",
-        finalizado: true,
-        motoristaId,
-        operador: localStorage.getItem("operador_nome") || "Não identificado",
-        dataCriacao: carregamentoData.timestamp,
-        dataEnvio: new Date().toISOString(),
+        horarios: { encostadoDoca: "", inicioCarregamento: "", terminoCarregamento: "", saidaLiberada: "", previsaoChegada: "" },
+        lacres: { traseiro: "", lateral1: "", lateral2: "" }
       };
 
-      const response = await fetch("/api/carregamento", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dadosParaBanco),
-      });
+      localStorage.setItem(chaveBase, JSON.stringify(carregamentosExistentes));
 
-      if (response.ok) {
-        // Marcar como finalizado no localStorage
-        const carregamentosStr = localStorage.getItem(chaveBase);
-        if (carregamentosStr) {
-          const carregamentos = JSON.parse(carregamentosStr);
-          if (carregamentos[motoristaId]) {
-            carregamentos[motoristaId] = {
-              ...carregamentos[motoristaId],
-              finalizado: true,
-              status: "not_used",
-            };
-            localStorage.setItem(chaveBase, JSON.stringify(carregamentos));
-          }
-        }
+      localStorage.removeItem("motoristaSelecionadoId");
+      localStorage.removeItem("MotoristaSelecionado");
+      localStorage.removeItem("DestinoAtual");
 
-        // Limpar dados temporários
-        localStorage.removeItem("motoristaSelecionadoId");
-        localStorage.removeItem("MotoristaSelecionado");
-        localStorage.removeItem("DestinoAtual");
-
-        return true;
-      } else {
-        console.error("Erro ao enviar not used:", await response.json());
-        return false;
-      }
+      return true;
     } catch (error) {
       console.error("Erro ao enviar not used:", error);
       return false;
@@ -790,7 +588,7 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
 
                     {carregamento.motorista.veiculoCarga &&
                       carregamento.motorista.veiculoCarga !==
-                        "Não especificado" && (
+                      "Não especificado" && (
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
                             <Truck className="w-4 h-4 text-green-600" />
@@ -988,24 +786,12 @@ ${carregamentoData.motorista.veiculoCarga && carregamentoData.motorista.veiculoC
                 <button
                   disabled={isComplete}
                   onClick={handleNotUsed}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    isComplete
-                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                      : "bg-red-500 text-white "
-                  }`}
+                  className={`px-4 py-2 rounded-lg transition-colors ${isComplete
+                    ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                    : "bg-red-500 text-white "
+                    }`}
                 >
                   {copiado === "notused" ? "Copiado!" : "Not Used"}
-                </button>
-                <button
-                  onClick={handleFinalizar}
-                  disabled={!isComplete}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    isComplete
-                      ? "bg-green-600 text-white hover:bg-green-700"
-                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                  }`}
-                >
-                  Finalizar Carregamento
                 </button>
               </div>
             </div>
