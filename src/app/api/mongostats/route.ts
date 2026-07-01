@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getClient } from "@/app/lib/mongodb";
-
+{/*
 export async function GET() {
 
     const ambiente = process.env.NODE_ENV
@@ -79,3 +79,5 @@ export async function GET() {
     );
   }
 }
+
+*/}
