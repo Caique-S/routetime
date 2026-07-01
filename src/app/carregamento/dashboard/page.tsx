@@ -13,11 +13,11 @@ import {
   ArrowLeft,
   Download,
   X,
-  ChevronDown, // ◄ Adicionado para o menu sanfona
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { Dialog, Transition } from "@headlessui/react";
-import { criarIntervaloDia, getTodayBrasilia } from "@/app/lib/utils/dateUtils";
+import { criarIntervaloDia, formatarDataBrasil, getTodayBrasilia } from "@/app/lib/utils/dateUtils";
 
 declare global {
   interface Window {
@@ -72,7 +72,7 @@ interface Carregamento {
 }
 
 interface DestinoProgresso {
-  id: string; // ◄ Guardará o código original (ex: EBA14) para cruzamento de dados
+  id: string;
   nome: string;
   total: number;
   concluidos: number;
@@ -107,12 +107,11 @@ export default function DashboardPage() {
   const [loadingUpload, setLoadingUpload] = useState(false);
   const [filter, setFilter] = useState({
     status: "",
-    facility: "SBA4",
+    facility: "",
+    data: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
   });
 
-  // Estado para controlar qual item da sanfona está expandido
   const [expandedDestino, setExpandedDestino] = useState<string | null>(null);
-
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportFilters, setExportFilters] = useState({
     dataInicio: getTodayBrasilia(),
@@ -120,38 +119,39 @@ export default function DashboardPage() {
     facility: ""
   });
 
-  // Busca o upload da data atual
+  const facilitiesDisponiveis = Array.from(
+    new Set(allCarregamentos.map((c) => c.facility).filter(Boolean))
+  ).sort();
+
   const fetchUploadDoDia = async () => {
     try {
       setLoadingUpload(true);
-      const today = getTodayBrasilia();
-      const response = await fetch(`/api/upload?date=${today}`);
+      const targetDateBr = filter.data.split('-').reverse().join('/');
+      const response = await fetch(`/api/upload?date=${targetDateBr}`);
       const result = await response.json();
+
       if (result.success && result.data && result.data.length > 0) {
-        setUploadDoDia(result.data[0]);
+        setUploadDoDia(result.data);
       } else {
-        setUploadDoDia(null);
+        setUploadDoDia([]);
       }
     } catch (error) {
       console.error('Erro ao buscar upload do dia:', error);
       setUploadDoDia(null);
-    } finally {
+    }finally{
       setLoadingUpload(false);
     }
   };
 
-  // Busca todos os carregamentos e depois filtra pelos do dia atual
   const fetchCarregamentos = async () => {
     try {
       setLoading(true);
       const queryParams = new URLSearchParams();
-      
-      if (filter.facility) queryParams.append("facility", filter.facility);
-      
-      const hoje = getTodayBrasilia(); // Formato YYYY-MM-DD
-      
+      const hoje = filter.data.split('-').reverse().join('/');
+
       queryParams.append("dataInicio", hoje);
       queryParams.append("dataFim", hoje);
+      queryParams.append("limit", "1000");
 
       const response = await fetch(`/api/carregamento?${queryParams}`);
       const data = await response.json();
@@ -161,7 +161,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error("Erro ao buscar carregamentos:", error);
-    } finally {
+    }finally{
       setLoading(false);
     }
   };
@@ -169,9 +169,10 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchCarregamentos();
     fetchUploadDoDia();
-  }, [filter.facility]);
+  }, [filter.data]);
 
-  const hojeStr = criarIntervaloDia(getTodayBrasilia()); // YYYY-MM-DD
+  const dataFormatadaBr = filter.data.split('-').reverse().join('/');
+  const hojeStr = criarIntervaloDia(dataFormatadaBr);
 
   const carregamentosDoDia = allCarregamentos.filter((c) => {
     const createdAt = new Date(c.dataCriacao).getTime();
@@ -183,51 +184,53 @@ export default function DashboardPage() {
     statusNormalizado: c.status === 'liberado' ? 'concluido' : c.status
   }));
 
-  // Filtro baseado no status (usando o status normalizado)
-  const filteredCarregamentos = carregamentosNormalizados.filter((c) =>
-    filter.status ? c.statusNormalizado === filter.status : true
-  );
+  const filteredCarregamentos = carregamentosNormalizados.filter((c) => {
+    const matchStatus = filter.status ? c.statusNormalizado === filter.status : true;
+    const matchFacility = filter.facility ? c.facility === filter.facility : true;
+    return matchStatus && matchFacility;
+  });
 
   const stats = {
     total: filteredCarregamentos.length,
-    pendentes: filteredCarregamentos.filter((c) => c.statusNormalizado ===  "emDoca" || c.statusNormalizado === "aguardando").length,
+    pendentes: filteredCarregamentos.filter((c) => c.statusNormalizado === "emDoca" || c.statusNormalizado === "aguardando").length,
     emAndamento: filteredCarregamentos.filter((c) => c.statusNormalizado === "carregando").length,
     concluidos: filteredCarregamentos.filter((c) => c.statusNormalizado === "liberado" || c.statusNormalizado === "concluido").length,
   };
 
-  // ------------------------------------------------------------
-  // Cálculo dos destinos com progresso (baseado no upload do dia)
-  // ------------------------------------------------------------
   const destinosProgresso: DestinoProgresso[] = (() => {
-    if (!uploadDoDia || !uploadDoDia.data || uploadDoDia.data.length === 0) return [];
+    const carregamentosDaFacility = carregamentosNormalizados.filter((c) =>
+      filter.facility ? c.facility === filter.facility : true
+    );
 
-    const totalPorDestino = new Map<string, number>();
-    uploadDoDia.data.forEach((item: any) => {
-      const destino = item.Destino || item.destino;
-      if (destino) {
-        totalPorDestino.set(destino, (totalPorDestino.get(destino) || 0) + 1);
-      }
-    });
+    if (carregamentosDaFacility.length === 0) return [];
 
-    const concluidosPorDestino = new Map<string, number>();
-    carregamentosDoDia.forEach((c) => {
-      if (c.status === 'liberado') {
-        const destino = c.destino;
-        concluidosPorDestino.set(destino, (concluidosPorDestino.get(destino) || 0) + 1);
+    const mapeamentoDestinos = new Map<string, { total: number; concluidos: number }>();
+
+    carregamentosDaFacility.forEach((c) => {
+      const destinoId = c.destino;
+      if (!destinoId) return;
+
+      const atual = mapeamentoDestinos.get(destinoId) || { total: 0, concluidos: 0 };
+      
+      atual.total += 1;
+      if (c.status === 'liberado' || c.statusNormalizado === 'concluido') {
+        atual.concluidos += 1;
       }
+
+      mapeamentoDestinos.set(destinoId, atual);
     });
 
     const destinosArray: DestinoProgresso[] = [];
-    for (const [destino, total] of totalPorDestino.entries()) {
-      const concluidos = concluidosPorDestino.get(destino) || 0;
+    
+    mapeamentoDestinos.forEach((valores, destinoId) => {
       destinosArray.push({
-        id: destino, // ◄ Preservando código original (ex: EBA14)
-        nome: getNomeDestino(destino) || destino,
-        total,
-        concluidos,
-        progresso: total > 0 ? (concluidos / total) * 100 : 0,
+        id: destinoId,
+        nome: getNomeDestino(destinoId) || destinoId,
+        total: valores.total,
+        concluidos: valores.concluidos,
+        progresso: valores.total > 0 ? (valores.concluidos / valores.total) * 100 : 0,
       });
-    }
+    });
 
     return destinosArray.sort((a, b) => a.nome.localeCompare(b.nome));
   })();
@@ -246,9 +249,9 @@ export default function DashboardPage() {
         queryParams.append("facility", exportFilters.facility.trim());
       }
       if (exportFilters.dataInicio && exportFilters.dataFim) {
-      queryParams.append("dataInicio", exportFilters.dataInicio);
-      queryParams.append("dataFim", exportFilters.dataFim);
-    }
+        queryParams.append("dataInicio", exportFilters.dataInicio);
+        queryParams.append("dataFim", exportFilters.dataFim);
+      }
       queryParams.append("limit", "1000");
 
       const response = await fetch(`/api/carregamento?${queryParams}`);
@@ -471,9 +474,23 @@ export default function DashboardPage() {
                   onChange={(e) => setFilter({ ...filter, facility: e.target.value })}
                   className="px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm w-full sm:w-auto"
                 >
-                  <option value="SBA4">SBA04</option>
-                  <option value="SBA2">SBA02</option>
+                  <option value="">Todas</option>
+                  {facilitiesDisponiveis.map((fac) => (
+                    <option key={fac} value={fac}>
+                      {fac}
+                    </option>
+                  ))}
                 </select>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <input
+                  type="date"
+                  lang="pt-BR"
+                  value={filter.data}
+                  onChange={(e) => setFilter({ ...filter, data: e.target.value })}
+                  className="px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm w-full sm:w-auto font-medium text-gray-700"
+                />
               </div>
             </div>
             <button
@@ -493,13 +510,13 @@ export default function DashboardPage() {
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border border-white/20 overflow-hidden">
           <div className="p-5 border-b border-white/20">
             <h2 className="text-lg font-bold text-gray-900">
-              Destinos · {filter.facility} ·  {getTodayBrasilia()}  
+              Destinos · {filter.facility || "Geral"} · {filter.data.split('-').reverse().join('/')}
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
               Clique em um destino para expandir e verificar os detalhes operacionais dos veículos.
             </p>
           </div>
-          
+
           {loading || loadingUpload ? (
             <div className="p-10 text-center">
               <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -510,27 +527,24 @@ export default function DashboardPage() {
               <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-600 font-medium text-sm">Nenhum destino encontrado</p>
               <p className="text-xs text-gray-500 mt-1">
-                {!uploadDoDia ? "Nenhum upload encontrado para hoje." : "Não há carregamentos programados para esta facility."}
+                Não há carregamentos programados para esta facility.
               </p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
               {destinosProgresso.map((destino) => {
                 const isExpanded = expandedDestino === destino.id;
-                
-                // Filtra os carregamentos correspondentes a este destino específico
+
                 const carregamentosFiltradosPorDestino = filteredCarregamentos.filter(
                   (c) => c.destino === destino.id
                 );
 
                 return (
                   <div key={destino.id} className="transition-colors duration-200">
-                    {/* Botão de Gatilho da Sanfona */}
-                    <button 
+                    <button
                       onClick={() => setExpandedDestino(isExpanded ? null : destino.id)}
-                      className={`w-full text-left p-5 flex flex-col transition-all duration-200 outline-none ${
-                        isExpanded ? 'bg-blue-50/40' : 'bg-white/10 hover:bg-white/40'
-                      }`}
+                      className={`w-full text-left p-5 flex flex-col transition-all duration-200 outline-none ${isExpanded ? 'bg-blue-50/40' : 'bg-white/10 hover:bg-white/40'
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-1.5 w-full mb-2">
                         <div className="flex items-center gap-2">
@@ -546,7 +560,7 @@ export default function DashboardPage() {
                           <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180 text-blue-600' : ''}`} />
                         </div>
                       </div>
-                      
+
                       <div className="w-full h-1.5 bg-gray-200/80 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-linear-to-r from-green-400 to-green-500 rounded-full transition-all duration-500"
@@ -555,11 +569,9 @@ export default function DashboardPage() {
                       </div>
                     </button>
 
-                    {/* Conteúdo Expansível (Detalhes Ocultos) */}
-                    <div 
-                      className={`overflow-hidden transition-all duration-300 ease-in-out bg-gray-50/40 ${
-                        isExpanded ? 'max-h-[1200px] border-t border-gray-100 p-4' : 'max-h-0'
-                      }`}
+                    <div
+                      className={`overflow-hidden transition-all duration-300 ease-in-out bg-gray-50/40 ${isExpanded ? 'max-h-[1200px] border-t border-gray-100 p-4' : 'max-h-0'
+                        }`}
                     >
                       {carregamentosFiltradosPorDestino.length === 0 ? (
                         <div className="py-4 text-center text-xs text-gray-400 font-medium">
@@ -568,12 +580,12 @@ export default function DashboardPage() {
                       ) : (
                         <div className="space-y-2.5">
                           {carregamentosFiltradosPorDestino.map((c) => (
-                            <div 
-                              key={c._id} 
+                            <div
+                              key={c._id}
                               className="bg-white border border-gray-200/70 p-3.5 rounded-xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-gray-300 transition-colors"
                             >
                               <div className="space-y-1 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex flex-wrap items-center mb-2 gap-2">
                                   <span className="text-xs font-bold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md border border-blue-100">
                                     Travel ID • {c.motorista?.travelId || "S/N"}
                                   </span>
@@ -582,7 +594,7 @@ export default function DashboardPage() {
                                   </h4>
                                 </div>
                                 <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-                                  <p>Placa Tração: <strong className="text-gray-700 px-2 py-0.5 bg-green-50">{c.motorista?.veiculoTracao || "---"}</strong></p>
+                                  <p>Placa Tração: <strong className="text-gray-700 px-2 py-0.5 rounded-md border border-blue-100 ">{c.motorista?.veiculoTracao || "---"}</strong></p>
                                   {c.doca && <p>Doca: <strong className="text-blue-600 font-semibold">{c.doca}</strong></p>}
                                   {c.operador && <p>Operador: <strong className="text-gray-700">{c.operador}</strong></p>}
                                   {c.motorista?.transportadora && (
@@ -591,18 +603,17 @@ export default function DashboardPage() {
                                 </div>
                               </div>
 
-                              {/* Coluna Lateral de Status */}
                               <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
                                 {c.horarios?.inicioCarregamento && (
-                                  <span className="text-[11px] text-gray-400 font-medium hidden md:inline">
-                                    Início: {c.horarios.inicioCarregamento}
-                                  </span>
+                                  <div className="flex gap-x-2 text-xs text-gray-500 mr-6 ">
+                                    {c.horarios.inicioCarregamento && <p> Início de Carregamento: <strong className=" font-semibold text-blue-600 hidden md:inline">{c.horarios.inicioCarregamento}</strong></p>}
+                                    {c.horarios.saidaLiberada && <p> Saída Liberada: <strong className=" font-semibold text-blue-600 hidden md:inline">{c.horarios.saidaLiberada}</strong></p>}
+                                  </div>
                                 )}
-                                <span className={`text-xs px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1.5 ${
-                                  c.status === 'liberado' ? 'bg-green-50 text-green-700 border border-green-200' :
+                                <span className={`text-xs px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1.5 ${c.status === 'liberado' ? 'bg-green-50 text-green-700 border border-green-200' :
                                   c.status === 'carregando' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                                  'bg-amber-50 text-amber-700 border border-amber-200'
-                                }`}>
+                                    'bg-amber-50 text-amber-700 border border-amber-200'
+                                  }`}>
                                   {c.status === 'liberado' && <CheckCircle className="w-3.5 h-3.5" />}
                                   {c.status === 'carregando' && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                                   {c.status === 'em_fila' && <Clock className="w-3.5 h-3.5" />}
