@@ -141,8 +141,9 @@ const MotoristaCardExibicao = ({
         <div className="bg-gray-50 rounded-lg p-2.5">
           <p className="text-xs text-gray-500 mb-0.5">⏱ Tempo em fila</p>
           <p
-            className={`font-mono font-bold text-xl tabular-nums ${motorista.status === "em_fila" ? cfg.timerCor : "text-gray-500"
-              }`}
+            className={`font-mono font-bold text-xl tabular-nums ${
+              motorista.status === "em_fila" ? cfg.timerCor : "text-gray-500"
+            }`}
           >
             {formatarTempo(tempoFilaExibido)}
           </p>
@@ -150,18 +151,19 @@ const MotoristaCardExibicao = ({
 
         {(motorista.status === "descarregando" ||
           motorista.status === "descarregado") && (
-            <div className="bg-gray-50 rounded-lg p-2.5">
-              <p className="text-xs text-gray-500 mb-0.5">🚛 Descarga</p>
-              <p
-                className={`font-mono font-bold text-xl tabular-nums ${motorista.status === "descarregando"
-                    ? cfg.timerCor
-                    : "text-gray-500"
-                  }`}
-              >
-                {formatarTempo(tempoDescargaExibido)}
-              </p>
-            </div>
-          )}
+          <div className="bg-gray-50 rounded-lg p-2.5">
+            <p className="text-xs text-gray-500 mb-0.5">🚛 Descarga</p>
+            <p
+              className={`font-mono font-bold text-xl tabular-nums ${
+                motorista.status === "descarregando"
+                  ? cfg.timerCor
+                  : "text-gray-500"
+              }`}
+            >
+              {formatarTempo(tempoDescargaExibido)}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Tempo total */}
@@ -219,7 +221,7 @@ const MotoristaCardExibicao = ({
                 Math.floor(
                   (new Date(motorista.timestampInicioDescarga).getTime() -
                     new Date(motorista.docaNotifiedAt).getTime()) /
-                  1000,
+                    1000,
                 ),
               );
               const h = Math.floor(diffSegundos / 3600)
@@ -335,7 +337,7 @@ export default function PainelPage() {
 
   useEffect(() => {
     if (!autoRefresh) return;
-    const id = setInterval(() => fetchMotoristas(true), 10000);
+    const id = setInterval(() => fetchMotoristas(true), 25000);
     return () => clearInterval(id);
   }, [autoRefresh, fetchMotoristas]);
 
@@ -500,10 +502,11 @@ export default function PainelPage() {
             </button>
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${autoRefresh
+              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
+                autoRefresh
                   ? "bg-green-100 text-green-700"
                   : "bg-gray-100 text-gray-500"
-                }`}
+              }`}
             >
               {autoRefresh ? "🔄 Auto (10s)" : "⏸️ Pausado"}
             </button>
@@ -535,10 +538,20 @@ export default function PainelPage() {
             href="/painel/inspecionar"
             className=" flex flex-row text-gray-400 hover:text-indigo-500 gap-1 transition-colors px-2 py-1"
             title="Inspecionar dados"
-          > 
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
             inspecionar
           </Link>
