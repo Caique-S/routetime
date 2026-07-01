@@ -1,6 +1,6 @@
 import { MongoClient, MongoClientOptions } from 'mongodb';
 
-if (!process.env.MONGODB_URI_PREVIEW) {
+if (!process.env.MONGODB_URI) {
   throw new Error('Variável MONGODB_URI não encontrada. Adicione-a no .env.local');
 }
 
