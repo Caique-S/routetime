@@ -595,11 +595,9 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
                                   <p>Placa Tração: <strong className="text-gray-700 px-2 py-0.5 rounded-md border border-blue-100 ">{c.motorista?.veiculoTracao || "---"}</strong></p>
+                                  {c.tipoVeiculo && <p>Tipo: <strong className="text-blue-600 font-semibold">{c.tipoVeiculo}</strong></p>}
                                   {c.doca && <p>Doca: <strong className="text-blue-600 font-semibold">{c.doca}</strong></p>}
                                   {c.operador && <p>Operador: <strong className="text-gray-700">{c.operador}</strong></p>}
-                                  {c.motorista?.transportadora && (
-                                    <p className="col-span-2 sm:col-span-1">Transportadora: <strong className="text-gray-600 font-normal">{c.motorista.transportadora}</strong></p>
-                                  )}
                                 </div>
                               </div>
 
