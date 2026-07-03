@@ -115,7 +115,6 @@ export default function CarregamentosPage() {
 
   const toRaw = (flat: CarregamentoFlat): CarregamentoRaw => ({
     _id: flat._id,
-    id: flat.idCarregamento,
     doca: flat.docaCarregamento,
     carga: {
       gaiolas: flat.gaiolas,
@@ -147,7 +146,6 @@ export default function CarregamentosPage() {
     status: flat.status,
     posicaoVeiculo: flat.posicaoSaida,
     operador: flat.operador,
-    dataCriacao: flat.dataCriacao,
   });
 
   const fetchCarregamentos = useCallback(async () => {

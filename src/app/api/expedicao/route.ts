@@ -2,12 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/app/lib/mongodb';
 import { criarIntervaloDia } from '@/app/lib/utils/dateUtils';
 
-/**
- * GET /api/expedicao
- *
- * Lista carregamentos da coleção, com filtro opcional por data (YYYY-MM-DD).
- * Utiliza criarIntervaloDia() para garantir o intervalo correto em UTC-3.
- */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
