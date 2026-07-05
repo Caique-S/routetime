@@ -253,6 +253,12 @@ export async function GET(request: NextRequest) {
           inicioViagem: motorista.inicioViagem
         }
       });
+    }else{
+      return NextResponse.json({
+        success: false,
+        active: true,
+        message: "Atribuições não encontradas"
+      },{status: 200})
     }
   } catch (error: any) {
     console.error('[ERRO] GET /api/melicage/fila/motorista-vazio', error);
