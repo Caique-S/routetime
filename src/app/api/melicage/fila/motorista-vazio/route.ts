@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
         horaChegada: novoRegistro.horaChegada,
         status: novoRegistro.status,
         inicioViagem: novoRegistro.inicioViagem,
+        chave_identificacao: novoRegistro.chave_identificacao,
         posicaoFila,
         totalFilaDestino
       },
