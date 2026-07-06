@@ -242,13 +242,15 @@ export async function GET(request: NextRequest) {
         active: true,
         data: {
           id: motorista._id.toString(),
-          nome: motorista.nome,
           cpf: motorista.cpf,
+          nome: motorista.nome,
           destino: motorista.destino,
           cidadeDestino: motorista.cidadeDestino,
-          status: motorista.status,
-          timestampChegada: motorista.timestampChegada,
           chave_identificacao: motorista.chave_identificacao,
+          status: motorista.status,
+          dataChegada: motorista.dataChegada,
+          horaChegada: motorista.horaChegada,
+          timestampChegada: motorista.timestampChegada,
           posicaoFila,
           totalFilaDestino,
           inicioViagem: motorista.inicioViagem
