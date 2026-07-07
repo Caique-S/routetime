@@ -42,7 +42,7 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    const { status, doca, gaiolas, palets, mangas } = body;
+    const { inicioViagem, doca, gaiolas, palets, mangas } = body;
 
     if (!id) {
       return NextResponse.json({ message: 'ID do registro não fornecido.' }, { status: 400 });
@@ -52,7 +52,7 @@ export async function PATCH(
     const collection = db.collection('melicages_motoristas');
 
     const camposAtualizados: any = {};
-    if (status) camposAtualizados.status = status;
+    if (inicioViagem) camposAtualizados.inicioViagem = inicioViagem;
     if (doca !== undefined) camposAtualizados.doca = doca;
     if (gaiolas !== undefined) camposAtualizados.gaiolas = gaiolas;
     if (palets !== undefined) camposAtualizados.palets = palets;
@@ -63,10 +63,10 @@ export async function PATCH(
       { $set: camposAtualizados }
     );
 
-    return NextResponse.json({ message: 'Registro atualizado com sucesso.' }, { status: 200 });
+    return NextResponse.json({ message: `Registro atualizado com sucesso..: ${result}` }, { status: 200 });
 
   } catch (error: any) {
-    console.error('[ERRO] PUT /api/fila/motorista-vazio/[id]', error);
+    console.error('[ERRO] PATCH /api/fila/motorista-vazio/[id]', error);
     return NextResponse.json(
       { message: 'Erro interno do servidor', error: error.message },
       { status: 500 }
