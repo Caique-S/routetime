@@ -157,7 +157,7 @@ export async function GET(request: NextRequest) {
     // 1. Busca o registro ativo do motorista na fila
     let motorista = await collection.findOne({
       cpf,
-      status: { $in: ['aguardando_carregamento', 'carregando'] }
+      status: { $in: ['aguardando_carregamento', 'carregando', 'liberado'] }
     });
 
     if (!motorista) {
@@ -252,6 +252,7 @@ export async function GET(request: NextRequest) {
           horaChegada: motorista.horaChegada,
           timestampChegada: motorista.timestampChegada,
           transportadora: motorista.transportadora,
+          motoristaId: motorista.motoristaId,
           posicaoFila,
           totalFilaDestino,
           inicioViagem: motorista.inicioViagem
