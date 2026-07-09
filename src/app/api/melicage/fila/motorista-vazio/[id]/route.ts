@@ -42,7 +42,7 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    const { inicioViagem, doca, gaiolas, palets, mangas, transportadora } = body;
+    const { inicioViagem, transportadora } = body;
 
     if (!id) {
       return NextResponse.json({ message: 'ID do registro não fornecido.' }, { status: 400 });
@@ -53,10 +53,6 @@ export async function PATCH(
 
     const camposAtualizados: any = {};
     if (inicioViagem) camposAtualizados.inicioViagem = inicioViagem;
-    if (doca !== undefined) camposAtualizados.doca = doca;
-    if (gaiolas !== undefined) camposAtualizados.gaiolas = gaiolas;
-    if (palets !== undefined) camposAtualizados.palets = palets;
-    if (mangas !== undefined) camposAtualizados.mangas = mangas;
     if (transportadora !== undefined) camposAtualizados.transportadora = transportadora;
 
      if (Object.keys(camposAtualizados).length === 0) {
