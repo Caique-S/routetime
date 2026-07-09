@@ -5,7 +5,7 @@ import { criarIntervaloDia } from '@/app/lib/utils/dateUtils';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { cpf, nome, chave_identificacao, latitude, longitude } = body;
+    const { cpf, nome, chave_identificacao, latitude, longitude, transportadora } = body;
 
     if (!cpf || !nome || latitude === undefined || longitude === undefined) {
       return NextResponse.json(
@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
       dataChegada: agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
       horaChegada: agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
       timestampChegada: agora,
+      transportadora,
       latitude,
       longitude,
       inicioViagem: null,
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
         status: novoRegistro.status,
         inicioViagem: novoRegistro.inicioViagem,
         chave_identificacao: novoRegistro.chave_identificacao,
+        transportadora: novoRegistro.transportadora,
         posicaoFila,
         totalFilaDestino
       },
