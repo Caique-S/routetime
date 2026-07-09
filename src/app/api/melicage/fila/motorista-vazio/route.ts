@@ -251,6 +251,7 @@ export async function GET(request: NextRequest) {
           dataChegada: motorista.dataChegada,
           horaChegada: motorista.horaChegada,
           timestampChegada: motorista.timestampChegada,
+          transportadora: motorista.transportadora,
           posicaoFila,
           totalFilaDestino,
           inicioViagem: motorista.inicioViagem
