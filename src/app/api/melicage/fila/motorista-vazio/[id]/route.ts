@@ -42,7 +42,7 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    const { status, doca, gaiolas, palets, mangas } = body;
+    const { inicioViagem, transportadora, motoristaId } = body;
 
     if (!id) {
       return NextResponse.json({ message: 'ID do registro não fornecido.' }, { status: 400 });
@@ -52,21 +52,23 @@ export async function PATCH(
     const collection = db.collection('melicages_motoristas');
 
     const camposAtualizados: any = {};
-    if (status) camposAtualizados.status = status;
-    if (doca !== undefined) camposAtualizados.doca = doca;
-    if (gaiolas !== undefined) camposAtualizados.gaiolas = gaiolas;
-    if (palets !== undefined) camposAtualizados.palets = palets;
-    if (mangas !== undefined) camposAtualizados.mangas = mangas;
+    if (inicioViagem) camposAtualizados.inicioViagem = inicioViagem;
+    if (motoristaId !== undefined) camposAtualizados.motoristaId = motoristaId;
+    if (transportadora !== undefined) camposAtualizados.transportadora = transportadora;
+
+     if (Object.keys(camposAtualizados).length === 0) {
+      return NextResponse.json({ message: 'Nenhum campo válido para atualização foi enviado.' }, { status: 400 });
+    }
 
     const result = await collection.updateOne(
       { _id: new ObjectId(id) },
       { $set: camposAtualizados }
     );
 
-    return NextResponse.json({ message: 'Registro atualizado com sucesso.' }, { status: 200 });
+    return NextResponse.json({ message: `Registro atualizado com sucesso..: ${result}` }, { status: 200 });
 
   } catch (error: any) {
-    console.error('[ERRO] PUT /api/fila/motorista-vazio/[id]', error);
+    console.error('[ERRO] PATCH /api/fila/motorista-vazio/[id]', error);
     return NextResponse.json(
       { message: 'Erro interno do servidor', error: error.message },
       { status: 500 }

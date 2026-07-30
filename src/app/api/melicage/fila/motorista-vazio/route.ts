@@ -5,7 +5,7 @@ import { criarIntervaloDia } from '@/app/lib/utils/dateUtils';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { cpf, nome, chave_identificacao, latitude, longitude } = body;
+    const { cpf, nome, chave_identificacao, latitude, longitude, transportadora } = body;
 
     if (!cpf || !nome || latitude === undefined || longitude === undefined) {
       return NextResponse.json(
@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
       dataChegada: agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
       horaChegada: agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
       timestampChegada: agora,
+      transportadora,
       latitude,
       longitude,
       inicioViagem: null,
@@ -126,6 +127,8 @@ export async function POST(request: NextRequest) {
         horaChegada: novoRegistro.horaChegada,
         status: novoRegistro.status,
         inicioViagem: novoRegistro.inicioViagem,
+        chave_identificacao: novoRegistro.chave_identificacao,
+        transportadora: novoRegistro.transportadora,
         posicaoFila,
         totalFilaDestino
       },
@@ -156,7 +159,7 @@ export async function GET(request: NextRequest) {
     // 1. Busca o registro ativo do motorista na fila
     let motorista = await collection.findOne({
       cpf,
-      status: { $in: ['aguardando_carregamento', 'carregando'] }
+      status: { $in: ['aguardando_carregamento', 'carregando', 'liberado'] }
     });
 
     if (!motorista) {
@@ -241,18 +244,28 @@ export async function GET(request: NextRequest) {
         active: true,
         data: {
           id: motorista._id.toString(),
-          nome: motorista.nome,
           cpf: motorista.cpf,
+          nome: motorista.nome,
           destino: motorista.destino,
           cidadeDestino: motorista.cidadeDestino,
-          status: motorista.status,
-          timestampChegada: motorista.timestampChegada,
           chave_identificacao: motorista.chave_identificacao,
+          status: motorista.status,
+          dataChegada: motorista.dataChegada,
+          horaChegada: motorista.horaChegada,
+          timestampChegada: motorista.timestampChegada,
+          transportadora: motorista.transportadora,
+          motoristaId: motorista.motoristaId,
           posicaoFila,
           totalFilaDestino,
           inicioViagem: motorista.inicioViagem
         }
       });
+    }else{
+      return NextResponse.json({
+        success: false,
+        active: true,
+        message: "Atribuições não encontradas"
+      },{status: 200})
     }
   } catch (error: any) {
     console.error('[ERRO] GET /api/melicage/fila/motorista-vazio', error);
