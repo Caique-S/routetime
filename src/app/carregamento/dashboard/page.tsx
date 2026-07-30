@@ -698,7 +698,7 @@ export default function DashboardPage() {
               className="px-2.5 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 text-xs font-medium shadow-xs"
               title="Relatório Completo de Controle de Jornada"
             >
-              <Clock className="w-4 h-4" />
+              <Clock className="w-6 h-6" />
               <span>.csv Jornada</span>
             </button>
             <button
@@ -1117,7 +1117,7 @@ export default function DashboardPage() {
 
                       {currentCityConfig.janelaInicio && currentCityConfig.janelaFim && (
                         <p className="text-[11px] text-gray-500 italic">
-                          Resultado na célula: <strong>Das {currentCityConfig.janelaInicio}h ás {currentCityConfig.janelaFim}h</strong>
+                          Parâmetros <strong>Atualizados</strong>
                         </p>
                       )}
                     </div>
