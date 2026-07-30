@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     const facilityFallback = filterValue ?? '';
 
     const bulkOps = filteredData
-      .filter((row) => row['Nome do motorista 1'] && row['Destino'])
+      .filter((row) => row['Nome do transportador 1'] && row['Destino'])
       .map((row) => {
         
         const carregamento = criarCarregamentosFromCSV(row, facilityFallback);

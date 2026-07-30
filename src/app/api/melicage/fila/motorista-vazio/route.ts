@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         .toLowerCase()
         .replace(/\s+/g, '');
       const registroEncontrado = uploadData.find((item: any) => {
-        const nomeCSV = item['Nome do motorista 1'];
+        const nomeCSV = item['Nome do transportador 1'];
         if (!nomeCSV) return false;
         const nomeCSVNormalizado = nomeCSV
           .normalize('NFD')
@@ -181,7 +181,7 @@ export async function GET(request: NextRequest) {
       const nomeNormalizado = motorista.nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '');
 
       const registroEncontrado = uploadData.find((item: any) => {
-        const nomeCSV = item['Nome do motorista 1'];
+        const nomeCSV = item['Nome do transportador 1'];
         if (!nomeCSV) return false;
         return nomeCSV.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '') === nomeNormalizado;
       });

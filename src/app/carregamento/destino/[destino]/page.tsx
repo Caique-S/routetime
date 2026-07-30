@@ -79,7 +79,7 @@ function DestinoContent() {
 
       const motoristasMap = new Map();
       filteredData.forEach((item: any) => {
-        const nome = item["Nome do motorista 1"] || item["Motorista"] || item["motorista"] || "Motorista Não Identificado";
+        const nome = item["Nome do transportador 1"] || item["Motorista"] || item["motorista"] || "Motorista Não Identificado";
         if (!motoristasMap.has(nome)) {
           motoristasMap.set(nome, {
             nome,

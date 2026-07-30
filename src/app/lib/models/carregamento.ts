@@ -69,7 +69,7 @@ export function criarCarregamentosFromCSV(row: Record<string, unknown>, facility
     const transportadora = String(row['Transportadora'] ?? ''.trim())
     const facility = String(row['Facility'] ?? ''.trim()) || facilityFallback;
     const tipoVeiculo = String(row['Tipo de veículo'] ?? ''.trim())
-    const nome = String(row['Nome do motorista 1'] ?? ''.trim())
+    const nome = String(row['Nome do transportador 1'] ?? ''.trim())
     const veiculoTracao = String(row['Veículo de tração'] ?? ''.trim())
     const veiculoCarga = String(row['Veículo de carga'] ?? ''.trim())
     const dataInicio = String(row['Data de início'] ?? ''.trim())

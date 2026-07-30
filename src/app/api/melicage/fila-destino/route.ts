@@ -111,8 +111,8 @@ export async function GET(request: NextRequest) {
 
     for (const row of csvData) {
       const codigoDestino = String(row['Destino'] ?? '').trim();
-      const nomeCSV       = String(row['Nome do motorista 1'] ?? '').trim();
-      const idCSV         = String(row['ID do motorista 1']   ?? '').trim();
+      const nomeCSV       = String(row['Nome do transportador 1'] ?? '').trim();
+      const idCSV         = String(row['ID do transportador 1']   ?? '').trim();
 
       if (!codigoDestino || !nomeCSV) continue;
 
