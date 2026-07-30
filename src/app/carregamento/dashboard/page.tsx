@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import { Dialog, Transition } from "@headlessui/react";
 import { criarIntervaloDia, formatarDataBrasil, getTodayBrasilia } from "@/app/lib/utils/dateUtils";
+import { DESTINOS } from "@/app/utils/constants"
 
 declare global {
   interface Window {
@@ -69,6 +70,17 @@ interface Carregamento {
     volumosos?: number;
     manga?: number;
   };
+  jornada?: {
+    chegadaXpt?: string;
+    retornoService?: string;
+    chegadaService?: string;
+  };
+  changeTruck?: {
+    hasChanged?: boolean;
+    motorista1: string;
+    motorista2?: string;
+    dateChanged?: string;
+  };
 }
 
 interface DestinoProgresso {
@@ -79,9 +91,109 @@ interface DestinoProgresso {
   progresso: number;
 }
 
+interface CityConfig {
+  horarioFixoCarregamento: string; // Ex: "22:00"
+  duracaoPercurso: string;          // Ex: "02:30" ou "150" (minutos)
+  prevChegada: string;             // Ex: "06:00"
+  janelaInicio: string;            // Ex: "13:00"
+  janelaFim: string;               // Ex: "15:00"
+}
+
 // ------------------------------------------------------------
 // Funções auxiliares
 // ------------------------------------------------------------
+
+// Converter string de tempo (HH:mm ou ISO) para minutos desde o início do dia ou timestamp
+const timeToMinutes = (val?: string): number | null => {
+  if (!val) return null;
+  // Se for ISO String (contém 'T' ou '-')
+  if (val.includes("T") || val.includes("-")) {
+    const date = new Date(val);
+    if (isNaN(date.getTime())) return null;
+    // Retorna minutos locais no dia
+    const hours = date.getHours();
+    const mins = date.getMinutes();
+    return hours * 60 + mins;
+  }
+  // Se for formato "HH:mm"
+  if (val.includes(":")) {
+    const [h, m] = val.split(":").map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    return h * 60 + m;
+  }
+  // Se já for numérico (minutos puros)
+  const num = Number(val);
+  return isNaN(num) ? null : num;
+};
+
+// Formatar minutos em formato "Xh Ym"
+const formatMinutesToHoursMin = (totalMinutes: number): string => {
+  if (isNaN(totalMinutes) || totalMinutes < 0) return "0h 0m";
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = Math.round(totalMinutes % 60);
+  return `${hours}h ${mins}m`;
+};
+
+// Calcular diferença entre dois tempos (lidando com virada de dia/madrugada)
+const calcTimeDiffMinutes = (startVal?: string, endVal?: string): number | null => {
+  if (!startVal || !endVal) return null;
+
+  // Se ambos forem ISO strings completas
+  if ((startVal.includes("T") || startVal.includes("-")) && (endVal.includes("T") || endVal.includes("-"))) {
+    const dStart = new Date(startVal).getTime();
+    const dEnd = new Date(endVal).getTime();
+    if (isNaN(dStart) || isNaN(dEnd)) return null;
+    const diffMs = dEnd - dStart;
+    return diffMs > 0 ? Math.floor(diffMs / 60000) : 0;
+  }
+
+  // Caso contrário, usa minutos no dia
+  const startMin = timeToMinutes(startVal);
+  const endMin = timeToMinutes(endVal);
+
+  if (startMin === null || endMin === null) return null;
+
+  let diff = endMin - startMin;
+  if (diff < 0) {
+    diff += 1440; // Soma 24h se virou a madrugada
+  }
+  return diff;
+};
+
+// Formatar ISO string para HH:mm
+const isoToTimeStr = (isoStr?: string): string => {
+  if (!isoStr) return "";
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+  } catch {
+    return "";
+  }
+};
+
+// Formatar ISO string/timestamp para dd/mm/aaaa
+const isoToDateStr = (isoStr?: string): string => {
+  if (!isoStr) return "";
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  } catch {
+    return "";
+  }
+};
+
+// Montar Tipo de Carga (G+V+M)
+const formatTipoCarga = (gaiolas?: number, volumosos?: number, manga?: number): string => {
+  const partes: string[] = [];
+  if (gaiolas && gaiolas > 0) partes.push("G");
+  if (volumosos && volumosos > 0) partes.push("V");
+  if (manga && manga > 0) partes.push("M");
+  return partes.join("+");
+};
+
+
 const getNomeDestino = (codigo: string): string => {
   const mapeamento: Record<string, string> = {
     EBA14: "Serrinha",
@@ -119,6 +231,227 @@ export default function DashboardPage() {
     facility: ""
   });
 
+
+  // Estados para o Modal de Jornada
+  const [isJornadaModalOpen, setIsJornadaModalOpen] = useState(false);
+  const [selectedCityCode, setSelectedCityCode] = useState<string>(DESTINOS[0]?.value || "");
+  const [cityConfigs, setCityConfigs] = useState<Record<string, CityConfig>>({});
+
+  // Helper para pegar ou inicializar config de uma cidade
+  const currentCityConfig: CityConfig = cityConfigs[selectedCityCode] || {
+    horarioFixoCarregamento: "",
+    duracaoPercurso: "",
+    prevChegada: "",
+    janelaInicio: "",
+    janelaFim: "",
+  };
+
+  const handleCityConfigChange = (field: keyof CityConfig, value: string) => {
+    setCityConfigs((prev) => ({
+      ...prev,
+      [selectedCityCode]: {
+        ...(prev[selectedCityCode] || {
+          horarioFixoCarregamento: "",
+          duracaoPercurso: "",
+          prevChegada: "",
+          janelaInicio: "",
+          janelaFim: "",
+        }),
+        [field]: value,
+      },
+    }));
+  };
+
+  // Função Geradora do Relatório de Controle de Jornada
+  const generateJornadaCSV = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (exportFilters.facility.trim() !== "") {
+        queryParams.append("facility", exportFilters.facility.trim());
+      }
+      if (exportFilters.dataInicio && exportFilters.dataFim) {
+        queryParams.append("dataInicio", exportFilters.dataInicio);
+        queryParams.append("dataFim", exportFilters.dataFim);
+      }
+      queryParams.append("limit", "1000");
+
+      const response = await fetch(`/api/carregamento?${queryParams}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        alert("Erro ao carregar os dados para exportação.");
+        return;
+      }
+
+      let carregamentos: Carregamento[] = data.data;
+
+      if (exportFilters.dataInicio && exportFilters.dataFim) {
+        const start = new Date(exportFilters.dataInicio + 'T00:00:00').getTime();
+        const end = new Date(exportFilters.dataFim + 'T00:00:00').getTime() + 24 * 60 * 60 * 1000;
+
+        carregamentos = carregamentos.filter((c) => {
+          const createdAt = new Date(c.dataCriacao).getTime();
+          return createdAt >= start && createdAt < end;
+        });
+      }
+
+      if (carregamentos.length === 0) {
+        alert("Nenhum registro encontrado para os filtros selecionados.");
+        return;
+      }
+
+      const headers = [
+        "Travel ID", "Data", "Origem", "XPT", "Motorista", "Tração", "Baú", "Tip. Veículo", "Cidade",
+        "Horario Fixo de Carregamento", "Início do Carregamento", "Atraso no Carregamento", "Fim do Carregamento",
+        "Tipo de Carga", "Qtd. Gaiolas", "Qtd Volumosos", "Qtd Manga Pallet",
+        "Início de Viagem", "Duração do Percurso", "Prev.Cheg.XPTs", "Chegada no XPT",
+        "Tempo de Viagem", "Tempo de Atraso", "Saida do XPT", "Prev.Chegada", "Janela de Devolução",
+        "Transferencia de Veiculo", "Tranferido para", "Data Transferência", "Hora transferencia",
+        "Chegada ao SVC", "Tempo de Retorno",
+        // Cabeçalhos do outro endpoint (Descarga)
+        "Inicio da Descarga", "Gaiolas Retornadas", "Pallets Retornados", "Mangas Retornadas", "Fim da Descarga", "Tempo de Descarga",
+        "Jornada"
+      ];
+
+      const rows = carregamentos.map((c) => {
+        const destinoCodigo = c.destino ?? "";
+        const nomeCidade = DESTINOS.find((d) => d.value === destinoCodigo)?.label || getNomeDestino(destinoCodigo);
+        const configCidade = cityConfigs[destinoCodigo] || {};
+
+        // 1. Atraso no Carregamento
+        const horFixo = configCidade.horarioFixoCarregamento || "";
+        const horInicioCarregamento = c.horarios?.inicioCarregamento || "";
+        const minAtrasoCarregamento = calcTimeDiffMinutes(horFixo, horInicioCarregamento);
+        const atrasoCarregamentoStr = (minAtrasoCarregamento !== null && minAtrasoCarregamento > 0)
+          ? formatMinutesToHoursMin(minAtrasoCarregamento)
+          : "Sem Atrasos";
+
+        // 2. Tipo de Carga
+        const tipoCarga = formatTipoCarga(c.carga?.gaiolas, c.carga?.volumosos, c.carga?.manga);
+
+        // 3. Viagem e Atraso
+        const inicioViagem = c.horarios?.saidaLiberada || "";
+        const chegadaXptIso = c.jornada?.chegadaXpt || "";
+        const chegadaXptHora = isoToTimeStr(chegadaXptIso);
+
+        const minTempoViagem = calcTimeDiffMinutes(inicioViagem, chegadaXptIso);
+        const tempoViagemStr = minTempoViagem !== null ? formatMinutesToHoursMin(minTempoViagem) : "";
+
+        // Duração percurso estimada em minutos
+        const minDuracaoEstimada = timeToMinutes(configCidade.duracaoPercurso);
+        const duracaoPercursoStr = configCidade.duracaoPercurso ? (minDuracaoEstimada !== null ? formatMinutesToHoursMin(minDuracaoEstimada) : configCidade.duracaoPercurso) : "";
+
+        // Tempo de Atraso na Pista
+        let tempoAtrasoStr = "Sem Atrasos";
+        if (minTempoViagem !== null && minDuracaoEstimada !== null) {
+          const diffAtraso = minTempoViagem - minDuracaoEstimada;
+          if (diffAtraso > 0) {
+            tempoAtrasoStr = formatMinutesToHoursMin(diffAtraso);
+          }
+        }
+
+        // 4. Retorno ao SVC
+        const saidaXptIso = c.jornada?.retornoService || "";
+        const saidaXptHora = isoToTimeStr(saidaXptIso);
+        const chegadaSvcIso = c.jornada?.chegadaService || "";
+        const chegadaSvcHora = isoToTimeStr(chegadaSvcIso);
+
+        const minTempoRetorno = calcTimeDiffMinutes(saidaXptIso, chegadaSvcIso);
+        const tempoRetornoStr = minTempoRetorno !== null ? formatMinutesToHoursMin(minTempoRetorno) : "";
+
+        // 5. Janela de Devolução
+        const janelaDevolucao = (configCidade.janelaInicio && configCidade.janelaFim)
+          ? `Das ${configCidade.janelaInicio}h ás ${configCidade.janelaFim}h`
+          : "";
+
+        // 6. Transferência
+        const teveTransferencia = c.changeTruck?.hasChanged ? "Sim" : "Não";
+        const transferidoPara = c.changeTruck?.motorista2 ?? "";
+        const dataTransferencia = isoToDateStr(c.changeTruck?.dateChanged);
+        const horaTransferencia = isoToTimeStr(c.changeTruck?.dateChanged);
+
+        // 7. Jornada Total
+        const minJornada = (minTempoViagem || 0) + (minTempoRetorno || 0);
+        const jornadaStr = minJornada > 0 ? formatMinutesToHoursMin(minJornada) : "";
+
+        return [
+          c.motorista?.travelId ?? "",
+          formatDate(c.dataCriacao),
+          c.facility ?? "",
+          destinoCodigo,
+          c.motorista?.nome ?? "",
+          c.motorista?.veiculoTracao ?? "",
+          c.motorista?.veiculoCarga ?? "",
+          c.motorista?.tipoVeiculo ?? "",
+          nomeCidade,
+          horFixo,
+          horInicioCarregamento,
+          atrasoCarregamentoStr,
+          c.horarios?.terminoCarregamento ?? "",
+          tipoCarga,
+          c.carga?.gaiolas?.toString() ?? "0",
+          c.carga?.volumosos?.toString() ?? "0",
+          c.carga?.manga?.toString() ?? "0",
+          inicioViagem,
+          duracaoPercursoStr,
+          c.horarios?.previsaoChegada ?? "",
+          chegadaXptHora,
+          tempoViagemStr,
+          tempoAtrasoStr,
+          saidaXptHora,
+          configCidade.prevChegada || "",
+          janelaDevolucao,
+          teveTransferencia,
+          transferidoPara,
+          dataTransferencia,
+          horaTransferencia,
+          chegadaSvcHora,
+          tempoRetornoStr,
+          // Colunas do próximo endpoint (vazias por enquanto)
+          "", "", "", "", "", "",
+          jornadaStr
+        ];
+      });
+
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((row) =>
+          row.map((cell) => {
+            if (typeof cell === "string" && (cell.includes(",") || cell.includes("\n") || cell.includes('"'))) {
+              return `"${cell.replace(/"/g, '""')}"`;
+            }
+            return cell;
+          }).join(",")
+        ),
+      ].join("\n");
+
+      const facilityName = exportFilters.facility.trim() || "todas_facilities";
+      const fileName = `controle_jornada_${facilityName}_${exportFilters.dataInicio}_a_${exportFilters.dataFim}.csv`;
+
+      if (typeof window.Android !== 'undefined' && (window as any).Android?.saveCsvFile) {
+        (window as any).Android.saveCsvFile(csvContent, fileName);
+        setIsJornadaModalOpen(false);
+        return;
+      }
+
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setIsJornadaModalOpen(false);
+    } catch (error) {
+      console.error("Erro ao gerar CSV de Jornada:", error);
+      alert("Ocorreu um erro ao gerar o relatório de jornada.");
+    }
+  };
+
+
   const facilitiesDisponiveis = Array.from(
     new Set(allCarregamentos.map((c) => c.facility).filter(Boolean))
   ).sort();
@@ -138,7 +471,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Erro ao buscar upload do dia:', error);
       setUploadDoDia(null);
-    }finally{
+    } finally {
       setLoadingUpload(false);
     }
   };
@@ -161,7 +494,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error("Erro ao buscar carregamentos:", error);
-    }finally{
+    } finally {
       setLoading(false);
     }
   };
@@ -211,7 +544,7 @@ export default function DashboardPage() {
       if (!destinoId) return;
 
       const atual = mapeamentoDestinos.get(destinoId) || { total: 0, concluidos: 0 };
-      
+
       atual.total += 1;
       if (c.status === 'liberado' || c.statusNormalizado === 'concluido') {
         atual.concluidos += 1;
@@ -221,7 +554,7 @@ export default function DashboardPage() {
     });
 
     const destinosArray: DestinoProgresso[] = [];
-    
+
     mapeamentoDestinos.forEach((valores, destinoId) => {
       destinosArray.push({
         id: destinoId,
@@ -360,6 +693,14 @@ export default function DashboardPage() {
                 <h1 className="text-lg font-bold text-gray-900">Dashboard</h1>
               </div>
             </div>
+            <button
+              onClick={() => setIsJornadaModalOpen(true)}
+              className="px-2.5 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 text-xs font-medium shadow-xs"
+              title="Relatório Completo de Controle de Jornada"
+            >
+              <Clock className="w-4 h-4" />
+              <span>.csv Jornada</span>
+            </button>
             <button
               onClick={() => setIsExportModalOpen(true)}
               className="px-2.5 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 text-ls font-medium"
@@ -633,6 +974,178 @@ export default function DashboardPage() {
           )}
         </div>
       </main>
+
+      {/* Modal Relatório de Controle de Jornada */}
+      <Transition appear show={isJornadaModalOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => setIsJornadaModalOpen(false)}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-lg transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all border border-gray-100">
+                  <div className="flex items-center justify-between mb-4 border-b pb-3">
+                    <Dialog.Title as="h3" className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-blue-600" />
+                      Relatório de Controle de Jornada
+                    </Dialog.Title>
+                    <button
+                      onClick={() => setIsJornadaModalOpen(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Filtros gerais de data */}
+                    <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200/60">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Data Inicial</label>
+                        <input
+                          type="date"
+                          value={exportFilters.dataInicio}
+                          onChange={(e) => setExportFilters({ ...exportFilters, dataInicio: e.target.value })}
+                          className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Data Final</label>
+                        <input
+                          type="date"
+                          value={exportFilters.dataFim}
+                          onChange={(e) => setExportFilters({ ...exportFilters, dataFim: e.target.value })}
+                          className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Seleção de Cidade para Parâmetros */}
+                    <div className="border-t border-gray-100 pt-3">
+                      <label className="block text-xs font-bold text-gray-800 mb-1">
+                        Selecione a Cidade / XPT para Parametrizar:
+                      </label>
+                      <select
+                        value={selectedCityCode}
+                        onChange={(e) => setSelectedCityCode(e.target.value)}
+                        className="w-full px-3 py-2 bg-blue-50/50 border border-blue-200 rounded-lg text-sm font-semibold text-blue-900 outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {DESTINOS.map((d) => (
+                          <option key={d.value} value={d.value}>
+                            {d.label} ({d.value})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Form de parâmetros específicos da cidade selecionada */}
+                    <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
+                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Configuração para: <span className="text-blue-600 font-extrabold">{DESTINOS.find(d => d.value === selectedCityCode)?.label}</span>
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-gray-600 mb-1">Horário Fixo Carregamento</label>
+                          <input
+                            type="time"
+                            value={currentCityConfig.horarioFixoCarregamento}
+                            onChange={(e) => handleCityConfigChange("horarioFixoCarregamento", e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-medium text-gray-600 mb-1">Duração do Percurso (Estimada)</label>
+                          <input
+                            type="time"
+                            value={currentCityConfig.duracaoPercurso}
+                            onChange={(e) => handleCityConfigChange("duracaoPercurso", e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-gray-600 mb-1">Previsão de Chegada</label>
+                          <input
+                            type="time"
+                            value={currentCityConfig.prevChegada}
+                            onChange={(e) => handleCityConfigChange("prevChegada", e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-medium text-gray-600 mb-1">Janela Devolução (Início / Fim)</label>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="time"
+                              value={currentCityConfig.janelaInicio}
+                              onChange={(e) => handleCityConfigChange("janelaInicio", e.target.value)}
+                              className="w-1/2 px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <span className="text-xs text-gray-400">às</span>
+                            <input
+                              type="time"
+                              value={currentCityConfig.janelaFim}
+                              onChange={(e) => handleCityConfigChange("janelaFim", e.target.value)}
+                              className="w-1/2 px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {currentCityConfig.janelaInicio && currentCityConfig.janelaFim && (
+                        <p className="text-[11px] text-gray-500 italic">
+                          Resultado na célula: <strong>Das {currentCityConfig.janelaInicio}h ás {currentCityConfig.janelaFim}h</strong>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex justify-end gap-3 border-t pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsJornadaModalOpen(false)}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={generateJornadaCSV}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm flex items-center gap-2 transition-all"
+                    >
+                      <Download className="w-4 h-4" />
+                      Gerar Relatório Completo
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
 
       {/* Modal de Exportação CSV */}
       <Transition appear show={isExportModalOpen} as={Fragment}>
