@@ -14,6 +14,7 @@ import {
   Download,
   X,
   ChevronDown,
+  Loader2
 } from "lucide-react";
 import Link from "next/link";
 import { Dialog, Transition } from "@headlessui/react";
@@ -246,6 +247,16 @@ export default function DashboardPage() {
     janelaFim: "",
   };
 
+  // Estados para o Spinner e Mensagens Dinâmicas de Exportação
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [loadingStepMessage, setLoadingStepMessage] = useState("");
+
+  // Helper para dar uma pequena pausa visual e permitir que o React desenhe a nova mensagem na tela
+  const updateLoadingStep = async (message: string, delayMs = 400) => {
+    setLoadingStepMessage(message);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  };
+
   const handleCityConfigChange = (field: keyof CityConfig, value: string) => {
     setCityConfigs((prev) => ({
       ...prev,
@@ -265,6 +276,10 @@ export default function DashboardPage() {
   // Função Geradora do Relatório de Controle de Jornada
   const generateJornadaCSV = async () => {
     try {
+
+      setIsGeneratingReport(true);
+      await updateLoadingStep("Buscando dados na API...");
+
       const queryParams = new URLSearchParams();
       if (exportFilters.facility.trim() !== "") {
         queryParams.append("facility", exportFilters.facility.trim());
@@ -299,6 +314,8 @@ export default function DashboardPage() {
         alert("Nenhum registro encontrado para os filtros selecionados.");
         return;
       }
+
+      await updateLoadingStep("Calculando jornada dos Motoristas...");
 
       const headers = [
         "Travel ID", "Data", "Origem", "XPT", "Motorista", "Tração", "Baú", "Tip. Veículo", "Cidade",
@@ -413,6 +430,8 @@ export default function DashboardPage() {
         ];
       });
 
+      await updateLoadingStep("Criando relatório CSV...");
+
       const csvContent = [
         headers.join(","),
         ...rows.map((row) =>
@@ -427,6 +446,8 @@ export default function DashboardPage() {
 
       const facilityName = exportFilters.facility.trim() || "todas_facilities";
       const fileName = `controle_jornada_${facilityName}_${exportFilters.dataInicio}_a_${exportFilters.dataFim}.csv`;
+
+      await updateLoadingStep("Download iniciado!", 300);
 
       if (typeof window.Android !== 'undefined' && (window as any).Android?.saveCsvFile) {
         (window as any).Android.saveCsvFile(csvContent, fileName);
@@ -1140,6 +1161,57 @@ export default function DashboardPage() {
                       Gerar Relatório Completo
                     </button>
                   </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* Modal de Loading / Progresso de Exportação */}
+      <Transition appear show={isGeneratingReport} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => { }}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-md" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-xs transform overflow-hidden rounded-2xl bg-white p-6 text-center shadow-2xl transition-all border border-gray-100">
+                  {/* Ícone Spinner Moderno com Animação */}
+                  <div className="relative mx-auto w-16 h-16 flex items-center justify-center mb-4">
+                    <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-40"></div>
+                    <div className="relative bg-blue-50 p-3 rounded-full border border-blue-100">
+                      <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                    </div>
+                  </div>
+
+                  {/* Título Principal */}
+                  <h4 className="text-base font-bold text-gray-900 mb-1">
+                    Processando Relatório
+                  </h4>
+
+                  {/* Submensagem Dinâmica */}
+                  <p className="text-xs text-blue-600 font-semibold animate-pulse min-h-[18px]">
+                    {loadingStepMessage}
+                  </p>
                 </Dialog.Panel>
               </Transition.Child>
             </div>
