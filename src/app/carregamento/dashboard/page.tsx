@@ -464,7 +464,8 @@ export default function DashboardPage() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-
+      
+      await updateLoadingStep("Relatório concluído com sucesso! 🎉", 800);
       setIsJornadaModalOpen(false);
     } catch (error) {
       console.error("Erro ao gerar CSV de Jornada:", error);
