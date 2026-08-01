@@ -159,6 +159,7 @@ export async function GET(request: NextRequest) {
     // 1. Busca o registro ativo do motorista na fila
     let motorista = await collection.findOne({
       cpf,
+      tipo: 'vazio',
       status: { $in: ['aguardando_carregamento', 'carregando', 'liberado'] }
     });
 
@@ -225,6 +226,7 @@ export async function GET(request: NextRequest) {
         // Conta quantos motoristas chegaram ANTES dele para o MESMO destino
         const motoristasNaFrente = await collection.countDocuments({
           destino: motorista.destino,
+          tipo: 'vazio',
           status: 'aguardando_carregamento',
           timestampChegada: { $lt: motorista.timestampChegada }
         });

@@ -14,6 +14,7 @@ import {
   Download,
   X,
   ChevronDown,
+  Loader2
 } from "lucide-react";
 import Link from "next/link";
 import { Dialog, Transition } from "@headlessui/react";
@@ -246,6 +247,16 @@ export default function DashboardPage() {
     janelaFim: "",
   };
 
+  // Estados para o Spinner e Mensagens Dinâmicas de Exportação
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [loadingStepMessage, setLoadingStepMessage] = useState("");
+
+  // Helper para dar uma pequena pausa visual e permitir que o React desenhe a nova mensagem na tela
+  const updateLoadingStep = async (message: string, delayMs = 400) => {
+    setLoadingStepMessage(message);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  };
+
   const handleCityConfigChange = (field: keyof CityConfig, value: string) => {
     setCityConfigs((prev) => ({
       ...prev,
@@ -265,6 +276,9 @@ export default function DashboardPage() {
   // Função Geradora do Relatório de Controle de Jornada
   const generateJornadaCSV = async () => {
     try {
+      setIsGeneratingReport(true);
+      await updateLoadingStep("Buscando dados na API...",300);
+
       const queryParams = new URLSearchParams();
       if (exportFilters.facility.trim() !== "") {
         queryParams.append("facility", exportFilters.facility.trim());
@@ -300,6 +314,47 @@ export default function DashboardPage() {
         return;
       }
 
+    await updateLoadingStep("Buscando os registros de Descarga...",400)
+
+    // 2. Mapear todas as datas necessárias para a descarga
+    // Se SBA4 -> +1 dia / Se SBA2 (ou outro) -> mesma data
+    const descargasMap = new Map<string, any>(); // Chave: "YYYY-MM-DD_NOME_MOTORISTA"
+    const datasParaBuscar = new Set<string>();
+
+    carregamentos.forEach((c) => {
+      const d = new Date(c.dataCriacao);
+      if (c.facility === "SBA4") {
+        d.setDate(d.getDate() + 1);
+      }
+      const dateStr = d.toISOString().split("T")[0]; // "YYYY-MM-DD"
+      datasParaBuscar.add(dateStr);
+    });
+
+    // 3. Buscar os registros de descarga de todas as datas envolvidas
+    await Promise.all(
+      Array.from(datasParaBuscar).map(async (dataStr) => {
+        try {
+          const res = await fetch(`/api/melicage/motoristas?tipo=gaiolas&data=${dataStr}`);
+          if (res.ok) {
+            const list = await res.json();
+            if (Array.isArray(list)) {
+              list.forEach((item) => {
+                if (item.nome) {
+                  // Normaliza o nome (minúsculo e sem espaços extras) para garantir o match
+                  const keyName = item.nome.trim().toLowerCase();
+                  descargasMap.set(`${dataStr}_${keyName}`, item);
+                }
+              });
+            }
+          }
+        } catch (e) {
+          console.error(`Erro ao buscar descargas da data ${dataStr}:`, e);
+        }
+      })
+    );
+
+      await updateLoadingStep("Calculando jornada dos Motoristas...");
+
       const headers = [
         "Travel ID", "Data", "Origem", "XPT", "Motorista", "Tração", "Baú", "Tip. Veículo", "Cidade",
         "Horario Fixo de Carregamento", "Início do Carregamento", "Atraso no Carregamento", "Fim do Carregamento",
@@ -307,10 +362,8 @@ export default function DashboardPage() {
         "Início de Viagem", "Duração do Percurso", "Prev.Cheg.XPTs", "Chegada no XPT",
         "Tempo de Viagem", "Tempo de Atraso", "Saida do XPT", "Prev.Chegada", "Janela de Devolução",
         "Transferencia de Veiculo", "Tranferido para", "Data Transferência", "Hora transferencia",
-        "Chegada ao SVC", "Tempo de Retorno",
-        // Cabeçalhos do outro endpoint (Descarga)
-        "Inicio da Descarga", "Gaiolas Retornadas", "Pallets Retornados", "Mangas Retornadas", "Fim da Descarga", "Tempo de Descarga",
-        "Jornada"
+        "Chegada ao SVC", "Tempo de Retorno", "Inicio da Descarga", "Gaiolas Retornadas", "Pallets Retornados",
+        "Mangas Retornadas", "Fim da Descarga", "Tempo de Descarga", "Jornada"
       ];
 
       const rows = carregamentos.map((c) => {
@@ -370,6 +423,50 @@ export default function DashboardPage() {
         const dataTransferencia = isoToDateStr(c.changeTruck?.dateChanged);
         const horaTransferencia = isoToTimeStr(c.changeTruck?.dateChanged);
 
+        // Determinar motorista alvo para buscar na descarga
+        let motoristaAlvo = "";
+        if (c.changeTruck?.hasChanged && c.changeTruck?.motorista2) {
+        motoristaAlvo = c.changeTruck.motorista2;
+        } else {
+          motoristaAlvo = c.changeTruck?.motorista1 || c.motorista?.nome || "";
+        }
+
+        // Determinar a data de descarga para cruzamento
+      const dDescarga = new Date(c.dataCriacao);
+      if (c.facility === "SBA4") {
+        dDescarga.setDate(dDescarga.getDate() + 1);
+      }
+      const dataDescargaStr = dDescarga.toISOString().split("T")[0];
+
+      // Cruzamento de dados de Descarga na API MeliCage
+      const chaveBusca = `${dataDescargaStr}_${motoristaAlvo.trim().toLowerCase()}`;
+      const dadosDescarga = descargasMap.get(chaveBusca);
+
+      let inicioDescargaHora = "";
+      let fimDescargaHora = "";
+      let minTempoDescarga: number | null = null;
+      let tempoDescargaStr = "";
+      let gaiolasRetornadas = "0";
+      let palletsRetornados = "0";
+      let mangasRetornadas = "0";
+
+      if (dadosDescarga) {
+        inicioDescargaHora = isoToTimeStr(dadosDescarga.timestampInicioDescarga);
+        fimDescargaHora = isoToTimeStr(dadosDescarga.timestampFimDescarga);
+        
+        gaiolasRetornadas = dadosDescarga.gaiolas?.toString() ?? "0";
+        palletsRetornados = dadosDescarga.palets?.toString() ?? "0";
+        mangasRetornadas = dadosDescarga.mangas?.toString() ?? "0";
+
+        minTempoDescarga = calcTimeDiffMinutes(
+          dadosDescarga.timestampInicioDescarga,
+          dadosDescarga.timestampFimDescarga
+        );
+        if (minTempoDescarga !== null) {
+          tempoDescargaStr = formatMinutesToHoursMin(minTempoDescarga);
+        }
+      }
+
         // 7. Jornada Total
         const minJornada = (minTempoViagem || 0) + (minTempoRetorno || 0);
         const jornadaStr = minJornada > 0 ? formatMinutesToHoursMin(minJornada) : "";
@@ -407,11 +504,17 @@ export default function DashboardPage() {
           horaTransferencia,
           chegadaSvcHora,
           tempoRetornoStr,
-          // Colunas do próximo endpoint (vazias por enquanto)
-          "", "", "", "", "", "",
+          inicioDescargaHora,
+          gaiolasRetornadas,
+          palletsRetornados,
+          mangasRetornadas,
+          fimDescargaHora,
+          tempoDescargaStr,
           jornadaStr
         ];
       });
+
+      await updateLoadingStep("Criando relatório CSV...",300);
 
       const csvContent = [
         headers.join(","),
@@ -426,7 +529,9 @@ export default function DashboardPage() {
       ].join("\n");
 
       const facilityName = exportFilters.facility.trim() || "todas_facilities";
-      const fileName = `controle_jornada_${facilityName}_${exportFilters.dataInicio}_a_${exportFilters.dataFim}.csv`;
+      const fileName = `Controle_Jornada_${facilityName}_${exportFilters.dataInicio}_a_${exportFilters.dataFim}.csv`;
+
+      await updateLoadingStep("Download iniciado!", 300);
 
       if (typeof window.Android !== 'undefined' && (window as any).Android?.saveCsvFile) {
         (window as any).Android.saveCsvFile(csvContent, fileName);
@@ -443,7 +548,9 @@ export default function DashboardPage() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-
+      
+      await updateLoadingStep("Relatório concluído com sucesso! 🎉", 900);
+      setIsGeneratingReport(false);
       setIsJornadaModalOpen(false);
     } catch (error) {
       console.error("Erro ao gerar CSV de Jornada:", error);
@@ -1137,6 +1244,57 @@ export default function DashboardPage() {
                       Gerar Relatório Completo
                     </button>
                   </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* Modal de Loading / Progresso de Exportação */}
+      <Transition appear show={isGeneratingReport} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => { }}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-md" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-xs transform overflow-hidden rounded-2xl bg-white p-6 text-center shadow-2xl transition-all border border-gray-100">
+                  {/* Ícone Spinner Moderno com Animação */}
+                  <div className="relative mx-auto w-16 h-16 flex items-center justify-center mb-4">
+                    <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-40"></div>
+                    <div className="relative bg-blue-50 p-3 rounded-full border border-blue-100">
+                      <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                    </div>
+                  </div>
+
+                  {/* Título Principal */}
+                  <h4 className="text-base font-bold text-gray-900 mb-1">
+                    Processando Relatório
+                  </h4>
+
+                  {/* Submensagem Dinâmica */}
+                  <p className="text-xs text-blue-600 font-semibold animate-pulse min-h-[18px]">
+                    {loadingStepMessage}
+                  </p>
                 </Dialog.Panel>
               </Transition.Child>
             </div>
