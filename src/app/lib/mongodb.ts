@@ -6,7 +6,6 @@ if (!process.env.MONGODB_URI) {
   throw new Error('Variável MONGODB_URI não encontrada. Adicione-a no .env.local');
 }
 
-
 const options: MongoClientOptions = {
   maxPoolSize:                50,
   minPoolSize:                5,
