@@ -264,7 +264,7 @@ export async function GET(request: NextRequest) {
       });
     }else{
       return NextResponse.json({
-        success: false,
+        success: true,
         active: true,
         message: "Atribuições não encontradas"
       },{status: 200})
